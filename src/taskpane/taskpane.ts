@@ -19,7 +19,9 @@ Office.onReady((info) => {
 });
 
 export async function run() {
-  /**
-   * Insert your Outlook code here
-   */
+  // Get a reference to the current message
+  var item = Office.context.mailbox.item;
+
+  // Write message property value to the task pane
+  document.getElementById("item-subject").innerHTML = "<b>Subject:</b> <br/>" + item.subject;
 }
