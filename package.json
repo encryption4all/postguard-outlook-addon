@@ -28,6 +28,7 @@
     "watch": "webpack --mode development --watch"
   },
   "dependencies": {
+    "@e4a/irmaseal-client": "0.0.3",
     "core-js": "^3.9.1",
     "regenerator-runtime": "^0.13.7"
   },
@@ -35,6 +36,7 @@
     "@babel/core": "^7.13.10",
     "@babel/preset-typescript": "^7.13.0",
     "@types/find-process": "1.2.0",
+    "@types/jquery": "^3.5.5",
     "@types/office-js": "^1.0.160",
     "@types/office-runtime": "^1.0.17",
     "babel-loader": "^8.2.2",

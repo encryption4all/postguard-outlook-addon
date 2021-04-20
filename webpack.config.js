@@ -16,7 +16,8 @@ module.exports = async (env, options) => {
     entry: {
       polyfill: ["core-js/stable", "regenerator-runtime/runtime"],
       taskpane: "./src/taskpane/taskpane.ts",
-      commands: "./src/commands/commands.ts"
+      commands: "./src/commands/commands.ts",
+      decrypt: "./src/decrypt/decrypt.ts"
     },
     resolve: {
       extensions: [".ts", ".tsx", ".html", ".js"]
@@ -81,6 +82,11 @@ module.exports = async (env, options) => {
         filename: "commands.html",
         template: "./src/commands/commands.html",
         chunks: ["polyfill", "commands"]
+      }),
+      new HtmlWebpackPlugin({
+        filename: "decrypt.html",
+        template: "./src/decrypt/decrypt.html",
+        chunks: ["polyfill", "decrypt"]
       })
     ],
     devServer: {

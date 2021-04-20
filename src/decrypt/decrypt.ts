@@ -10,13 +10,13 @@ Office.onReady(() => {
 });
 
 /**
- * Shows a notification when the add-in command is executed.
+ * Decrypt the current email.
  * @param event
  */
-function encrypt(event: Office.AddinCommands.Event) {
+function decrypt(event: Office.AddinCommands.Event) {
   const message: Office.NotificationMessageDetails = {
     type: Office.MailboxEnums.ItemNotificationMessageType.InformationalMessage,
-    message: "Encrypt email ...",
+    message: "Decrypt email ...",
     icon: "Icon.80x80",
     persistent: true,
   };
@@ -28,17 +28,5 @@ function encrypt(event: Office.AddinCommands.Event) {
   event.completed();
 }
 
-function getGlobal() {
-  return typeof self !== "undefined"
-    ? self
-    : typeof window !== "undefined"
-    ? window
-    : typeof global !== "undefined"
-    ? global
-    : undefined;
-}
-
-const g = getGlobal() as any;
-
 // the add-in command functions need to be available in global scope
-g.encrypt = encrypt;
+g.decrypt = decrypt;
