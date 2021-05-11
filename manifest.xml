@@ -11,6 +11,7 @@
   <SupportUrl DefaultValue="https://irma.app"/>
   <AppDomains>
     <AppDomain>https://irma.app</AppDomain>
+    <AppDomain>https://qrona.info</AppDomain>
   </AppDomains>
   <Hosts>
     <Host Name="Mailbox"/>
@@ -128,5 +129,6 @@
         <bt:String id="EncryptButton.Tooltip" DefaultValue="Encrypt the current email with IRMASeal"/>
       </bt:LongStrings>
     </Resources>
+    <ContentSecurityPolicy>script-src 'self' 'unsafe-eval'; object-src 'self'</ContentSecurityPolicy>
   </VersionOverrides>
 </OfficeApp>
