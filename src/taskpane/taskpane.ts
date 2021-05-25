@@ -9,7 +9,16 @@ import "../../assets/icon-16.png"
 import "../../assets/icon-32.png"
 import "../../assets/icon-80.png"
 
-import { Client, Attribute } from "@e4a/irmaseal-client"
+import "web-streams-polyfill"
+
+import {
+    Client,
+    Attribute,
+    createUint8ArrayReadable,
+    KeySet,
+    symcrypt,
+    MetadataReaderResult,
+} from "@e4a/irmaseal-client"
 
 var Buffer = require("buffer/").Buffer
 
@@ -34,13 +43,9 @@ export async function run() {
     })
 }
 
-//const client = getClient()
-
 Office.initialize = function () {
     item = Office.context.mailbox.item
     mailbox = Office.context.mailbox
-
-    //let client = getClient()
 
     console.log("Initialize")
 
@@ -69,7 +74,7 @@ function setItemBody() {
                 write(
                     "This is an IRMASeal encrypted email, starting decrypting process ..."
                 )
-                getAttachmentToken()
+                getGraphAPIToken() //AttachmentToken()
             } else {
                 console.log("No IRMASeal email")
             }
@@ -82,13 +87,17 @@ function write(message) {
     document.getElementById("item-subject").innerHTML += message
 }
 
-function getAttachmentToken() {
-    mailbox.getCallbackTokenAsync(attachmentTokenCallback)
+function writeMail(message) {
+    document.getElementById("item-mail").innerHTML += message
+}
+
+function getGraphAPIToken() {
+    mailbox.getCallbackTokenAsync(graphAPITokenCallback)
 }
 
 const BOUNDARY = "foo"
 
-function decryptData(dataBuffer: string) {
+function extractFromMime(dataBuffer: string): string {
     const [section1, section2, section3] = dataBuffer
         .split(`--${BOUNDARY}`)
         .slice(0, -1)
@@ -99,105 +108,90 @@ function decryptData(dataBuffer: string) {
 
     const plain = section1.replace(sec1RegExp, "$1")
     const version = section2.replace(sec2RegExp, "$1")
-    const bytes = section3.replace(sec3RegExp, "$1")
+    const bytes = section3
+        .replace(sec3RegExp, "$1")
+        .replace(" ", "")
+        .replace("\n", "")
 
-    // TODO: error handling in case of no match
-    //if (!section2.match(sec2RegExp)) {
-    //    DEBUG_LOG('not an IRMAseal message')
-    //    return
-    //}
+    // console.log(`info: ${version},\n bytes: ${bytes}`)
 
-    //DEBUG_LOG(`plain: ${plain},\n info: ${version},\n bytes: ${bytes}`)
-
-    // For now, just pass the ciphertext bytes to the frontend
-    const msg = bytes //atob(bytes.replace(/[\r\n]/g, ''))
-
-    // We need to wrap the result into a multipart/mixed message
-    // TODO: can add more here
-    let output = ""
-    output += `Content-Type: multipart/mixed; boundary="${BOUNDARY}"\r\n\r\n`
-    output += `--${BOUNDARY}\r\n`
-    output += `Content-Type: text/plain\r\n\r\n`
-    output += `${msg}\r\n`
-    output += `--${BOUNDARY}--\r\n`
-
-    return output
+    // return { bytes, version } //output
+    return bytes //output
 }
 
-async function getClient() {
-    try {
-        var client = await Client.build(
-            "https://qrona.info/pkg",
-            true,
-            window.localStorage
-        ) //192.168.2.5:8087');
-        console.log(client)
-        return client
-    } catch (err) {
-        console.log(err)
-    }
-}
-
-const client: Client = await Client.build(
-    "https://qrona.info/pkg",
+const client2: Client = await Client.build(
+    "https://irmacrypt.nl/pkg",
     true,
-    window.localStorage
+    Office.context.roamingSettings
 )
 
 function successMessageReceived(returnData) {
-    var decryptedData = decryptData(returnData)
-    console.log("decrypted data: ", decryptedData)
-
-    var identity = Office.context.mailbox.userProfile.emailAddress
-
+    var identity = mailbox.userProfile.emailAddress
     console.log("current identity: ", identity)
 
-    //getClient().then((client) => {
-    const bytes = Buffer.from(decryptedData, "base64")
-
+    const bytes = extractFromMime(returnData)
+    const sealBytes: Uint8Array = new Uint8Array(Buffer.from(bytes, "base64"))
     console.log("ct bytes: ", bytes)
 
-    // const id = client.extractIdentity(bytes)
-    //console.log("identity in bytestream:", id)
+    const readableStream = createUint8ArrayReadable(sealBytes)
 
-    const attribute: Attribute = {
+    Client.build(
+        "https://irmacrypt.nl/pkg",
+        true,
+        Office.context.roamingSettings
+    ).then((client) => {
+        client
+            .extractMetadata(readableStream)
+            .then((metadata: MetadataReaderResult) => {
+                console.log("metadata extract", metadata)
+                let metajson = metadata.metadata.to_json()
+                console.log("metadata to json: ", metajson)
+
+                client
+                    .requestToken(metajson.identity.attribute)
+                    .then((token) =>
+                        client.requestKey(token, metajson.identity.timestamp)
+                    )
+                    .then(async (usk) => {
+                        const keys: KeySet = metadata.metadata.derive_keys(usk)
+                        const plainBytes: Uint8Array = await symcrypt(
+                            keys,
+                            metajson.iv,
+                            metadata.header,
+                            sealBytes,
+                            true
+                        )
+                        const mail: string = new TextDecoder().decode(
+                            plainBytes
+                        )
+                        console.log("Mail content: ", mail)
+                        writeMail(mail)
+                    })
+                    .catch((err) => {
+                        console.log("Error decrypting mail: ", err, err.stack)
+                    })
+            })
+            .catch((err) => {
+                console.error("Error exracting metadata: ", err, err.stack)
+            })
+    })
+
+    /*const attribute: Attribute = {
         type: "pbdf.sidn-pbdf.email.email",
         value: identity,
     }
 
-    console.log("Client ", client)
-
-    let meta = client.createMetadata(attribute)
-
+    const meta = client.createMetadata(attribute)
     console.log("Meta: ", meta)
+    */
 
-    /*
-  console.log("Created metadata: ", meta);
-
-  let metadata = meta.to_json();
-  console.log("metadata to json: ", metadata);
-
-  client
-    .requestToken(attribute)
-    .then((token) => client.requestKey(token, metadata.identity.timestamp))
-    .then(async (usk) => {
-      //const mail = client.decrypt(usk, bytes)
-      console.log(usk);
-      //await browser.messageDisplayScripts.register({
-      //    js: [{ code: `document.body.textContent = "${mail.body}";` }, { file: 'display.js' }],
-      //})
-    })
-    .catch((err) => {
-      console.log("error: ", err);
-    });
-  //.finally(() => window.close())
-  //});
-*/
+    //.finally(() => window.close())
+    //});
 
     //.catch((err) => console.log(err));
 }
 
-function attachmentTokenCallback(asyncResult) {
+function graphAPITokenCallback(asyncResult) {
     if (asyncResult.status === "succeeded") {
         var restHost = Office.context.mailbox.restUrl
         var getMessageUrl =

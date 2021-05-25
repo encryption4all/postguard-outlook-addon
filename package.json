@@ -30,9 +30,9 @@
         "@babel/plugin-transform-runtime": "^7.13.15",
         "babel-runtime": "^6.26.0",
         "core-js": "^3.9.1",
-        "irmaseal-wasm-bindings": "file:../pkg",
         "jquery": "3.6.0",
-        "regenerator-runtime": "^0.13.7"
+        "regenerator-runtime": "^0.13.7",
+        "web-streams-polyfill": "^3.0.3"
     },
     "devDependencies": {
         "@babel/core": "^7.13.10",
@@ -40,7 +40,7 @@
         "@babel/preset-typescript": "^7.13.0",
         "@types/find-process": "1.2.0",
         "@types/jquery": "^3.5.5",
-        "@types/office-js": "^1.0.160",
+        "@types/office-js": "^1.0.178",
         "@types/office-runtime": "^1.0.17",
         "babel-loader": "^8.2.2",
         "babel-plugin-transform-runtime": "^6.23.0",
