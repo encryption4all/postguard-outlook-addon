@@ -13,7 +13,6 @@ import "web-streams-polyfill"
 
 import {
     Client,
-    Attribute,
     createUint8ArrayReadable,
     KeySet,
     symcrypt,
@@ -27,7 +26,7 @@ var Buffer = require("buffer/").Buffer
 Office.onReady((info) => {
     if (info.host === Office.HostType.Outlook) {
         document.getElementById("sideload-msg").style.display = "none"
-        document.getElementById("app-body").style.display = "flex"
+        document.getElementById("app-body").hidden = false
         document.getElementById("run").onclick = run
     }
 })
@@ -36,25 +35,22 @@ var item
 var mailbox
 
 export async function run() {
-    // Write message property value to the task pane
     console.log("Run method")
+
     $(function () {
-        setItemBody()
+        getGraphAPIToken()
     })
 }
 
 Office.initialize = function () {
+    console.log("Initialize")
+
     item = Office.context.mailbox.item
     mailbox = Office.context.mailbox
 
-    console.log("Initialize")
-
-    /*import("@e4a/irmaseal-wasm-bindings/index.js").then((wasm) => {
-        let myBigThing = new wasm.MyBigThing()
-        console.log("wasm ", wasm)
-        console.log(myBigThing.greet())
-        
-    })*/
+    $(function () {
+        setItemBody()
+    })
 }
 
 // Get the body type of the composed item, and set data in
@@ -66,17 +62,17 @@ function setItemBody() {
             write(result.error.message)
         } else {
             var attachmentContentType = item.attachments[0].contentType
-            // Successfully got the type of item body.
-            // Set data of the appropriate type in body.
             if (attachmentContentType == "application/irmaseal") {
+                enableSenderinfo(item.sender.emailAddress)
+                enablePolicyInfo(item.to[0].emailAddress)
+
+                document.getElementById("run").hidden = false
+
+                write("IRMASeal encrypted email, able to decrypt.")
                 console.log("IRMASeal email")
-                // Body is of text type.
-                write(
-                    "This is an IRMASeal encrypted email, starting decrypting process ..."
-                )
-                getGraphAPIToken() //AttachmentToken()
             } else {
                 console.log("No IRMASeal email")
+                write("No IRMASeal email, cannot decrypt.")
             }
         }
     })
@@ -84,7 +80,18 @@ function setItemBody() {
 
 // Writes to a div with id='message' on the page.
 function write(message) {
-    document.getElementById("item-subject").innerHTML += message
+    document.getElementById("item-status").innerHTML += message
+    document.getElementById("item-status").innerHTML += "<br/>"
+}
+
+function enablePolicyInfo(receiver: string) {
+    document.getElementById("item-policy").hidden = false
+    document.getElementById("item-policy").innerHTML = receiver
+}
+
+function enableSenderinfo(sender: string) {
+    document.getElementById("item-sender").hidden = false
+    document.getElementById("item-sender").innerHTML += sender
 }
 
 function writeMail(message) {
@@ -119,12 +126,6 @@ function extractFromMime(dataBuffer: string): string {
     return bytes //output
 }
 
-const client2: Client = await Client.build(
-    "https://irmacrypt.nl/pkg",
-    true,
-    Office.context.roamingSettings
-)
-
 function successMessageReceived(returnData) {
     var identity = mailbox.userProfile.emailAddress
     console.log("current identity: ", identity)
@@ -135,11 +136,7 @@ function successMessageReceived(returnData) {
 
     const readableStream = createUint8ArrayReadable(sealBytes)
 
-    Client.build(
-        "https://irmacrypt.nl/pkg",
-        true,
-        Office.context.roamingSettings
-    ).then((client) => {
+    Client.build("https://irmacrypt.nl/pkg").then((client) => {
         client
             .extractMetadata(readableStream)
             .then((metadata: MetadataReaderResult) => {
@@ -166,6 +163,8 @@ function successMessageReceived(returnData) {
                         )
                         console.log("Mail content: ", mail)
                         writeMail(mail)
+                        write("Email successfully decrypted.")
+                        document.getElementById("run").hidden = true
                     })
                     .catch((err) => {
                         console.log("Error decrypting mail: ", err, err.stack)

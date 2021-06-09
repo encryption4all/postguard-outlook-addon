@@ -24,13 +24,17 @@
         "start:web": "office-addin-debugging start manifest.xml web",
         "stop": "office-addin-debugging stop manifest.xml",
         "validate": "office-addin-manifest validate manifest.xml",
-        "watch": "webpack --mode development --watch"
+        "watch": "webpack --mode development --watch",
+        "configure-sso": "office-addin-sso configure manifest.xml"
     },
     "dependencies": {
+        "@azure/msal-browser": "^2.14.2",
         "@babel/plugin-transform-runtime": "^7.13.15",
         "babel-runtime": "^6.26.0",
         "core-js": "^3.9.1",
         "jquery": "3.6.0",
+        "msal": "^1.4.11",
+        "office-addin-sso": "^1.0.36",
         "regenerator-runtime": "^0.13.7",
         "web-streams-polyfill": "^3.0.3"
     },
@@ -38,6 +42,7 @@
         "@babel/core": "^7.13.10",
         "@babel/plugin-syntax-top-level-await": "^7.12.13",
         "@babel/preset-typescript": "^7.13.0",
+        "@microsoft/microsoft-graph-types": "^1.38.0",
         "@types/find-process": "1.2.0",
         "@types/jquery": "^3.5.5",
         "@types/office-js": "^1.0.178",

@@ -23,6 +23,7 @@ module.exports = async (env, options) => {
         experiments: { syncWebAssembly: true, topLevelAwait: true },
         resolve: {
             extensions: [".ts", ".tsx", ".html", ".js"],
+            //fallback: { stream: false, crypto: false, fs: false },
         },
         module: {
             rules: [

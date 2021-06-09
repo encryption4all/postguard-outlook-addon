@@ -3,12 +3,15 @@
  * See LICENSE in the project root for license information.
  */
 
-html,
 body {
-    width: 100%;
-    height: 100%;
-    margin: 0;
-    padding: 0;
+    width: 95%;
+    height: 95%;
+    margin: 2px;
+    padding: 0px;
+    background: #ffffff;
+    font-family: "Karla", sans-serif;
+    font-weight: 300;
+    font-size: 14px;
 }
 
 ul {
@@ -17,9 +20,9 @@ ul {
 }
 
 .ms-welcome__header {
-    padding: 20px;
-    padding-bottom: 30px;
-    padding-top: 50px;
+    padding: 10px;
+    padding-bottom: 10px;
+    padding-top: 10px;
     display: -webkit-flex;
     display: flex;
     -webkit-flex-direction: column;
@@ -46,6 +49,12 @@ ul {
     text-align: center;
 }
 
+.ms-welcome__header h2 {
+    width: 100%;
+    text-align: center;
+    font: 15px Arial, sans-serif;
+}
+
 .ms-welcome__features {
     list-style-type: none;
     margin-top: 20px;
@@ -66,7 +75,8 @@ ul {
 }
 
 .ms-Button.ms-Button--hero .ms-Button-label {
-    color: #0078d7;
+    color: #00569c;
+    font: 18px Arial, sans-serif;
 }
 
 .ms-Button.ms-Button--hero:hover .ms-Button-label,
@@ -77,4 +87,90 @@ ul {
 
 b {
     font-weight: bold;
+}
+
+div,
+p {
+    margin: 0px;
+}
+
+.bg {
+    width: 340px;
+    background: #ffffff;
+}
+
+.center {
+    display: flex;
+    justify-content: center;
+}
+
+#idlock_svg {
+    margin-top: 16px;
+}
+
+#idlock_txt {
+    margin-top: 4px;
+    font-weight: 700;
+    font-size: 14px;
+    color: #004c92;
+}
+
+#info_message {
+    margin-top: 16px;
+    text-align: center;
+    font-size: 16px;
+}
+
+.blue {
+    color: #0074df;
+}
+
+.smaller {
+    font-size: 12px;
+}
+
+.gray {
+    color: #808080;
+    margin-top: 4px;
+}
+
+.instructions_container {
+    width: 324px;
+    display: flex;
+    display: -webkit-flex;
+    margin-left: 16px;
+    margin-top: 20px;
+}
+
+.left {
+    width: 50px;
+}
+.right {
+    width: 260px;
+}
+
+#logo {
+    width: 40px;
+}
+
+#attributes {
+    margin-top: 16px;
+}
+
+#qr_instruction {
+    margin-top: 16px;
+}
+
+#qr_img {
+    margin-top: 16px;
+    width: 118px;
+}
+
+#download_irma {
+    margin-top: 12px;
+}
+
+#download_irma img {
+    height: 30px;
+    margin-top: 12px;
 }

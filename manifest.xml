@@ -43,7 +43,7 @@
     <Hosts>
       <Host xsi:type="MailHost">
         <DesktopFormFactor>
-          <FunctionFile resid="Commands.Url"/>
+          <FunctionFile resid="Encrypt.Url"/>
           <ExtensionPoint xsi:type="MessageReadCommandSurface">
             <OfficeTab id="TabDefault">
               <Group id="msgReadGroup">
@@ -129,6 +129,5 @@
         <bt:String id="EncryptButton.Tooltip" DefaultValue="Encrypt the current email with IRMASeal"/>
       </bt:LongStrings>
     </Resources>
-    <ContentSecurityPolicy>script-src 'self' 'unsafe-eval'; object-src 'self'</ContentSecurityPolicy>
   </VersionOverrides>
 </OfficeApp>
