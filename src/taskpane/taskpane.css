@@ -72,16 +72,27 @@ ul {
 
 .ms-welcome__action.ms-Button--hero {
     margin-top: 30px;
+    background-color: #0074df;
+    text-align: center;
+    border-radius: 4px;
+    padding: 0px;
+    height: 26px;
+    width: 250px;
 }
 
 .ms-Button.ms-Button--hero .ms-Button-label {
-    color: #00569c;
-    font: 18px Arial, sans-serif;
+    color: #ffffff;
+    font: bold 14px Arial, sans-serif;
+    text-align: center;
+    padding: 6px 2px 6px 2px;
+    height: 14px;
+    width: 246px;
+    display: block;
 }
 
-.ms-Button.ms-Button--hero:hover .ms-Button-label,
-.ms-Button.ms-Button--hero:focus .ms-Button-label {
-    color: #005a9e;
+.ms-Button.ms-Button--hero:hover,
+.ms-Button.ms-Button--hero:focus {
+    background-color: #004c92;
     cursor: pointer;
 }
 
@@ -173,4 +184,10 @@ p {
 #download_irma img {
     height: 30px;
     margin-top: 12px;
+}
+
+#bg_decrypted_txt {
+    padding: 15px;
+    margin: 15px;
+    background-color: #f1f1f1;
 }

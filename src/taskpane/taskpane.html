@@ -197,7 +197,7 @@
                 <p class="smaller gray">Expires on July 05, 2021</p>
             </div>
 
-            <div class="instructions_container">
+            <div class="instructions_container" id="decryptinfo" hidden="false">
                 <div class="left">
                     <img src="/assets/irma_logo.svg" id="logo" />
                 </div>
@@ -232,13 +232,16 @@
                         class="ms-welcome__action ms-Button ms-Button--hero ms-font-xl"
                     >
                         <span class="ms-Button-label"
-                            >Show QR code to be able to disclose
+                            >Show QR Code & Scan with IRMA
                         </span>
                     </div>
+                    <p hidden="true">
+                        <b>Status:</b> <label id="item-status"></label>
+                    </p>
                 </div>
             </div>
 
-            <div class="instructions_container">
+            <div class="instructions_container" id="irmaapp" hidden="false">
                 <div class="left"></div>
 
                 <div class="right">
@@ -253,22 +256,15 @@
                         <a
                             href="https://apps.apple.com/us/app/irma-authentication/id1294092994?itsct=apps_box_badge&amp;itscg=30200"
                             ><img
-                                src="https://tools.applemediaservices.com/api/badges/download-on-the-app-store/black/en-us?size=250x83&amp;releaseDate=1508716800&h=13f12f00a774260b0f9018f1bae12dbc"
+                                src="/assets/download-on-the-app-store-badge.png"
                                 alt="Download on the App Store"
                         /></a>
                     </div>
                 </div>
             </div>
 
-            <div class="instructions_container">
-                <div class="left"></div>
-
-                <div class="right">
-                    <p><b>Decrypted mail content:</b></p>
-                    <p><label id="item-mail"></label></p>
-                    <p>&NonBreakingSpace;</p>
-                    <p><b>Status:</b> <label id="item-status"></label></p>
-                </div>
+            <div id="bg_decrypted_txt" hidden="false">
+                <p id="decrypted-text"></p>
             </div>
         </main>
     </body>

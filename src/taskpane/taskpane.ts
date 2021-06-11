@@ -56,7 +56,7 @@ Office.initialize = function () {
 // Get the body type of the composed item, and set data in
 // in the appropriate data type in the item body.
 function setItemBody() {
-    item.body.getAsync(Office.CoercionType.Text, (result) => {
+    item.body.getAsync("text", (result) => {
         console.log(result.value)
         if (result.status == Office.AsyncResultStatus.Failed) {
             write(result.error.message)
@@ -95,7 +95,7 @@ function enableSenderinfo(sender: string) {
 }
 
 function writeMail(message) {
-    document.getElementById("item-mail").innerHTML += message
+    document.getElementById("decrypted-text").innerHTML += message
 }
 
 function getGraphAPIToken() {
@@ -162,9 +162,14 @@ function successMessageReceived(returnData) {
                             plainBytes
                         )
                         console.log("Mail content: ", mail)
+                        document.getElementById("decryptinfo").style.display =
+                            "none"
+                        document.getElementById("irmaapp").style.display =
+                            "none"
+                        document.getElementById(
+                            "bg_decrypted_txt"
+                        ).hidden = false
                         writeMail(mail)
-                        write("Email successfully decrypted.")
-                        document.getElementById("run").hidden = true
                     })
                     .catch((err) => {
                         console.log("Error decrypting mail: ", err, err.stack)
@@ -174,20 +179,6 @@ function successMessageReceived(returnData) {
                 console.error("Error exracting metadata: ", err, err.stack)
             })
     })
-
-    /*const attribute: Attribute = {
-        type: "pbdf.sidn-pbdf.email.email",
-        value: identity,
-    }
-
-    const meta = client.createMetadata(attribute)
-    console.log("Meta: ", meta)
-    */
-
-    //.finally(() => window.close())
-    //});
-
-    //.catch((err) => console.log(err));
 }
 
 function graphAPITokenCallback(asyncResult) {
