@@ -95,7 +95,7 @@ function enableSenderinfo(sender: string) {
 }
 
 function writeMail(message) {
-    document.getElementById("decrypted-text").innerHTML += message
+    document.getElementById("decrypted-text").innerHTML = message
 }
 
 function getGraphAPIToken() {
@@ -162,13 +162,30 @@ function successMessageReceived(returnData) {
                             plainBytes
                         )
                         console.log("Mail content: ", mail)
+
                         document.getElementById("decryptinfo").style.display =
                             "none"
+
                         document.getElementById("irmaapp").style.display =
                             "none"
+
                         document.getElementById(
                             "bg_decrypted_txt"
-                        ).hidden = false
+                        ).style.display = "block"
+
+                        document.getElementById(
+                            "idlock_svg_decrypt"
+                        ).style.display = "block"
+
+                        document.getElementById("idlock_svg").style.display =
+                            "none"
+
+                        document.getElementById("expires").style.display =
+                            "none"
+
+                        document.getElementById("info_message_text").innerHTML =
+                            "Decrypted message from"
+
                         writeMail(mail)
                     })
                     .catch((err) => {
