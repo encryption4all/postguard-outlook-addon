@@ -5,6 +5,8 @@ const { CleanWebpackPlugin } = require("clean-webpack-plugin")
 const CopyWebpackPlugin = require("copy-webpack-plugin")
 const HtmlWebpackPlugin = require("html-webpack-plugin")
 
+const webpack = require("webpack")
+
 const urlDev = "https://localhost:3000/"
 const urlProd = "https://www.contoso.com/" // CHANGE THIS TO YOUR PRODUCTION DEPLOYMENT LOCATION
 
@@ -19,11 +21,17 @@ module.exports = async (env, options) => {
             taskpane: "./src/taskpane/taskpane.ts",
             commands: "./src/commands/commands.ts",
             decrypt: "./src/decrypt/decrypt.ts",
+            fallbackauthdialog: "./src/helpers/fallbackauthdialog.ts",
         },
         experiments: { syncWebAssembly: true, topLevelAwait: true },
         resolve: {
             extensions: [".ts", ".tsx", ".html", ".js"],
-            //fallback: { stream: false, crypto: false, fs: false },
+            //fallback: { stream: require.resolve("stream-browserify") },
+            alias: {
+                process: "process/browser",
+                stream: "stream-browserify",
+                zlib: "browserify-zlib",
+            },
         },
         module: {
             rules: [
@@ -58,6 +66,10 @@ module.exports = async (env, options) => {
             ],
         },
         plugins: [
+            new webpack.ProvidePlugin({
+                process: "process/browser",
+                Buffer: ["buffer", "Buffer"],
+            }),
             new CleanWebpackPlugin(),
             new HtmlWebpackPlugin({
                 filename: "taskpane.html",
@@ -95,6 +107,11 @@ module.exports = async (env, options) => {
                 template: "./src/decrypt/decrypt.html",
                 chunks: ["polyfill", "decrypt"],
             }),
+            new HtmlWebpackPlugin({
+                filename: "fallbackauthdialog.html",
+                template: "./src/helpers/fallbackauthdialog.html",
+                chunks: ["polyfill", "fallbackauthdialog"],
+            }),
         ],
         devServer: {
             headers: {
@@ -106,6 +123,7 @@ module.exports = async (env, options) => {
                     ? options.https
                     : await devCerts.getHttpsServerOptions(),
             port: process.env.npm_package_config_dev_server_port || 3000,
+            disableHostCheck: true,
         },
         output: {
             publicPath: "",

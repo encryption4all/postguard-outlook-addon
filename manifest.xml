@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<OfficeApp xmlns="http://schemas.microsoft.com/office/appforoffice/1.1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0" xmlns:mailappor="http://schemas.microsoft.com/office/mailappversionoverrides/1.0" xsi:type="MailApp">
+<OfficeApp xmlns="http://schemas.microsoft.com/office/appforoffice/1.1"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0"
+  xmlns:mailappor="http://schemas.microsoft.com/office/mailappversionoverrides/1.0" xsi:type="MailApp">
   <Id>7274321f-8067-4844-ae11-dabe76ad38c0</Id>
   <Version>1.0.0.0</Version>
   <ProviderName>IRMA</ProviderName>
@@ -10,15 +13,17 @@
   <HighResolutionIconUrl DefaultValue="https://localhost:3000/assets/icon-128.png"/>
   <SupportUrl DefaultValue="https://irma.app"/>
   <AppDomains>
-    <AppDomain>https://irma.app</AppDomain>
+    <AppDomain>https://irmacrypt.nl</AppDomain>
     <AppDomain>https://qrona.info</AppDomain>
+    <AppDomain>https://login.microsoftonline.com</AppDomain>
+    <AppDomain>https://login.windows.net</AppDomain>
   </AppDomains>
   <Hosts>
     <Host Name="Mailbox"/>
   </Hosts>
   <Requirements>
     <Sets>
-      <Set Name="Mailbox" MinVersion="1.3"/>
+      <Set Name="Mailbox" MinVersion="1.4"/>
     </Sets>
   </Requirements>
   <FormSettings>
@@ -36,7 +41,7 @@
   <DisableEntityHighlighting>false</DisableEntityHighlighting>
   <VersionOverrides xmlns="http://schemas.microsoft.com/office/mailappversionoverrides" xsi:type="VersionOverridesV1_0">
     <Requirements>
-      <bt:Sets DefaultMinVersion="1.3">
+      <bt:Sets DefaultMinVersion="1.4">
         <bt:Set Name="Mailbox"/>
       </bt:Sets>
     </Requirements>
@@ -61,21 +66,6 @@
                   </Icon>
                   <Action xsi:type="ShowTaskpane">
                     <SourceLocation resid="Taskpane.Url"/>
-                  </Action>
-                </Control>
-                <Control xsi:type="Button" id="DecryptButton">
-                  <Label resid="DecryptButton.Label"/>
-                  <Supertip>
-                    <Title resid="DecryptButton.Label"/>
-                    <Description resid="DecryptButton.Tooltip"/>
-                  </Supertip>
-                  <Icon>
-                    <bt:Image size="16" resid="Icon.16x16"/>
-                    <bt:Image size="32" resid="Icon.32x32"/>
-                    <bt:Image size="80" resid="Icon.80x80"/>
-                  </Icon>
-                  <Action xsi:type="ExecuteFunction">
-                    <FunctionName>decrypt</FunctionName>
                   </Action>
                 </Control>
               </Group>
@@ -129,5 +119,100 @@
         <bt:String id="EncryptButton.Tooltip" DefaultValue="Encrypt the current email with IRMASeal"/>
       </bt:LongStrings>
     </Resources>
+
+    <!-- VersionOverrides v1.1 to add support for SSO -->
+    <VersionOverrides xmlns="http://schemas.microsoft.com/office/mailappversionoverrides/1.1" xsi:type="VersionOverridesV1_1">
+      <Requirements>
+        <bt:Sets DefaultMinVersion="1.4">
+          <bt:Set Name="Mailbox"/>
+        </bt:Sets>
+      </Requirements>
+      <Hosts>
+        <Host xsi:type="MailHost">
+          <DesktopFormFactor>
+            <FunctionFile resid="Encrypt.Url"/>
+            <ExtensionPoint xsi:type="MessageReadCommandSurface">
+              <OfficeTab id="TabDefault">
+                <Group id="msgReadGroup">
+                  <Label resid="GroupLabel"/>
+                  <Control xsi:type="Button" id="msgReadOpenPaneButton">
+                    <Label resid="TaskpaneButton.Label"/>
+                    <Supertip>
+                      <Title resid="TaskpaneButton.Label"/>
+                      <Description resid="TaskpaneButton.Tooltip"/>
+                    </Supertip>
+                    <Icon>
+                      <bt:Image size="16" resid="Icon.16x16"/>
+                      <bt:Image size="32" resid="Icon.32x32"/>
+                      <bt:Image size="80" resid="Icon.80x80"/>
+                    </Icon>
+                    <Action xsi:type="ShowTaskpane">
+                      <SourceLocation resid="Taskpane.Url"/>
+                    </Action>
+                  </Control>
+                </Group>
+              </OfficeTab>
+            </ExtensionPoint>
+            <ExtensionPoint xsi:type="MessageComposeCommandSurface">
+              <OfficeTab id="TabDefault">
+                <Group id="msgComposeGroup">
+                  <Label resid="GroupLabel"/>
+                  <Control xsi:type="Button" id="EncryptButton">
+                    <Label resid="EncryptButton.Label"/>
+                    <Supertip>
+                      <Title resid="EncryptButton.Label"/>
+                      <Description resid="EncryptButton.Tooltip"/>
+                    </Supertip>
+                    <Icon>
+                      <bt:Image size="16" resid="Icon.16x16"/>
+                      <bt:Image size="32" resid="Icon.32x32"/>
+                      <bt:Image size="80" resid="Icon.80x80"/>
+                    </Icon>
+                    <Action xsi:type="ExecuteFunction">
+                      <FunctionName>encrypt</FunctionName>
+                    </Action>
+                  </Control>
+                </Group>
+              </OfficeTab>
+            </ExtensionPoint>
+          </DesktopFormFactor>
+        </Host>
+      </Hosts>
+      <Resources>
+        <bt:Images>
+          <bt:Image id="Icon.16x16" DefaultValue="https://localhost:3000/assets/icon-16.png"/>
+          <bt:Image id="Icon.32x32" DefaultValue="https://localhost:3000/assets/icon-32.png"/>
+          <bt:Image id="Icon.80x80" DefaultValue="https://localhost:3000/assets/icon-80.png"/>
+        </bt:Images>
+        <bt:Urls>
+          <bt:Url id="Encrypt.Url" DefaultValue="https://localhost:3000/commands.html"/>
+          <bt:Url id="Taskpane.Url" DefaultValue="https://localhost:3000/taskpane.html"/>
+          <bt:Url id="Decrypt.Url" DefaultValue="https://localhost:3000/decrypt.html"/>
+        </bt:Urls>
+        <bt:ShortStrings>
+          <bt:String id="GroupLabel" DefaultValue="IRMASeal Add-in"/>
+          <bt:String id="TaskpaneButton.Label" DefaultValue="Show addon"/>
+          <bt:String id="DecryptButton.Label" DefaultValue="Decrypt email"/>
+          <bt:String id="EncryptButton.Label" DefaultValue="Encrypt and send email"/>
+        </bt:ShortStrings>
+        <bt:LongStrings>
+          <bt:String id="TaskpaneButton.Tooltip" DefaultValue="Opens a pane displaying all available properties."/>
+          <bt:String id="DecryptButton.Tooltip" DefaultValue="Decrypt the current email (if it is an IRMASeal email)"/>
+          <bt:String id="EncryptButton.Tooltip" DefaultValue="Encrypt the current email with IRMASeal"/>
+        </bt:LongStrings>
+      </Resources>
+
+      <WebApplicationInfo>
+        <Id>6ee2a054-1d61-405d-8e5d-c2daf25c5833</Id>
+        <Resource>api://localhost:3000/6ee2a054-1d61-405d-8e5d-c2daf25c5833</Resource>
+        <Scopes>
+          <Scope>mail.send</Scope>
+          <Scope>openid</Scope>
+          <Scope>profile</Scope>
+        </Scopes>
+      </WebApplicationInfo>
+
+    </VersionOverrides>
+
   </VersionOverrides>
 </OfficeApp>
