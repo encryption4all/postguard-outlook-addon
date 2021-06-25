@@ -3,16 +3,16 @@
  * See LICENSE in the project root for license information.
  */
 
+/* global $, Office */
+
 import { Client, Attribute, symcrypt } from "@e4a/irmaseal-client"
 
 import * as msal from "@azure/msal-browser"
 import { AccountInfo } from "@azure/msal-browser"
 import { LogLevel } from "msal"
 
+// eslint-disable-next-line no-undef
 var Buffer = require("buffer/").Buffer
-var fs = require("browserify-fs")
-
-const filename = "encrypt.log"
 
 const msalConfig = {
     auth: {
@@ -28,6 +28,7 @@ const msalConfig = {
             loggerCallback: (
                 level: LogLevel,
                 message: string,
+                // eslint-disable-next-line no-unused-vars
                 containsPii: boolean
             ): void => {
                 switch (level) {
@@ -97,8 +98,13 @@ function showLoginPopup(url) {
     )
 }
 
+var mailboxItem
+var globalEvent
+
 Office.initialize = () => {
-    Office.onReady(() => {})
+    Office.onReady(() => {
+        mailboxItem = Office.context.mailbox.item
+    })
 }
 
 function setEventError() {
@@ -117,6 +123,7 @@ function setEventError() {
  * Shows a notification when the add-in command is executed.
  * @param event
  */
+// eslint-disable-next-line no-unused-vars
 function encrypt(event: Office.AddinCommands.Event) {
     const message: Office.NotificationMessageDetails = {
         type:
@@ -126,6 +133,8 @@ function encrypt(event: Office.AddinCommands.Event) {
         icon: "Icon.80x80",
         persistent: true,
     }
+
+    globalEvent = event
 
     Office.context.mailbox.item.notificationMessages.replaceAsync(
         "action",
@@ -146,18 +155,13 @@ function encrypt(event: Office.AddinCommands.Event) {
                     let accessToken = accessTokenResponse.accessToken
                     // Call your API with token
                     console.log("[encrypt] pca token: ", accessToken)
-                    //encryptAndsendMail(accessToken)
+                    encryptAndsendMail(accessToken)
                 })
                 .catch(function (error) {
                     //Acquire token silent failure, send an interactive request
                     if (error instanceof msal.BrowserAuthError) {
+                        // show login popup
                         showLoginPopup("/fallbackauthdialog.html")
-                        /*msalInstance
-                            .acquireTokenRedirect(accessTokenRequest)
-                            .catch(function (error) {
-                                // Acquire token interactive failure
-                                console.log(error)
-                            })*/
                     }
                     console.log("[encrypt] Browserautherror: ", error)
                 })
@@ -166,127 +170,168 @@ function encrypt(event: Office.AddinCommands.Event) {
             const myAccount: AccountInfo = msalInstance.getAccountByHomeId(
                 accountId
             )
-            console.log("[encrypt] having token for accid ", myAccount)
+            console.log("[encrypt] having token for account id ", myAccount)
         }
     })
 }
 
-function encryptAndsendMail(token) {
-    const mailboxItem = Office.context.mailbox.item
-
-    mailboxItem.to.getAsync((recipients) => {
-        const recipientEmail = recipients.value[0].emailAddress
-
-        console.log("Recipient: ", recipientEmail)
-
-        const identity: Attribute = {
-            type: "pbdf.sidn-pbdf.email.email",
-            value: recipientEmail,
-        }
-
-        mailboxItem.body.getAsync(Office.CoercionType.Text, (asyncResult) => {
-            console.log("Mailbody: ", asyncResult.value)
-
-            Client.build("https://irmacrypt.nl/pkg").then((client) => {
-                const bytes = new TextEncoder().encode(asyncResult.value)
-
-                const meta = client.createMetadata(identity)
-                const metadata = meta.metadata.to_json()
-
-                console.log("meta.header: ", meta.header)
-                console.log("meta.keys: ", meta.keys)
-                console.log("meta.metadata: ", metadata)
-                console.log("nonce: ", metadata.iv)
-
-                symcrypt(meta.keys, metadata.iv, meta.header, bytes).then(
-                    (ct) => {
-                        console.log("ct :", ct)
-                        const b64encoded = Buffer.from(ct).toString("base64")
-
-                        //const restHost = Office.context.mailbox.restUrl
-                        const sendMessageUrl =
-                            "https://graph.microsoft.com/v1.0/me/sendMail"
-                        //  restHost + "/v2.0/me/sendMail"
-
-                        console.log("Trying to send email via ", sendMessageUrl)
-
-                        let message = {
-                            message: {
-                                subject: "test", //Office.context.mailbox.item.subject,
-                                body: {
-                                    contentType: "Text",
-                                    content: b64encoded,
-                                },
-                                toRecipients: [
-                                    {
-                                        emailAddress: {
-                                            address: recipientEmail,
-                                        },
-                                    },
-                                ],
-                            },
-                        }
-
-                        const BOUNDARY = "foo"
-                        const encryptedData = b64encoded.replace(
-                            /(.{80})/g,
-                            "$1\n"
-                        )
-
-                        var content =
-                            "This is an IRMAseal/MIME encrypted message.\r\n\r\n"
-                        content += `--${BOUNDARY}\r\n`
-                        content += "Content-Type: application/irmaseal\r\n\r\n"
-                        content += "Version: 1\r\n\r\n"
-                        content += `--${BOUNDARY}\r\n`
-                        content +=
-                            "Content-Type: application/octet-stream\r\n\r\n"
-                        content += `${encryptedData}\r\n\r\n`
-                        content += `--${BOUNDARY}--\r\n`
-
-                        //message = Buffer.from(content).toString("base64")
-
-                        console.log("Email content: ", message)
-
-                        $.ajax({
-                            type: "POST",
-                            //contentType: "text/plain",
-                            contentType: "application/json; charset=utf-8",
-                            processData: false,
-                            url: sendMessageUrl,
-                            data: message,
-                            headers: {
-                                Authorization: "Bearer " + token,
-                                ContentType: "application/json",
-                            },
-                            success: function (success) {
-                                console.log("Sendmail success: ", success)
-
-                                const successMsg: Office.NotificationMessageDetails = {
-                                    type:
-                                        Office.MailboxEnums
-                                            .ItemNotificationMessageType
-                                            .InformationalMessage,
-                                    message:
-                                        "Successfully encrypted and send email",
-                                    icon: "Icon.80x80",
-                                    persistent: true,
-                                }
-
-                                Office.context.mailbox.item.notificationMessages.replaceAsync(
-                                    "action",
-                                    successMsg
-                                )
-                            },
-                        }).fail(function ($xhr) {
-                            var data = $xhr.responseJSON
-                            console.log("Ajax error: ", data)
-                            setEventError()
-                        })
-                    }
-                )
-            })
+function getRecipientEmail(): Promise<string> {
+    return new Promise(function (resolve, reject) {
+        mailboxItem.to.getAsync((recipients) => {
+            const recipientEmail: string = recipients.value[0].emailAddress
+            if (recipientEmail !== "") resolve(recipientEmail)
+            else reject("No recipient email")
         })
+    })
+}
+
+async function getMailBody(): Promise<string> {
+    return new Promise(function (resolve, reject) {
+        mailboxItem.body.getAsync(Office.CoercionType.Text, (asyncResult) => {
+            const body: string = asyncResult.value
+            if (body !== "") resolve(body)
+            else reject("No body in email")
+        })
+    })
+}
+
+async function getMailSubject(): Promise<string> {
+    return new Promise(function (resolve, reject) {
+        mailboxItem.subject.getAsync((asyncResult) => {
+            if (asyncResult.status == Office.AsyncResultStatus.Failed) {
+                reject("Subject async failed")
+            } else {
+                const subject: string = asyncResult.value
+                if (subject !== "") resolve(subject)
+                else reject("No subject in email")
+            }
+        })
+    })
+}
+
+async function encryptAndsendMail(_token) {
+    const recipientEmail = await getRecipientEmail() //.catch(e => console.error(e)) // mailboxItem.to.getAsync()
+
+    console.log("Recipient: ", recipientEmail)
+
+    const identity: Attribute = {
+        type: "pbdf.sidn-pbdf.email.email",
+        value: recipientEmail,
+    }
+
+    const mailBody = await getMailBody()
+    const mailSubject = await getMailSubject()
+
+    console.log("Mailbody: ", mailBody)
+
+    const client = await Client.build("https://irmacrypt.nl/pkg") //.then((client) => {
+
+    const bytes = new TextEncoder().encode(mailBody)
+
+    const meta = client.createMetadata(identity)
+    const metadata = meta.metadata.to_json()
+
+    console.log("meta.header: ", meta.header)
+    console.log("meta.keys: ", meta.keys)
+    console.log("meta.metadata: ", metadata)
+    console.log("nonce: ", metadata.iv)
+
+    const ct = await symcrypt(meta.keys, metadata.iv, meta.header, bytes) //then((ct) => {
+    console.log("ct :", ct)
+    const b64encoded = Buffer.from(ct).toString("base64")
+
+    //const restHost = Office.context.mailbox.restUrl + "/v2.0/me/sendMail"
+    const sendMessageUrl = "https://graph.microsoft.com/beta/me/sendMail"
+
+    console.log("Trying to send email via ", sendMessageUrl)
+
+    let message = {
+        message: {
+            subject: mailSubject,
+            body: {
+                contentType: "Text",
+                content: b64encoded,
+            },
+            toRecipients: [
+                {
+                    emailAddress: {
+                        address: recipientEmail,
+                    },
+                },
+            ],
+        },
+    }
+
+    const BOUNDARY = "--+IRMASEAL+--"
+    const encryptedData = b64encoded.replace(/(.{80})/g, "$1\n")
+
+    const headers = {
+        Subject: `${mailSubject}`,
+        To: `${recipientEmail}`,
+        From: `${Office.context.mailbox.userProfile.emailAddress}`,
+        "MIME-Version": "1.0",
+        "Content-Type": `multipart/encrypted; protocol="application/irmaseal"; boundary=${BOUNDARY}`,
+    }
+
+    var headerStr = ""
+    for (const [k, v] of Object.entries(headers)) {
+        headerStr += `${k}: ${v}\r\n`
+    }
+    headerStr += "\r\n\r\n"
+
+    console.log("Encrypted data: ", encryptedData)
+
+    var content = headerStr
+    content += "Content-Type: text/plain\r\n\r\n"
+    content += "This is an IRMAseal/MIME encrypted message.\r\n\r\n"
+    content += `--${BOUNDARY}\r\n`
+    content += "Content-Type: application/irmaseal\r\n"
+    content += "Content-Transfer-Encoding: base64\r\n\r\n"
+    content += "Version: 1\r\n\r\n"
+    content += `--${BOUNDARY}\r\n`
+    content += "Content-Type: application/octet-stream\r\n"
+    content += "Content-Transfer-Encoding: base64\r\n\r\n"
+    content += `${encryptedData}\r\n\r\n`
+    content += `--${BOUNDARY}--\r\n`
+
+    message = Buffer.from(content).toString("base64")
+
+    console.log("Email content: ", message)
+
+    $.ajax({
+        type: "POST",
+        contentType: "text/plain",
+        url: sendMessageUrl,
+        data: message,
+        headers: {
+            Authorization:
+                "Bearer " +
+                // token,
+                "EwB4A8l6BAAU6k7+XVQzkGyMv7VHB/h4cHbJYRAAAapYNkliFsERNAyVY90gq7LRUY8U07UJVKFwC9f+LnG8T/PGBIDogIYqVBQ2QjzRPqvCOUzhAeGEU3+hKaA44lU7LLVBbltcsANMuyacFymeZqerNZC2buuPkKuiAfU/0qAh+KwPMdtvCP2rH3rUD28JsBa5knnwPNIMVUh78ROwnc2MVgeqOwEwxPAYBP9T8Q3GC73mOvh7ESc7Kzvibfr4PbxdCZhJHfb5Ur3l5ZnWzbCuZdo/+KNDW9ln8NbQ30I4OKOhKi1vue2nHFGtQEK2Zqip1l2YHLaM536a8p3ENd2adZG59hH11MrS0KyMPL8/on5E2xRN1iwvl9wbAk4DZgAACHpN3BGkydabSALTgbsJeaJQ4dZUD/hLKO65NM3fkIuFviR7XnmGIA2sBGnPsb1Ge1QFItdvA1cpYJjG7Em35fPHRkZMjDWcJ50w3u6r21t2JkBI1am9MO/hqKY/GaJtxs6lh7yw2yzDGcfVmty1custdLA9G52Y6xSix7o9nivLo9NE//+gafnguQRQy5RiIxcRNm9QQKdc64L419etlAlBCsOw+07drvJm+9k7ADFWyeH8j6H5Nv1jdfDgBb+E+wI+DV//jmDL7zd9Z8VuNtnnXLZwl/60aEeMxcL7xlqafKydXkOMi3sIumbvwaE+vQ2fCzd8hVsh4q2s3aoGabZWu4MuI7pLXKICcEyFxXhOZKaN/OITfkHNC4yzwXTY2liclT/W2PO4DTW4l4FfvsMmYfjmxX3bVxXuc0niHuyt5zLJ1zb7kPM6hIL3grLZC5QWvai+M05hMAqhwzTzF+9/DBudVOcVSXTsJz/cm37RP0C7d/XT3ykVG2BbNWRAdcbhylZ19s9J7h/rVGjpWoZRWTeE+v92DGkuNLMalQdPN1M/IpP3JA3s316icdnAhkLyRs5aLtgy8wMlzD0O8m6vGYZyPYmMOYiE3BvbUHRS86Tly2Le1Mk7/3ht6bR6FzLry7VYYb0Y5t+LGw59O5Z1kVALl3+JdZDZq7hxzfhEG6dWi/68KRvA0nMDcA0CNO7Lwnf1182DGBwADIrgcyfB/0b81omH4J2Qa2dpWneIMrofpatwVbSIGQPv2KkkHjVsJ/k1JjSTx49ZBYxMed8DSI8C",
+        },
+        success: function (success) {
+            console.log("Sendmail success: ", success)
+
+            const successMsg: Office.NotificationMessageDetails = {
+                type:
+                    Office.MailboxEnums.ItemNotificationMessageType
+                        .InformationalMessage,
+                message: "Successfully encrypted and send email",
+                icon: "Icon.80x80",
+                persistent: true,
+            }
+
+            Office.context.mailbox.item.notificationMessages.replaceAsync(
+                "action",
+                successMsg
+            )
+
+            globalEvent.completed()
+        },
+    }).fail(function ($xhr) {
+        var data = $xhr.responseJSON
+        console.log("Ajax error: ", data)
+        setEventError()
     })
 }
 

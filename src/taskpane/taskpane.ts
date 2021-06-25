@@ -21,7 +21,7 @@ import {
 
 var Buffer = require("buffer/").Buffer
 
-/* global document, Office */
+/* global Office */
 
 Office.onReady((info) => {
     if (info.host === Office.HostType.Outlook) {
@@ -73,6 +73,7 @@ function setItemBody() {
             } else {
                 console.log("No IRMASeal email")
                 write("No IRMASeal email, cannot decrypt.")
+                document.getElementById("run").hidden = false
             }
         }
     })
@@ -102,41 +103,70 @@ function getGraphAPIToken() {
     mailbox.getCallbackTokenAsync(graphAPITokenCallback)
 }
 
-const BOUNDARY = "foo"
+var BOUNDARY: string
 
 function extractFromMime(dataBuffer: string): string {
-    const [section1, section2, section3] = dataBuffer
+    // First extract boundary
+    BOUNDARY = dataBuffer
+        .match(/boundary=(.*)/gm)[0]
+        .replace("boundary=", "")
+        .replace(/"/g, "")
+
+    console.log("Boundary: ", BOUNDARY)
+
+    const [_, section2, section3, section4] = dataBuffer
         .split(`--${BOUNDARY}`)
         .slice(0, -1)
 
-    const sec1RegExp = /(.*)\r?\n--foo/
-    const sec2RegExp = /Content-Type: application\/irmaseal\r?\nVersion: (.*)\r?\n/
-    const sec3RegExp = /Content-Type: application\/octet-stream\r?\n(.*)\r?\n/
+    var ctPart: string
+    var versionPart: string
+    if (
+        section4 === undefined ||
+        section3.search("Content-Type: application/octet-stream") !== -1
+    ) {
+        versionPart = section2
+        ctPart = section3
+    } else {
+        versionPart = section3
+        ctPart = section4
+    }
 
-    const plain = section1.replace(sec1RegExp, "$1")
-    const version = section2.replace(sec2RegExp, "$1")
-    const bytes = section3
+    const sec2RegExp = /Content-Type: application\/irmaseal\r?\n(.*)\r?\n/
+    const sec3RegExp = /Content-Transfer-Encoding: base64\r?\n\r?\n([\s\S]*)/gm
+
+    versionPart = versionPart
+        .match(sec3RegExp)[0]
         .replace(sec3RegExp, "$1")
         .replace(" ", "")
-        .replace("\n", "")
+        .replace("\r\n", "")
+    const version = Buffer.from(versionPart, "base64").toString("utf-8")
 
-    // console.log(`info: ${version},\n bytes: ${bytes}`)
+    const bytes = ctPart
+        .match(sec3RegExp)[0]
+        .replace(sec3RegExp, "$1")
+        .replace(/(?:\r\n|\r|\n| )/g, "")
 
-    // return { bytes, version } //output
-    return bytes //output
+    console.log(version)
+    console.log("Bytes: ", bytes)
+
+    return bytes
 }
 
 function successMessageReceived(returnData) {
     var identity = mailbox.userProfile.emailAddress
     console.log("current identity: ", identity)
 
+    console.log("MIME: ", returnData)
+
     const bytes = extractFromMime(returnData)
+
     const sealBytes: Uint8Array = new Uint8Array(Buffer.from(bytes, "base64"))
-    console.log("ct bytes: ", bytes)
+    console.log("ct bytes: ", sealBytes)
 
     const readableStream = createUint8ArrayReadable(sealBytes)
 
     Client.build("https://irmacrypt.nl/pkg").then((client) => {
+        console.log("Client build")
         client
             .extractMetadata(readableStream)
             .then((metadata: MetadataReaderResult) => {
@@ -210,7 +240,8 @@ function graphAPITokenCallback(asyncResult) {
             url: getMessageUrl,
             headers: { Authorization: "Bearer " + asyncResult.value },
             success: successMessageReceived,
-            error: function (xhr, status, error) {
+            // eslint-disable-next-line no-unused-vars
+            error: function (xhr, _status, _error) {
                 var errorMessage = xhr.status + ": " + xhr.statusText
                 console.log("Error - " + errorMessage)
             },
