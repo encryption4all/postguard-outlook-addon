@@ -11,6 +11,8 @@ import "../../assets/icon-80.png"
 
 import "web-streams-polyfill"
 
+import { ReadMail } from "@e4a/irmaseal-mail-utils"
+
 import {
     Client,
     createUint8ArrayReadable,
@@ -103,65 +105,18 @@ function getGraphAPIToken() {
     mailbox.getCallbackTokenAsync(graphAPITokenCallback)
 }
 
-var BOUNDARY: string
-
-function extractFromMime(dataBuffer: string): string {
-    // First extract boundary
-    BOUNDARY = dataBuffer
-        .match(/boundary=(.*)/gm)[0]
-        .replace("boundary=", "")
-        .replace(/"/g, "")
-
-    console.log("Boundary: ", BOUNDARY)
-
-    const [_, section2, section3, section4] = dataBuffer
-        .split(`--${BOUNDARY}`)
-        .slice(0, -1)
-
-    var ctPart: string
-    var versionPart: string
-    if (
-        section4 === undefined ||
-        section3.search("Content-Type: application/octet-stream") !== -1
-    ) {
-        versionPart = section2
-        ctPart = section3
-    } else {
-        versionPart = section3
-        ctPart = section4
-    }
-
-    const sec2RegExp = /Content-Type: application\/irmaseal\r?\n(.*)\r?\n/
-    const sec3RegExp = /Content-Transfer-Encoding: base64\r?\n\r?\n([\s\S]*)/gm
-
-    versionPart = versionPart
-        .match(sec3RegExp)[0]
-        .replace(sec3RegExp, "$1")
-        .replace(" ", "")
-        .replace("\r\n", "")
-    const version = Buffer.from(versionPart, "base64").toString("utf-8")
-
-    const bytes = ctPart
-        .match(sec3RegExp)[0]
-        .replace(sec3RegExp, "$1")
-        .replace(/(?:\r\n|\r|\n| )/g, "")
-
-    console.log(version)
-    console.log("Bytes: ", bytes)
-
-    return bytes
-}
-
 function successMessageReceived(returnData) {
-    var identity = mailbox.userProfile.emailAddress
+    const identity = mailbox.userProfile.emailAddress
     console.log("current identity: ", identity)
 
     console.log("MIME: ", returnData)
 
-    const bytes = extractFromMime(returnData)
+    const readMail = new ReadMail()
+    readMail.parseMail(returnData)
 
-    const sealBytes: Uint8Array = new Uint8Array(Buffer.from(bytes, "base64"))
-    console.log("ct bytes: ", sealBytes)
+    console.log("Version: ", readMail.getVersion())
+
+    const sealBytes = readMail.getCiphertext()
 
     const readableStream = createUint8ArrayReadable(sealBytes)
 
