@@ -117,14 +117,11 @@ function authCallback(error, response) {
             console.log(response.idToken.rawIdToken)
         } else {
             Office.context.ui.messageParent(
-                JSON.stringify(
-                    {
-                        status: "success",
-                        result: response,
-                        logging: logginger,
-                    },
-                    replacer
-                )
+                JSON.stringify({
+                    status: "success",
+                    result: response,
+                    logging: logginger,
+                })
             )
         }
     }
