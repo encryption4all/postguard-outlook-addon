@@ -21,8 +21,6 @@ import {
     MetadataReaderResult,
 } from "@e4a/irmaseal-client"
 
-var Buffer = require("buffer/").Buffer
-
 /* global Office */
 
 Office.onReady((info) => {

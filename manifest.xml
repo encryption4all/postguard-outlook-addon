@@ -209,6 +209,7 @@
           <Scope>mail.send</Scope>
           <Scope>openid</Scope>
           <Scope>profile</Scope>
+          <Scope>mail.read</Scope>
         </Scopes>
       </WebApplicationInfo>
 
