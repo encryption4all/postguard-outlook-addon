@@ -99,7 +99,7 @@ async function encryptAndsendMail(token) {
 
     console.log("Mailbody: ", mailBody)
 
-    const client = await Client.build("https://irmacrypt.nl/pkg") //.then((client) => {
+    const client = await Client.build("https://irmacrypt.nl/pkg")
 
     const bytes = new TextEncoder().encode(mailBody)
 
@@ -111,7 +111,7 @@ async function encryptAndsendMail(token) {
     console.log("meta.metadata: ", metadata)
     console.log("nonce: ", metadata.iv)
 
-    const ct = await symcrypt(meta.keys, metadata.iv, meta.header, bytes) //then((ct) => {
+    const ct = await symcrypt(meta.keys, metadata.iv, meta.header, bytes)
     console.log("ct :", ct)
 
     const composeMail = new ComposeMail()
