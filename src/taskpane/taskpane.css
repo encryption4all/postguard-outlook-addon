@@ -206,3 +206,8 @@ p {
 #attachmentList {
     display: contents;
 }
+
+#attachmentList div {
+    text-decoration: underline;
+    cursor: pointer;
+}

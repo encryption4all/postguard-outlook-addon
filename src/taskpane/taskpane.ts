@@ -168,23 +168,17 @@ function successMessageReceived(returnData) {
                                 "attachments"
                             ).style.display = "flex"
 
-                            // create for each attachment an "a" element to be able to download it
+                            // create for each attachment a "div" element, which we assign a click event, and the data as a blob object via jQueries data storage.
+                            // why to use blob (uint8array) instead of base64 encoded string: https://blobfolio.com/2019/better-binary-batter-mixing-base64-and-uint8array/
+                            // when the user clicks, the blob is attached to a temporary anchor element and triggered programmatically to download the file.
                             const a = document
                                 .getElementById("attachmentList")
-                                .appendChild(document.createElement("a"))
-                            a.download = attachment.fileName
+                                .appendChild(document.createElement("div"))
                             a.innerHTML = attachment.fileName
-                            a.href =
-                                "data:text/plain;base64," +
-                                base64EncodedAttachment
-
-                            const decodedAttachment = Buffer.from(
-                                base64EncodedAttachment,
-                                "base64"
-                            ).toString("utf-8")
-
-                            console.log(
-                                `Attachment ${attachment.fileName} content: ${decodedAttachment}`
+                            a.onclick = downloadBlobHandler
+                            $(a).data(
+                                "blob",
+                                base64toBlob(base64EncodedAttachment)
                             )
                         }
 
@@ -259,4 +253,35 @@ function getItemRestId() {
             Office.MailboxEnums.RestVersion.v2_0
         )
     }
+}
+
+// helper functions for attachment conversion and download
+
+const base64toBlob = function (data: string) {
+    const contentType = "application/octet-stream"
+    const buff = Buffer.from(data, "base64")
+    return new Blob([buff.buffer], { type: contentType })
+}
+
+const downloadBlobAsFile = function (blob: Blob, filename: string) {
+    const contentType = "application/octet-stream"
+    if (!blob) {
+        console.error("No data")
+        return
+    }
+
+    const a = document.createElement("a")
+    a.download = filename
+    a.href = window.URL.createObjectURL(blob)
+    a.dataset.downloadurl = [contentType, a.download, a.href].join(":")
+
+    const e = new MouseEvent("click")
+    a.dispatchEvent(e)
+}
+
+function downloadBlobHandler(e) {
+    const target = e.target
+    const filename = target.innerHTML
+    const data = $(target).data("blob")
+    downloadBlobAsFile(data, filename)
 }
