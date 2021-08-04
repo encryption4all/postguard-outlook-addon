@@ -141,10 +141,52 @@ function successMessageReceived(returnData) {
                             sealBytes,
                             true
                         )
+
                         const mail: string = new TextDecoder().decode(
                             plainBytes
                         )
                         console.log("Mail content: ", mail)
+
+                        // decrypt attachments
+                        const attachments = readMail.getAttachments()
+                        for (let i = 0; i < attachments.length; i++) {
+                            const attachment = attachments[i]
+
+                            const attachmentBytes: Uint8Array = await symcrypt(
+                                keys,
+                                attachment.nonce,
+                                metadata.header,
+                                attachment.body,
+                                true
+                            )
+
+                            const base64EncodedAttachment: string = new TextDecoder().decode(
+                                attachmentBytes
+                            )
+
+                            document.getElementById(
+                                "attachments"
+                            ).style.display = "flex"
+
+                            // create for each attachment an "a" element to be able to download it
+                            const a = document
+                                .getElementById("attachmentList")
+                                .appendChild(document.createElement("a"))
+                            a.download = attachment.fileName
+                            a.innerHTML = attachment.fileName
+                            a.href =
+                                "data:text/plain;base64," +
+                                base64EncodedAttachment
+
+                            const decodedAttachment = Buffer.from(
+                                base64EncodedAttachment,
+                                "base64"
+                            ).toString("utf-8")
+
+                            console.log(
+                                `Attachment ${attachment.fileName} content: ${decodedAttachment}`
+                            )
+                        }
 
                         document.getElementById("decryptinfo").style.display =
                             "none"

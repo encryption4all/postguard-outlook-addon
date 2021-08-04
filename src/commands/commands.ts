@@ -83,6 +83,54 @@ async function getMailSubject(): Promise<string> {
     })
 }
 
+interface IAttachmentContent {
+    filename: string
+    content: string
+}
+
+async function getMailAttachments(): Promise<IAttachmentContent[]> {
+    return new Promise(function (resolve, reject) {
+        mailboxItem.getAttachmentsAsync(async (asyncResult) => {
+            if (asyncResult.status == Office.AsyncResultStatus.Failed) {
+                reject("Attachments async failed")
+            } else {
+                if (asyncResult.value.length > 0) {
+                    let attachmentsArray = []
+                    let content = ""
+                    for (var i = 0; i < asyncResult.value.length; i++) {
+                        var attachment = asyncResult.value[i]
+                        content = await getMailAttachmentContent(attachment.id)
+                        attachmentsArray.push({
+                            filename: attachment.name,
+                            content: content,
+                        })
+                    }
+                    if (attachmentsArray.length > 0) resolve(attachmentsArray)
+                    else reject("No attachments in email")
+                }
+            }
+        })
+    })
+}
+
+async function getMailAttachmentContent(attachmentId: string): Promise<string> {
+    return new Promise(function (resolve, reject) {
+        mailboxItem.getAttachmentContentAsync(attachmentId, (asyncResult) => {
+            if (asyncResult.status == Office.AsyncResultStatus.Failed) {
+                reject("Attachment content async failed")
+            } else {
+                if (asyncResult.value.content.length > 0) {
+                    resolve(asyncResult.value.content)
+                } else
+                    reject(
+                        "No attachment content in attachment with id" +
+                            attachmentId
+                    )
+            }
+        })
+    })
+}
+
 // Encrypts and sends the mail
 async function encryptAndsendMail(token) {
     const recipientEmail = await getRecipientEmail() //.catch(e => console.error(e)) // mailboxItem.to.getAsync()
@@ -96,6 +144,7 @@ async function encryptAndsendMail(token) {
 
     const mailBody = await getMailBody()
     const mailSubject = await getMailSubject()
+    const attachments = await getMailAttachments()
 
     console.log("Mailbody: ", mailBody)
 
@@ -121,7 +170,28 @@ async function encryptAndsendMail(token) {
     composeMail.setCiphertext(ct)
     composeMail.setSender(Office.context.mailbox.userProfile.emailAddress)
 
+    for (let i = 0; i < attachments.length; i++) {
+        const attachment = attachments[i]
+        let nonce = new Uint8Array(16)
+        nonce = window.crypto.getRandomValues(nonce)
+        const attachmentBytes = new TextEncoder().encode(attachment.content)
+        const attachmentCT = await symcrypt(
+            meta.keys,
+            nonce,
+            meta.header,
+            attachmentBytes
+        )
+        composeMail.addAttachment(
+            attachmentCT,
+            attachment.filename,
+            nonce
+            // Encode uint8array to base64: Buffer.from(nonce).toString("base64") // decode base64 to uint8array: var uintArray = Base64Binary.decode(base64_string);
+        )
+    }
+
     const message = Buffer.from(composeMail.getMimeMail()).toString("base64")
+
+    console.log("MIME mail: \n", composeMail.getMimeMail())
 
     const sendMessageUrl = "https://graph.microsoft.com/v1.0/me/sendMail"
 

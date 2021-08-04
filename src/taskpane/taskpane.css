@@ -196,3 +196,13 @@ p {
 #idlock_svg_decrypt {
     display: none;
 }
+
+#attachments {
+    padding: 15px;
+    display: none;
+    flex-direction: column;
+}
+
+#attachmentList {
+    display: contents;
+}
