@@ -5,8 +5,9 @@
 
 /* global $, Office */
 
-import { Client, Attribute, symcrypt } from "@e4a/irmaseal-client"
+import { Client, Attribute } from "@e4a/irmaseal-client"
 import { ComposeMail } from "@e4a/irmaseal-mail-utils"
+import { CryptifyApiWrapper } from "@e4a/cryptify-api-wrapper/dist/cryptify-api-wrapper"
 
 // eslint-disable-next-line no-undef
 var Buffer = require("buffer/").Buffer
@@ -15,9 +16,16 @@ var loginDialog
 var mailboxItem
 var globalEvent
 
+// in bytes (1024 x 1024 = 1 MB)
+const MAX_ATTACHMENT_SIZE = 1024 * 1024
+
 Office.initialize = () => {
     Office.onReady(() => {
         mailboxItem = Office.context.mailbox.item
+
+        delete window.alert // assures alert works
+        delete window.confirm // assures confirm works
+        delete window.prompt // assures prompt works
     })
 }
 
@@ -60,7 +68,7 @@ function getRecipientEmail(): Promise<string> {
 // Gets the mail body
 async function getMailBody(): Promise<string> {
     return new Promise(function (resolve, reject) {
-        mailboxItem.body.getAsync(Office.CoercionType.Text, (asyncResult) => {
+        mailboxItem.body.getAsync(Office.CoercionType.Html, (asyncResult) => {
             const body: string = asyncResult.value
             if (body !== "") resolve(body)
             else reject("No body in email")
@@ -134,6 +142,7 @@ async function getMailAttachmentContent(attachmentId: string): Promise<string> {
 // Encrypts and sends the mail
 async function encryptAndsendMail(token) {
     const recipientEmail = await getRecipientEmail() //.catch(e => console.error(e)) // mailboxItem.to.getAsync()
+    const sender = Office.context.mailbox.userProfile.emailAddress
 
     console.log("Recipient: ", recipientEmail)
 
@@ -142,59 +151,92 @@ async function encryptAndsendMail(token) {
         value: recipientEmail,
     }
 
-    const mailBody = await getMailBody()
+    let mailBody = await getMailBody()
+    // extract HTML within <body>
+    const pattern = /<body[^>]*>((.|[\n\r])*)<\/body>/im
+    const arrayMatches = pattern.exec(mailBody)
+    mailBody = arrayMatches[1]
+
     const mailSubject = await getMailSubject()
     const attachments = await getMailAttachments()
 
-    console.log("Mailbody: ", mailBody)
-
     const client = await Client.build("https://irmacrypt.nl/pkg")
-
-    const bytes = new TextEncoder().encode(mailBody)
+    const controller = new AbortController()
+    const cryptifyApiWrapper = new CryptifyApiWrapper(
+        client,
+        recipientEmail,
+        sender,
+        "https://dellxps"
+    )
 
     const meta = client.createMetadata(identity)
     const metadata = meta.metadata.to_json()
+
+    const keys = meta.keys
+    const header: Uint8Array = meta.header
+    const iv = metadata.iv
 
     console.log("meta.header: ", meta.header)
     console.log("meta.keys: ", meta.keys)
     console.log("meta.metadata: ", metadata)
     console.log("nonce: ", metadata.iv)
 
-    const ct = await symcrypt(meta.keys, metadata.iv, meta.header, bytes)
-    console.log("ct :", ct)
-
     const composeMail = new ComposeMail()
     composeMail.addRecipient(recipientEmail)
     composeMail.setVersion("1")
     composeMail.setSubject(mailSubject)
-    composeMail.setCiphertext(ct)
-    composeMail.setSender(Office.context.mailbox.userProfile.emailAddress)
+    composeMail.setSender(sender)
 
     for (let i = 0; i < attachments.length; i++) {
         const attachment = attachments[i]
-        let nonce = new Uint8Array(16)
-        nonce = window.crypto.getRandomValues(nonce)
-        const attachmentBytes = new TextEncoder().encode(attachment.content)
-        const attachmentCT = await symcrypt(
-            meta.keys,
-            nonce,
-            meta.header,
-            attachmentBytes
-        )
-        composeMail.addAttachment(
-            attachmentCT,
-            attachment.filename,
-            nonce
-            // Encode uint8array to base64: Buffer.from(nonce).toString("base64") // decode base64 to uint8array: var uintArray = Base64Binary.decode(base64_string);
-        )
+
+        let useCryptify = false
+        const fileBlob = new Blob([attachment.content], {
+            type: "application/octet-stream",
+        })
+        const file = new File([fileBlob], attachment.filename, {
+            type: "application/octet-stream",
+        })
+
+        // if attachment is too large, ask user if it should be encrypted via Cryptify
+        if (fileBlob.size > MAX_ATTACHMENT_SIZE) {
+            // TODO: Add confirmation dialog (https://theofficecontext.com/2017/06/14/dialogs-in-officejs/)
+            console.log(`Attachment ${attachment.filename} larger than 1 MB`)
+            useCryptify = true
+            const downloadUrl = await cryptifyApiWrapper.encryptAndUploadFile(
+                file,
+                controller
+            )
+            mailBody += `<p><a href="${downloadUrl}">Download ${attachment.filename} via Cryptify</a></p>`
+        }
+
+        if (!useCryptify) {
+            let nonce = new Uint8Array(16)
+            nonce = window.crypto.getRandomValues(nonce)
+            const input = new TextEncoder().encode(attachment.content)
+
+            console.log("Attachment bytes length: ", input.byteLength)
+            console.log("Metaheader bytes length: ", header.byteLength)
+
+            const attachmentCT = await client.symcrypt({
+                keys,
+                iv,
+                header,
+                input,
+            })
+            composeMail.addAttachment(attachmentCT, attachment.filename, nonce)
+        }
     }
 
+    console.log("Mailbody: ", mailBody)
+
+    const input = new TextEncoder().encode(mailBody)
+    console.log("Body bytes length: ", input.byteLength)
+    const ct = await client.symcrypt({ keys, iv, header, input })
+    composeMail.setCiphertext(ct)
+
     const message = Buffer.from(composeMail.getMimeMail()).toString("base64")
-
-    console.log("MIME mail: \n", composeMail.getMimeMail())
-
     const sendMessageUrl = "https://graph.microsoft.com/v1.0/me/sendMail"
-
     console.log("Trying to send email via ", sendMessageUrl)
 
     $.ajax({

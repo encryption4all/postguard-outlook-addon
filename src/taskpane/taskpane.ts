@@ -13,13 +13,11 @@ import "web-streams-polyfill"
 
 import { ReadMail } from "@e4a/irmaseal-mail-utils"
 
-import {
-    Client,
-    createUint8ArrayReadable,
-    KeySet,
-    symcrypt,
-    MetadataReaderResult,
-} from "@e4a/irmaseal-client"
+import { Client } from "@e4a/irmaseal-client"
+
+import * as IrmaCore from "@privacybydesign/irma-core"
+import * as IrmaClient from "@privacybydesign/irma-client"
+import * as IrmaPopup from "@privacybydesign/irma-popup"
 
 /* global Office */
 
@@ -114,105 +112,99 @@ function successMessageReceived(returnData) {
 
     console.log("Version: ", readMail.getVersion())
 
-    const sealBytes = readMail.getCiphertext()
-
-    const readableStream = createUint8ArrayReadable(sealBytes)
+    const input = readMail.getCiphertext()
 
     Client.build("https://irmacrypt.nl/pkg").then((client) => {
-        console.log("Client build")
+        const readableStream = client.createUint8ArrayReadable(input)
         client
             .extractMetadata(readableStream)
-            .then((metadata: MetadataReaderResult) => {
+            .then(async ({ metadata, header }) => {
                 console.log("metadata extract", metadata)
-                let metajson = metadata.metadata.to_json()
-                console.log("metadata to json: ", metajson)
+                const {
+                    identity: { attribute: irmaIdentity, timestamp: timestamp },
+                } = metadata.to_json()
 
-                client
-                    .requestToken(metajson.identity.attribute)
-                    .then((token) =>
-                        client.requestKey(token, metajson.identity.timestamp)
+                const metajson = metadata.to_json()
+
+                var session = client.createPKGSession(irmaIdentity, timestamp)
+
+                var irma = new IrmaCore({ debugging: true, session: session })
+                irma.use(IrmaClient)
+                irma.use(IrmaPopup)
+
+                const usk = await irma.start()
+                const keys = metadata.derive_keys(usk)
+                const iv = metajson.iv
+                const decrypt = true
+
+                console.log("Input length: ", input.byteLength)
+
+                const plainBytes: Uint8Array = await client.symcrypt({
+                    keys,
+                    iv,
+                    header,
+                    input,
+                    decrypt,
+                })
+
+                const mail: string = new TextDecoder().decode(plainBytes)
+                console.log("Mail content: ", mail)
+
+                // decrypt attachments
+                const attachments = readMail.getAttachments()
+                for (let i = 0; i < attachments.length; i++) {
+                    const attachment = attachments[i]
+                    const iv = attachment.nonce
+                    const input = attachment.body
+
+                    // decrypt only attachments that end on .enc (as we need to skip the version and CT part)
+                    const attachmentBytes: Uint8Array = await client.symcrypt({
+                        keys,
+                        iv,
+                        header,
+                        input,
+                        decrypt,
+                    })
+
+                    const base64EncodedAttachment: string = new TextDecoder().decode(
+                        attachmentBytes
                     )
-                    .then(async (usk) => {
-                        const keys: KeySet = metadata.metadata.derive_keys(usk)
-                        const plainBytes: Uint8Array = await symcrypt(
-                            keys,
-                            metajson.iv,
-                            metadata.header,
-                            sealBytes,
-                            true
-                        )
 
-                        const mail: string = new TextDecoder().decode(
-                            plainBytes
-                        )
-                        console.log("Mail content: ", mail)
+                    document.getElementById("attachments").style.display =
+                        "flex"
 
-                        // decrypt attachments
-                        const attachments = readMail.getAttachments()
-                        for (let i = 0; i < attachments.length; i++) {
-                            const attachment = attachments[i]
+                    // create for each attachment a "div" element, which we assign a click event, and the data as a blob object via jQueries data storage.
+                    // why to use blob (uint8array) instead of base64 encoded string: https://blobfolio.com/2019/better-binary-batter-mixing-base64-and-uint8array/
+                    // when the user clicks, the blob is attached to a temporary anchor element and triggered programmatically to download the file.
+                    const a = document
+                        .getElementById("attachmentList")
+                        .appendChild(document.createElement("div"))
+                    a.innerHTML = attachment.fileName
+                    a.onclick = downloadBlobHandler
+                    $(a).data("blob", base64toBlob(base64EncodedAttachment))
+                }
 
-                            const attachmentBytes: Uint8Array = await symcrypt(
-                                keys,
-                                attachment.nonce,
-                                metadata.header,
-                                attachment.body,
-                                true
-                            )
+                document.getElementById("decryptinfo").style.display = "none"
 
-                            const base64EncodedAttachment: string = new TextDecoder().decode(
-                                attachmentBytes
-                            )
+                document.getElementById("irmaapp").style.display = "none"
 
-                            document.getElementById(
-                                "attachments"
-                            ).style.display = "flex"
+                document.getElementById("bg_decrypted_txt").style.display =
+                    "block"
 
-                            // create for each attachment a "div" element, which we assign a click event, and the data as a blob object via jQueries data storage.
-                            // why to use blob (uint8array) instead of base64 encoded string: https://blobfolio.com/2019/better-binary-batter-mixing-base64-and-uint8array/
-                            // when the user clicks, the blob is attached to a temporary anchor element and triggered programmatically to download the file.
-                            const a = document
-                                .getElementById("attachmentList")
-                                .appendChild(document.createElement("div"))
-                            a.innerHTML = attachment.fileName
-                            a.onclick = downloadBlobHandler
-                            $(a).data(
-                                "blob",
-                                base64toBlob(base64EncodedAttachment)
-                            )
-                        }
+                document.getElementById("idlock_svg_decrypt").style.display =
+                    "block"
 
-                        document.getElementById("decryptinfo").style.display =
-                            "none"
+                document.getElementById("idlock_svg").style.display = "none"
 
-                        document.getElementById("irmaapp").style.display =
-                            "none"
+                document.getElementById("expires").style.display = "none"
 
-                        document.getElementById(
-                            "bg_decrypted_txt"
-                        ).style.display = "block"
+                document.getElementById("irma-popup-web-form").style.display =
+                    "none"
 
-                        document.getElementById(
-                            "idlock_svg_decrypt"
-                        ).style.display = "block"
+                document.getElementById("info_message_text").innerHTML =
+                    "Decrypted message from"
 
-                        document.getElementById("idlock_svg").style.display =
-                            "none"
-
-                        document.getElementById("expires").style.display =
-                            "none"
-
-                        document.getElementById("info_message_text").innerHTML =
-                            "Decrypted message from"
-
-                        writeMail(mail)
-                    })
-                    .catch((err) => {
-                        console.log("Error decrypting mail: ", err, err.stack)
-                    })
-            })
-            .catch((err) => {
-                console.error("Error exracting metadata: ", err, err.stack)
+                writeMail(mail)
             })
     })
 }

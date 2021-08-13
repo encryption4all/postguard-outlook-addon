@@ -31,6 +31,8 @@ module.exports = async (env, options) => {
                 process: "process/browser",
                 stream: "stream-browserify",
                 zlib: "browserify-zlib",
+                https: "https-browserify", // 'resolve.fallback: { "http": require.resolve("stream-http") }'
+                http: "stream-http",
             },
         },
         module: {
