@@ -113,8 +113,8 @@ async function getMailAttachments(): Promise<IAttachmentContent[]> {
                             content: content,
                         })
                     }
-                    if (attachmentsArray.length > 0) resolve(attachmentsArray)
-                    else reject("No attachments in email")
+                } else {
+                    reject("No attachments in email")
                 }
             }
         })
@@ -158,7 +158,12 @@ async function encryptAndsendMail(token) {
     mailBody = arrayMatches[1]
 
     const mailSubject = await getMailSubject()
-    const attachments = await getMailAttachments()
+    let attachments: IAttachmentContent[]
+    await getMailAttachments()
+        .then((attas) => (attachments = attas))
+        .catch((error) => console.log(error))
+
+    console.log("Mail subject: ", mailSubject)
 
     const client = await Client.build("https://irmacrypt.nl/pkg")
     const controller = new AbortController()
@@ -187,44 +192,52 @@ async function encryptAndsendMail(token) {
     composeMail.setSubject(mailSubject)
     composeMail.setSender(sender)
 
-    for (let i = 0; i < attachments.length; i++) {
-        const attachment = attachments[i]
+    if (attachments !== undefined) {
+        for (let i = 0; i < attachments.length; i++) {
+            const attachment = attachments[i]
 
-        let useCryptify = false
-        const fileBlob = new Blob([attachment.content], {
-            type: "application/octet-stream",
-        })
-        const file = new File([fileBlob], attachment.filename, {
-            type: "application/octet-stream",
-        })
-
-        // if attachment is too large, ask user if it should be encrypted via Cryptify
-        if (fileBlob.size > MAX_ATTACHMENT_SIZE) {
-            // TODO: Add confirmation dialog (https://theofficecontext.com/2017/06/14/dialogs-in-officejs/)
-            console.log(`Attachment ${attachment.filename} larger than 1 MB`)
-            useCryptify = true
-            const downloadUrl = await cryptifyApiWrapper.encryptAndUploadFile(
-                file,
-                controller
-            )
-            mailBody += `<p><a href="${downloadUrl}">Download ${attachment.filename} via Cryptify</a></p>`
-        }
-
-        if (!useCryptify) {
-            let nonce = new Uint8Array(16)
-            nonce = window.crypto.getRandomValues(nonce)
-            const input = new TextEncoder().encode(attachment.content)
-
-            console.log("Attachment bytes length: ", input.byteLength)
-            console.log("Metaheader bytes length: ", header.byteLength)
-
-            const attachmentCT = await client.symcrypt({
-                keys,
-                iv,
-                header,
-                input,
+            let useCryptify = false
+            const fileBlob = new Blob([attachment.content], {
+                type: "application/octet-stream",
             })
-            composeMail.addAttachment(attachmentCT, attachment.filename, nonce)
+            const file = new File([fileBlob], attachment.filename, {
+                type: "application/octet-stream",
+            })
+
+            // if attachment is too large, ask user if it should be encrypted via Cryptify
+            if (fileBlob.size > MAX_ATTACHMENT_SIZE) {
+                // TODO: Add confirmation dialog (https://theofficecontext.com/2017/06/14/dialogs-in-officejs/)
+                console.log(
+                    `Attachment ${attachment.filename} larger than 1 MB`
+                )
+                useCryptify = true
+                const downloadUrl = await cryptifyApiWrapper.encryptAndUploadFile(
+                    file,
+                    controller
+                )
+                mailBody += `<p><a href="${downloadUrl}">Download ${attachment.filename} via Cryptify</a></p>`
+            }
+
+            if (!useCryptify) {
+                let nonce = new Uint8Array(16)
+                nonce = window.crypto.getRandomValues(nonce)
+                const input = new TextEncoder().encode(attachment.content)
+
+                console.log("Attachment bytes length: ", input.byteLength)
+                console.log("Metaheader bytes length: ", header.byteLength)
+
+                const attachmentCT = await client.symcrypt({
+                    keys,
+                    iv,
+                    header,
+                    input,
+                })
+                composeMail.addAttachment(
+                    attachmentCT,
+                    attachment.filename,
+                    nonce
+                )
+            }
         }
     }
 
