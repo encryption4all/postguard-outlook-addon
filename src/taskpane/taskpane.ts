@@ -154,14 +154,21 @@ function successMessageReceived(returnData) {
                 const attachments = readMail.getAttachments()
                 for (let i = 0; i < attachments.length; i++) {
                     const attachment = attachments[i]
-                    const iv = attachment.nonce
                     const input = attachment.body
+                    const readableStreamAttachment = client.createUint8ArrayReadable(
+                        input
+                    )
+                    const reader = readableStreamAttachment.getReader()
 
-                    // decrypt only attachments that end on .enc (as we need to skip the version and CT part)
+                    // eslint-disable-next-line no-unused-vars
+                    const { value, done } = await reader.read()
+                    const chunk = value
+                    const nonce = chunk.slice(0, 16)
+
                     const attachmentBytes: Uint8Array = await client.symcrypt({
                         keys,
-                        iv,
-                        header,
+                        iv: nonce,
+                        header: nonce,
                         input,
                         decrypt,
                     })
