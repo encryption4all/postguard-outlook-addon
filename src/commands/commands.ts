@@ -8,6 +8,7 @@
 import { Client, Attribute } from "@e4a/irmaseal-client"
 import { ComposeMail } from "@e4a/irmaseal-mail-utils"
 import { CryptifyApiWrapper } from "@e4a/cryptify-api-wrapper/dist/cryptify-api-wrapper"
+import { merge } from "jquery"
 
 // eslint-disable-next-line no-undef
 var Buffer = require("buffer/").Buffer
@@ -223,8 +224,11 @@ async function encryptAndsendMail(token) {
             */
 
             if (!useCryptify) {
-                let nonce = new Uint8Array(16)
+                let nonce = new Uint8Array(8)
                 nonce = window.crypto.getRandomValues(nonce)
+
+                const counter = new Uint8Array(8)
+                const mergedArray = new Uint8Array([...nonce, ...counter])
 
                 const input = new TextEncoder().encode(attachment.content)
 
@@ -232,8 +236,8 @@ async function encryptAndsendMail(token) {
 
                 const attachmentCT = await client.symcrypt({
                     keys,
-                    iv: nonce,
-                    header: nonce,
+                    iv: mergedArray,
+                    header: mergedArray,
                     input,
                 })
                 composeMail.addAttachment(attachmentCT, attachment.filename)
