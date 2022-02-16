@@ -14,7 +14,6 @@
   <SupportUrl DefaultValue="https://irma.app"/>
   <AppDomains>
     <AppDomain>https://irmacrypt.nl</AppDomain>
-    <AppDomain>https://qrona.info</AppDomain>
     <AppDomain>https://login.microsoftonline.com</AppDomain>
     <AppDomain>https://login.windows.net</AppDomain>
   </AppDomains>
@@ -38,6 +37,10 @@
   <Rule xsi:type="RuleCollection" Mode="Or">
     <Rule xsi:type="ItemIs" ItemType="Message" FormType="Edit"/>
   </Rule>
+  <Rule xsi:type="ItemHasRegularExpressionMatch"
+    PropertyName="BodyAsHTML"
+    RegExName="IrmaSealMail"
+    RegExValue="IRMASeal"/>
   <DisableEntityHighlighting>false</DisableEntityHighlighting>
   <VersionOverrides xmlns="http://schemas.microsoft.com/office/mailappversionoverrides" xsi:type="VersionOverridesV1_0">
     <Requirements>
@@ -66,6 +69,7 @@
                   </Icon>
                   <Action xsi:type="ShowTaskpane">
                     <SourceLocation resid="Taskpane.Url"/>
+                    <SupportsPinning>true</SupportsPinning>
                   </Action>
                 </Control>
               </Group>
@@ -148,6 +152,7 @@
                     </Icon>
                     <Action xsi:type="ShowTaskpane">
                       <SourceLocation resid="Taskpane.Url"/>
+                      <SupportsPinning>true</SupportsPinning>
                     </Action>
                   </Control>
                 </Group>

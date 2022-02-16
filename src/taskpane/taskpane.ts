@@ -11,7 +11,7 @@ import "../../assets/icon-80.png"
 
 import "web-streams-polyfill"
 
-import { ReadMail } from "@e4a/irmaseal-mail-utils"
+import { ReadMail } from "@e4a/irmaseal-mail-utils/dist/index"
 
 import { Client } from "@e4a/irmaseal-client"
 
@@ -114,8 +114,11 @@ function successMessageReceived(returnData) {
 
     const input = readMail.getCiphertext()
 
+    console.log("CT: " + input)
+
     Client.build("https://irmacrypt.nl/pkg").then((client) => {
         const readableStream = client.createUint8ArrayReadable(input)
+        console.log("Readable stream: " + readableStream)
         client
             .extractMetadata(readableStream)
             .then(async ({ metadata, header }) => {

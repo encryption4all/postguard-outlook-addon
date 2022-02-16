@@ -6,9 +6,8 @@
 /* global $, Office */
 
 import { Client, Attribute } from "@e4a/irmaseal-client"
-import { ComposeMail } from "@e4a/irmaseal-mail-utils"
-import { CryptifyApiWrapper } from "@e4a/cryptify-api-wrapper/dist/cryptify-api-wrapper"
-import { merge } from "jquery"
+import { ComposeMail } from "@e4a/irmaseal-mail-utils/dist/index"
+// import { CryptifyApiWrapper } from "@e4a/cryptify-api-wrapper/dist/cryptify-api-wrapper"
 
 // eslint-disable-next-line no-undef
 var Buffer = require("buffer/").Buffer
@@ -18,7 +17,7 @@ var mailboxItem
 var globalEvent
 
 // in bytes (1024 x 1024 = 1 MB)
-const MAX_ATTACHMENT_SIZE = 1024 * 1024
+// const MAX_ATTACHMENT_SIZE = 1024 * 1024
 
 Office.initialize = () => {
     Office.onReady(() => {
@@ -200,7 +199,7 @@ async function encryptAndsendMail(token) {
             const attachment = attachments[i]
 
             let useCryptify = false
-            const fileBlob = new Blob([attachment.content], {
+            /*const fileBlob = new Blob([attachment.content], {
                 type: "application/octet-stream",
             })
             const file = new File([fileBlob], attachment.filename, {
@@ -208,7 +207,6 @@ async function encryptAndsendMail(token) {
             })
 
             // if attachment is too large, ask user if it should be encrypted via Cryptify
-            /*
             if (fileBlob.size > MAX_ATTACHMENT_SIZE) {
                 // TODO: Add confirmation dialog (https://theofficecontext.com/2017/06/14/dialogs-in-officejs/)
                 console.log(
