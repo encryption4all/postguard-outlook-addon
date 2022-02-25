@@ -2,24 +2,25 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Attach to Office Add-in (Edge Chromium)",
-            "type": "edge",
+            "name": "Outlook Desktop (Edge Chromium)",
+            "type": "pwa-msedge",
             "request": "attach",
-            "useWebView": "advanced",
+            "useWebView": true,
             "port": 9229,
             "timeout": 600000,
             "webRoot": "${workspaceRoot}",
-            "trace": "verbose"
+            "preLaunchTask": "Debug: Outlook Desktop"
+            //"postDebugTask": "Stop Debug"
         },
         {
-            "type": "office-addin",
+            "name": "Attach to Office Add-in (Edge Chromium)",
+            "type": "pwa-msedge",
             "request": "attach",
-            "name": "Attach to Office Add-ins (Legacy)",
+            "useWebView": true,
             "port": 9222,
-            "trace": "verbose",
-            "url": "https://localhost:3000/taskpane.html?_host_Info=Outlook$Win32$16.02$en-US$$$$0",
-            "webRoot": "${workspaceFolder}",
-            "timeout": 45000
+            "timeout": 600000,
+            "webRoot": "${workspaceRoot}",
+            "trace": true
         },
         {
             "name": "Debug Office Add-in (Edge Chromium)",
@@ -40,17 +41,6 @@
             "request": "attach",
             "url": "https://localhost:3000/taskpane.html?_host_Info=Outlook$Win32$16.01$en-US$$$$0",
             "port": 9222,
-            "timeout": 600000,
-            "webRoot": "${workspaceRoot}",
-            "preLaunchTask": "Debug: Outlook Desktop",
-            "postDebugTask": "Stop Debug"
-        },
-        {
-            "name": "Outlook Desktop (Edge Chromium)",
-            "type": "pwa-msedge",
-            "request": "attach",
-            "useWebView": true,
-            "port": 9229,
             "timeout": 600000,
             "webRoot": "${workspaceRoot}",
             "preLaunchTask": "Debug: Outlook Desktop",

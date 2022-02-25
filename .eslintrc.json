@@ -1,16 +1,17 @@
 {
-    "parser": "@typescript-eslint/parser",
-    "plugins": ["@typescript-eslint", "office-addins"],
-    "parserOptions": {
-        "ecmaVersion": 6,
-        "sourceType": "module",
-        "ecmaFeatures": {
-            "jsx": true
-        },
-        "project": "./tsconfig.json"
+  "root": true,
+  "parser": "@typescript-eslint/parser",
+  "plugins": ["@typescript-eslint", "office-addins", "prettier"],
+  "parserOptions": {
+    "ecmaVersion": 6,
+    "sourceType": "module",
+    "ecmaFeatures": {
+      "jsx": true
     },
-    "extends": ["eslint-config-office-addins"],
-    "env": {
-        "browser": true
-    }
+    "project": "./tsconfig.json"
+  },
+  "extends": ["eslint-config-office-addins", "prettier"],
+  "env": {
+    "browser": true
+  }
 }

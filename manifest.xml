@@ -11,11 +11,12 @@
   <Description DefaultValue="IRMASeal - easy email encryption."/>
   <IconUrl DefaultValue="https://localhost:3000/assets/icon-64.png"/>
   <HighResolutionIconUrl DefaultValue="https://localhost:3000/assets/icon-128.png"/>
-  <SupportUrl DefaultValue="https://irma.app"/>
+  <SupportUrl DefaultValue="https://cryptify.nl"/>
   <AppDomains>
     <AppDomain>https://irmacrypt.nl</AppDomain>
     <AppDomain>https://login.microsoftonline.com</AppDomain>
     <AppDomain>https://login.windows.net</AppDomain>
+    <AppDomain>https://main.irmaseal-pkg.ihub.ru.nl</AppDomain>
   </AppDomains>
   <Hosts>
     <Host Name="Mailbox"/>
@@ -215,6 +216,8 @@
           <Scope>openid</Scope>
           <Scope>profile</Scope>
           <Scope>mail.read</Scope>
+          <Scope>mail.readwrite</Scope>
+          <Scope>mail.readbasic</Scope>
         </Scopes>
       </WebApplicationInfo>
 
