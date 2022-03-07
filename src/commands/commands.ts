@@ -3,32 +3,25 @@
  * See LICENSE in the project root for license information.
  */
 
-/*
-
-TODO:
-
-- Create MIME mail
-- Update mail-utils (see changes already applied)
-
-
-*/
-
 /* global $, Office */
 
 import { ComposeMail } from '@e4a/irmaseal-mail-utils/dist/index'
 import { createMimeMessage } from 'mimetext'
+import {
+  storeMailAsPlainLocally,
+  IAttachmentContent,
+  setEventError,
+  htmlBodyType
+} from '../helpers/utils'
 
 // eslint-disable-next-line no-undef
 var Buffer = require('buffer/').Buffer
 
-var loginDialog
 var mailboxItem
 var globalEvent
 
-//const hostname = 'https://main.irmaseal-pkg.ihub.ru.nl'
-const hostname = 'http://localhost:8087'
+const hostname = 'https://main.irmaseal-pkg.ihub.ru.nl'
 const mod_promise = import('@e4a/irmaseal-wasm-bindings')
-const folder_name = 'Cryptify'
 
 // in bytes (1024 x 1024 = 1 MB)
 // const MAX_ATTACHMENT_SIZE = 1024 * 1024
@@ -111,7 +104,10 @@ async function getMailBody(): Promise<string> {
   return new Promise(function (resolve, reject) {
     mailboxItem.body.getAsync(Office.CoercionType.Html, (asyncResult) => {
       const body: string = asyncResult.value
-      if (body !== '') resolve(body)
+      const pattern = /<body[^>]*>((.|[\n\r])*)<\/body>/im
+      const arrayMatches = pattern.exec(body)
+      const mailBody = arrayMatches[1]
+      if (body !== '') resolve(mailBody)
       else reject('No body in email')
     })
   })
@@ -130,12 +126,6 @@ async function getMailSubject(): Promise<string> {
       }
     })
   })
-}
-
-interface IAttachmentContent {
-  filename: string
-  content: string
-  isInline: boolean
 }
 
 async function getMailAttachments(): Promise<IAttachmentContent[]> {
@@ -226,10 +216,6 @@ async function encryptAndsendMail(token) {
   console.log('Encrypting using the following policies: ', allPolicies)
 
   let mailBody = await getMailBody()
-  // extract HTML within <body>
-  const pattern = /<body[^>]*>((.|[\n\r])*)<\/body>/im
-  const arrayMatches = pattern.exec(mailBody)
-  mailBody = arrayMatches[1]
 
   const mailSubject = await getMailSubject()
   console.log('Mail subject: ', mailSubject)
@@ -248,33 +234,6 @@ async function encryptAndsendMail(token) {
         sender,
         "https://dellxps"
     )*/
-
-  // build JSON message that is used to create message in Cryptify folder
-  let jsonInnerMail = {
-    sender: { emailAddress: { address: sender } },
-    subject: mailSubject,
-    body: {
-      contentType: 'HTML',
-      content: mailBody
-    },
-    toRecipients: recipientEmails.map((recipient) => {
-      return {
-        emailAddress: { address: recipient }
-      }
-    }),
-    ccRecipients: ccRecipientEmails.map((recipient) => {
-      return {
-        emailAddress: { address: recipient }
-      }
-    }),
-    bccRecipients: bccRecipientEmails.map((recipient) => {
-      return {
-        emailAddress: { address: recipient }
-      }
-    })
-  }
-
-  console.log('jsonInnerMail: ', JSON.stringify(jsonInnerMail))
 
   // Use createMimeMessage to create inner MIME mail
   const msg = createMimeMessage()
@@ -300,11 +259,12 @@ async function encryptAndsendMail(token) {
     composeMail.addBccRecipient(recipientEmail)
   })
 
+  let hasAttachments: boolean = false
+
   if (attachments !== undefined) {
+    let useCryptify = false
     for (let i = 0; i < attachments.length; i++) {
       const attachment = attachments[i]
-
-      let useCryptify = false
       /*const fileBlob = new Blob([attachment.content], {
                 type: "application/octet-stream",
             })
@@ -328,20 +288,55 @@ async function encryptAndsendMail(token) {
             */
 
       if (!attachment.isInline) {
-        jsonInnerMail['hasAttachments'] = true
-      }
-
-      if (!useCryptify) {
-        const input = new TextEncoder().encode(attachment.content)
-        console.log('Attachment bytes length: ', input.byteLength)
-        msg.setAttachment(
-          attachment.filename,
-          'application/octet-stream',
-          msg.toBase64(attachment.content)
+        hasAttachments = true
+        if (!useCryptify) {
+          const input = new TextEncoder().encode(attachment.content)
+          console.log('Attachment bytes length: ', input.byteLength)
+          msg.setAttachment(
+            attachment.filename,
+            'application/octet-stream',
+            attachment.content
+          )
+        }
+      } else {
+        // replace inline image in body
+        const imageContentIDToReplace = `cid:${attachment.filename}@.*"`
+        const regex = new RegExp(imageContentIDToReplace, 'g')
+        mailBody = mailBody.replace(
+          regex,
+          `data:image;base64,${attachment.content}"`
+          //attachment.filename + '"'
         )
       }
     }
   }
+
+  let jsonInnerMail = {
+    sender: { emailAddress: { address: sender } },
+    subject: mailSubject,
+    body: {
+      contentType: htmlBodyType,
+      content: mailBody
+    },
+    toRecipients: recipientEmails.map((recipient) => {
+      return {
+        emailAddress: { address: recipient }
+      }
+    }),
+    ccRecipients: ccRecipientEmails.map((recipient) => {
+      return {
+        emailAddress: { address: recipient }
+      }
+    }),
+    bccRecipients: bccRecipientEmails.map((recipient) => {
+      return {
+        emailAddress: { address: recipient }
+      }
+    }),
+    hasAttachments: hasAttachments
+  }
+
+  console.log('jsonInnerMail: ', JSON.stringify(jsonInnerMail))
 
   console.log('Mailbody: ', mailBody)
   msg.setMessage('text/html', mailBody)
@@ -387,7 +382,7 @@ async function encryptAndsendMail(token) {
         persistent: true
       }
 
-      checkCryptifyMailFolder(token, jsonInnerMail)
+      storeMailAsPlainLocally(token, jsonInnerMail, attachments, 'CryptifySend')
 
       Office.context.mailbox.item.notificationMessages.replaceAsync(
         'action',
@@ -403,84 +398,16 @@ async function encryptAndsendMail(token) {
   })
 }
 
-// get id from cryptify folder to create inner mail in that folder
-// if it does not exist, create it
-function checkCryptifyMailFolder(token, innerMail) {
-  const mailFoldersUrl = 'https://graph.microsoft.com/v1.0/me/mailFolders'
-  $.ajax({
-    type: 'GET',
-    url: mailFoldersUrl,
-    headers: {
-      Authorization: 'Bearer ' + token
-    },
-    success: function (success) {
-      console.log('MailFolders: ', success)
-      let folderFound = false
-      success.value.forEach((folder) => {
-        if (!folderFound && folder.displayName === folder_name) {
-          folderFound = true
-          console.log('Folder exists with id ', folder.id)
-          storeInnerMail(folder.id, innerMail, token)
-        }
-      })
-      if (!folderFound) {
-        console.log('Folder not found, creating ...')
-        createCryptifyMailFolder(token, innerMail)
-      }
+function new_readable_stream_from_array(array) {
+  return new ReadableStream({
+    start(controller) {
+      controller.enqueue(array)
+      controller.close()
     }
-  }).fail(function ($xhr) {
-    var data = $xhr.responseJSON
-    console.log('Ajax error: ', data)
-    setEventError()
   })
 }
 
-function createCryptifyMailFolder(token, innerMail) {
-  const createMailFoldersUrl = 'https://graph.microsoft.com/v1.0/me/mailFolders'
-  const payload = {
-    displayName: folder_name,
-    isHidden: false
-  }
-
-  $.ajax({
-    type: 'POST',
-    contentType: 'application/json',
-    url: createMailFoldersUrl,
-    data: JSON.stringify(payload),
-    headers: {
-      Authorization: 'Bearer ' + token
-    },
-    success: function (success) {
-      console.log('Created mailfolder succesfully!')
-      storeInnerMail(success.id, innerMail, token)
-    }
-  }).fail(function ($xhr) {
-    var data = $xhr.responseJSON
-    console.log('Ajax error: ', data)
-    setEventError()
-  })
-}
-
-function storeInnerMail(folderId, innerMail, token) {
-  const createMessageUrl = `https://graph.microsoft.com/v1.0/me/mailFolders/${folderId}/messages`
-
-  $.ajax({
-    type: 'POST',
-    contentType: 'application/json',
-    url: createMessageUrl,
-    data: JSON.stringify(innerMail),
-    headers: {
-      Authorization: 'Bearer ' + token
-    },
-    success: function (success) {
-      console.log('Createmail success: ', success)
-    }
-  }).fail(function ($xhr) {
-    var data = $xhr.responseJSON
-    console.log('Ajax error: ', data)
-    setEventError()
-  })
-}
+var loginDialog
 
 // This handler responds to the success or failure message that the pop-up dialog receives from the identity provider
 // and access token provider.
@@ -525,27 +452,6 @@ function showLoginPopup(url) {
       )
     }
   )
-}
-
-function setEventError() {
-  const message: Office.NotificationMessageDetails = {
-    type: Office.MailboxEnums.ItemNotificationMessageType.ErrorMessage,
-    message: 'Error during encryption, please contact your administrator.'
-  }
-
-  Office.context.mailbox.item.notificationMessages.replaceAsync(
-    'action',
-    message
-  )
-}
-
-function new_readable_stream_from_array(array) {
-  return new ReadableStream({
-    start(controller) {
-      controller.enqueue(array)
-      controller.close()
-    }
-  })
 }
 
 function getGlobal() {
