@@ -68,6 +68,7 @@ module.exports = async (env, options) => {
       ]
     },
     plugins: [
+      new CopyWebpackPlugin({ patterns: [{ from: 'assets', to: 'assets' }] }),
       new webpack.ProvidePlugin({
         process: 'process/browser',
         Buffer: ['buffer', 'Buffer']
@@ -113,13 +114,17 @@ module.exports = async (env, options) => {
         filename: 'fallbackauthdialog.html',
         template: './src/helpers/fallbackauthdialog.html',
         chunks: ['polyfill', 'fallbackauthdialog']
+      }),
+      new HtmlWebpackPlugin({
+        filename: 'emailpopup.html',
+        template: './src/emailpopup/emailpopup.html',
+        chunks: ['polyfill']
       })
     ],
     devServer: {
       headers: {
         'Access-Control-Allow-Origin': '*'
       },
-      //https: false,
       https:
         options.https !== undefined
           ? options.https
