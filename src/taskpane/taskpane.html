@@ -362,6 +362,21 @@
         <p>Attachments (click to download):</p>
         <div id="attachmentList"></div>
       </div>
+
+      <div id="showPopupContainer">
+        <script>
+          function getMailContent() {
+            return document.getElementById('decrypted-text').innerHTML
+          }
+        </script>
+
+        <input
+          id="showPopup"
+          type="button"
+          value="Open in popup"
+          onclick="getMailContent();"
+        />
+      </div>
     </main>
   </body>
 </html>

@@ -10,6 +10,99 @@ export interface IAttachmentContent {
   isInline: boolean
 }
 
+// 1. replace mail body
+// 2. remove current attachment
+// 3. add attachments
+export function replaceMailBody(
+  token: string,
+  item: any,
+  body: string,
+  attachments: IAttachmentContent[]
+) {
+  const messageUrl = `https://graph.microsoft.com/v1.0/me/messages/${item.itemId}`
+  const payload = {
+    body: {
+      contentType: htmlBodyType,
+      content: body
+    }
+  }
+  $.ajax({
+    type: 'PATCH',
+    contentType: 'application/json',
+    url: messageUrl,
+    data: JSON.stringify(payload),
+    headers: {
+      Authorization: 'Bearer ' + token
+    },
+    success: function (success) {
+      console.log('PATCH message success: ', success)
+      removeAttachment(token, item.itemId, item.attachments[0].id, attachments)
+    }
+  }).fail(function ($xhr) {
+    var data = $xhr.responseJSON
+    console.log('Ajax error: ', data)
+    setEventError()
+  })
+}
+
+function removeAttachment(
+  token: string,
+  messageId: string,
+  attachmentId: string,
+  attachments: IAttachmentContent[]
+) {
+  const attachmentUrl = `https://graph.microsoft.com/v1.0/me/messages/${messageId}/attachments/${attachmentId}`
+  $.ajax({
+    type: 'DELETE',
+    url: attachmentUrl,
+    headers: {
+      Authorization: 'Bearer ' + token
+    },
+    success: function (success) {
+      console.log('DELETE attachment success: ', success)
+      attachments.forEach((attachment) => {
+        addAttachment(token, messageId, attachment)
+      })
+    }
+  }).fail(function ($xhr) {
+    var data = $xhr.responseJSON
+    console.log('Ajax error: ', data)
+    setEventError()
+  })
+}
+
+function addAttachment(
+  token: string,
+  messageId: string,
+  attachment: IAttachmentContent
+) {
+  const createAttachmentUrl = `https://graph.microsoft.com/v1.0/me/messages/${messageId}/attachments`
+
+  const jsonAttachment = {
+    '@odata.type': '#microsoft.graph.fileAttachment',
+    name: attachment.filename,
+    contentBytes: attachment.content,
+    isInline: attachment.isInline
+  }
+
+  $.ajax({
+    type: 'POST',
+    contentType: 'application/json',
+    url: createAttachmentUrl,
+    data: JSON.stringify(jsonAttachment),
+    headers: {
+      Authorization: 'Bearer ' + token
+    },
+    success: function (success) {
+      console.log('Add attachment success: ', success)
+    }
+  }).fail(function ($xhr) {
+    var data = $xhr.responseJSON
+    console.log('Ajax error: ', data)
+    setEventError()
+  })
+}
+
 // get id from cryptify folder to create inner mail in that folder
 // if it does not exist, create it
 export function storeMailAsPlainLocally(
@@ -102,7 +195,7 @@ function storeInnerMail(
   })
 }
 
-async function storeAttachment(
+function storeAttachment(
   folderId,
   messageId,
   token,
@@ -145,4 +238,29 @@ export function setEventError() {
     'action',
     message
   )
+}
+
+var mailPopup
+
+export function showMailPopup(mailBody: string) {
+  var fullUrl =
+    location.protocol +
+    '//' +
+    location.hostname +
+    (location.port ? ':' + location.port : '') +
+    '/emailpopup.html'
+
+  window.localStorage.setItem('mailBody', mailBody)
+  Office.context.ui.displayDialogAsync(
+    fullUrl,
+    { height: 60, width: 60 },
+    function (asyncResult) {
+      mailPopup = asyncResult.value
+      mailPopup.messageChild(mailBody)
+    }
+  )
+}
+
+export function utilsFillMailPopup(content: string) {
+  mailPopup.messageChild(content)
 }

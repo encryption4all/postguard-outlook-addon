@@ -19,8 +19,11 @@ import { toDataURL } from 'qrcode'
 import {
   htmlBodyType,
   IAttachmentContent,
-  storeMailAsPlainLocally
+  replaceMailBody
 } from '../helpers/utils'
+
+const getLogger = require('webpack-log')
+const log = getLogger({ name: 'taskpane-log' })
 
 const mod_promise = import('@e4a/irmaseal-wasm-bindings')
 const mod = await mod_promise
@@ -110,6 +113,7 @@ function showMailContent(message) {
 
   document.getElementById('bg_decrypted_txt').style.display = 'block'
   document.getElementById('idlock_svg_decrypt').style.display = 'block'
+  document.getElementById('showPopupContainer').style.display = 'block'
 
   document.getElementById('info_message_text').innerHTML =
     'Decrypted message from'
@@ -255,7 +259,13 @@ async function successMessageReceived(mime: string, token: string) {
     }
   )
 
-  storeMailAsPlainLocally(token, jsonInnerMail, attachments, 'CryptifyReceived')
+  if (Office.context.requirements.isSetSupported('DialogApi', '1.2')) {
+    log.info('Dialog API 1.2 supported')
+  }
+
+  //showMailPopup(parsed.html)
+  //storeMailAsPlainLocally(token, jsonInnerMail, attachments, 'CryptifyReceived')
+  replaceMailBody(token, mailbox.item, parsed.html, attachments)
 }
 
 async function graphAPITokenCallback(token) {
