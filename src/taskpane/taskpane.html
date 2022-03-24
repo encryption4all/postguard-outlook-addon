@@ -286,10 +286,21 @@
         <p id="idlock_txt">Cryptify mail</p>
       </div>
 
+      <p id="status-container" hidden="true">
+        <b>Status:</b> <label id="status"></label>
+      </p>
+
       <div id="info_message">
         <p id="info_message_text">Encrypted message from</p>
         <p class="blue" id="item-sender"></p>
-        <p id="expires" class="smaller gray">Expires on July 05, 2021</p>
+      </div>
+
+      <div id="header_text">
+        <h3>Get your Cryptify Key</h3>
+        <p>
+          To decrypt and read Cryptify encrypted emails you need your Cryptify
+          key.
+        </p>
       </div>
 
       <div class="instructions_container" id="decryptinfo">
@@ -300,8 +311,8 @@
         <div class="right">
           <div>
             <p>
-              Decrypt the message by disclosing the following personal data from
-              your IRMA app:
+              Scan the QR code with the <b>IRMA app</b> to disclose your email
+              address.
             </p>
           </div>
 
@@ -316,20 +327,9 @@
             </table>
           </div>
 
-          <div
-            role="button"
-            id="run"
-            hidden="true"
-            class="ms-welcome__action ms-Button ms-Button--hero ms-font-xl"
-          >
-            <span class="ms-Button-label">Show QR Code & Scan with IRMA </span>
-          </div>
-
           <div id="qrcodecontainer">
-            <img id="qrcode" />
+            <div id="qrcode"></div>
           </div>
-
-          <p hidden="true"><b>Status:</b> <label id="item-status"></label></p>
         </div>
       </div>
 
@@ -338,7 +338,7 @@
 
         <div class="right">
           <div id="download_irma">
-            <p>Not yet downloaded the IRMA app?</p>
+            <p><b>Not yet downloaded the IRMA app?</b></p>
             <a
               href="https://play.google.com/store/apps/details?id=org.irmacard.cardemu&hl=en&gl=US&pcampaignid=pcampaignidMKT-Other-global-all-co-prtnr-py-PartBadge-Mar2515-1"
               ><img
@@ -361,21 +361,6 @@
       <div id="attachments">
         <p>Attachments (click to download):</p>
         <div id="attachmentList"></div>
-      </div>
-
-      <div id="showPopupContainer">
-        <script>
-          function getMailContent() {
-            return document.getElementById('decrypted-text').innerHTML
-          }
-        </script>
-
-        <input
-          id="showPopup"
-          type="button"
-          value="Open in popup"
-          onclick="getMailContent();"
-        />
       </div>
     </main>
   </body>

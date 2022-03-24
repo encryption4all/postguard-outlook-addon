@@ -132,6 +132,11 @@ p {
   font-size: 16px;
 }
 
+#header_text {
+  margin-top: 10px;
+  text-align: center;
+}
+
 .blue {
   color: #0074df;
 }
@@ -147,8 +152,8 @@ p {
 
 .instructions_container {
   width: 324px;
-  display: flex;
   display: -webkit-flex;
+  display: flex;
   margin-left: 16px;
   margin-top: 20px;
 }
@@ -217,8 +222,8 @@ p {
 }
 
 #qrcode {
-  width: 200px;
-  height: 200px;
+  width: 250px;
+  height: 250px;
 }
 
 #showPopupContainer {

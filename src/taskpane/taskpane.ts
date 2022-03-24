@@ -15,9 +15,10 @@ import { ReadMail } from '@e4a/irmaseal-mail-utils/dist/index'
 
 import * as IrmaCore from '@privacybydesign/irma-core'
 import * as IrmaClient from '@privacybydesign/irma-client'
-import { toDataURL } from 'qrcode'
+import * as IrmaWeb from '@privacybydesign/irma-web'
 import {
-  htmlBodyType,
+  getItemRestId,
+  hashString,
   IAttachmentContent,
   replaceMailBody
 } from '../helpers/utils'
@@ -33,178 +34,84 @@ const hostname = 'https://main.irmaseal-pkg.ihub.ru.nl'
 const email_attribute = 'pbdf.sidn-pbdf.email.email'
 
 /* global $, Office */
+var item
+var mailbox
 
 Office.onReady((info) => {
   if (info.host === Office.HostType.Outlook) {
     document.getElementById('sideload-msg').style.display = 'none'
     document.getElementById('app-body').hidden = false
-    document.getElementById('run').onclick = run
+    item = Office.context.mailbox.item
+    mailbox = Office.context.mailbox
+    $(function () {
+      checkIrmasealEmail()
+    })
   }
 })
 
-var item
-var mailbox
-
-export async function run() {
-  console.log('Run method')
-
-  $(function () {
-    getGraphAPIToken()
-  })
-}
-
-Office.initialize = function () {
-  console.log('Initialize')
-
-  item = Office.context.mailbox.item
-  mailbox = Office.context.mailbox
-
-  $(function () {
-    setItemBody()
-  })
-}
-
 // Get the body type of the composed item, and set data in
 // in the appropriate data type in the item body.
-function setItemBody() {
-  item.body.getAsync('text', (result) => {
-    if (result.status == Office.AsyncResultStatus.Failed) {
-      write(result.error.message)
+function checkIrmasealEmail() {
+  // first attachment's content type must be 'application/irmaseal' to accept email as 'irmaseal' mail
+  if (item.attachments.length != 0) {
+    const attachmentContentType = item.attachments[0].contentType
+    if (attachmentContentType == 'application/irmaseal') {
+      enableSenderinfo(item.sender.emailAddress)
+      enablePolicyInfo(item.to[0].emailAddress)
+      console.log('IRMASeal email')
+      getGraphAPIToken()
     } else {
-      // first attachment's content type must be 'application/irmaseal' to accept email as 'irmaseal' mail
-      const attachmentContentType = item.attachments[0].contentType
-      if (attachmentContentType == 'application/irmaseal') {
-        enableSenderinfo(item.sender.emailAddress)
-        enablePolicyInfo(item.to[0].emailAddress)
-
-        document.getElementById('run').hidden = false
-
-        write('IRMASeal encrypted email, able to decrypt.')
-        console.log('IRMASeal email')
-      } else {
-        console.log('No IRMASeal email')
-        write('No IRMASeal email, cannot decrypt.')
-        document.getElementById('run').hidden = false
-      }
+      console.log('No Cryptify email')
+      write('No Cryptify email, cannot decrypt.')
     }
-  })
-}
-
-function write(message) {
-  document.getElementById('item-status').innerHTML += message
-  document.getElementById('item-status').innerHTML += '<br/>'
-}
-
-function enablePolicyInfo(receiver: string) {
-  document.getElementById('item-policy').hidden = false
-  document.getElementById('item-policy').innerHTML = receiver
-}
-
-function enableSenderinfo(sender: string) {
-  document.getElementById('item-sender').hidden = false
-  document.getElementById('item-sender').innerHTML += sender
-}
-
-function showMailContent(message) {
-  document.getElementById('decryptinfo').style.display = 'none'
-  document.getElementById('irmaapp').style.display = 'none'
-  document.getElementById('idlock_svg').style.display = 'none'
-  document.getElementById('expires').style.display = 'none'
-
-  document.getElementById('bg_decrypted_txt').style.display = 'block'
-  document.getElementById('idlock_svg_decrypt').style.display = 'block'
-  document.getElementById('showPopupContainer').style.display = 'block'
-
-  document.getElementById('info_message_text').innerHTML =
-    'Decrypted message from'
-
-  document.getElementById('decrypted-text').innerHTML = message
-}
-
-function showAttachments(attachments) {
-  for (let i = 0; i < attachments.length; i++) {
-    document.getElementById('attachments').style.display = 'flex'
-    // create for each attachment a "div" element, which we assign a click event, and the data as a blob object via jQueries data storage.
-    // why to use blob (uint8array) instead of base64 encoded string: https://blobfolio.com/2019/better-binary-batter-mixing-base64-and-uint8array/
-    // when the user clicks, the blob is attached to a temporary anchor element and triggered programmatically to download the file.
-    const attachment = attachments[i]
-    const blob = new Blob([attachment.content.buffer], {
-      type: attachment.contentType
-    })
-
-    const a = document
-      .getElementById('attachmentList')
-      .appendChild(document.createElement('div'))
-    a.innerHTML = attachment.filename
-    a.onclick = downloadBlobHandler
-    $(a).data('blob', blob)
+  } else {
+    console.log('No Cryptify email')
+    write('No Cryptify email, cannot decrypt.')
   }
-}
-
-async function getGraphAPIToken() {
-  showLoginPopup('/fallbackauthdialog.html')
 }
 
 async function successMessageReceived(mime: string, token: string) {
   const recipient_id = mailbox.userProfile.emailAddress
   console.log('current identity: ', recipient_id)
+  const conjunction = [{ t: email_attribute, v: recipient_id }]
+  const hashConjunction = await hashString(JSON.stringify(conjunction))
 
   const readMail = new ReadMail()
   readMail.parseMail(mime)
   const input = readMail.getCiphertext()
+  const readable: ReadableStream = newReadableStreamFromArray(input)
 
-  const readable: ReadableStream = new_readable_stream_from_array(input)
-  const unsealer = await new mod.Unsealer(readable)
-
+  const unsealer = await mod.Unsealer.new(readable)
   const hidden = unsealer.get_hidden_policies()
-  console.log('hidden: ', hidden)
-  const guess = {
-    con: [{ t: email_attribute, v: recipient_id }]
+
+  document.getElementById('qrcodecontainer').style.display = 'block'
+
+  let localJwt = window.localStorage.getItem(`jwt_${hashConjunction}`)
+
+  // if JWT in local storage is null, we need to execute IRMA disclosure session
+  if (localJwt === null) {
+    log.info('JWT not stored within localStorage.')
+    localJwt = await executeIrmaDisclosureSession(conjunction, hashConjunction)
   }
 
-  const irma = new IrmaCore({
-    debugging: true,
-    session: {
-      url: hostname,
-      start: {
-        url: (o) => `${o.url}/v2/request`,
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(guess)
-      },
-      mapping: {
-        sessionPtr: (r) => {
-          const sessionPtr = {
-            u: 'https://ihub.ru.nl/irma/1/' + r.sessionPtr.u,
-            irmaqr: 'disclosing'
-          }
-          console.log('Session ptr: ', sessionPtr)
-          toDataURL(JSON.stringify(sessionPtr)).then((dataURL) => {
-            document.getElementById('run').style.display = 'none'
-            document.getElementById('qrcodecontainer').style.display = 'block'
-            document.getElementById('qrcode').setAttribute('src', dataURL)
-          })
-          return sessionPtr
-        }
-      },
-      result: {
-        url: (o, { sessionToken: token }) =>
-          `${o.url}/v2/request/${token}/${hidden[recipient_id].ts.toString()}`,
-        parseResponse: (r) => {
-          return new Promise((resolve, reject) => {
-            if (r.status != '200') reject('not ok')
-            r.json().then((json) => {
-              if (json.status !== 'DONE_VALID') reject('not done and valid')
-              resolve(json.key)
-            })
-          })
-        }
-      }
-    }
+  // retrieve USK
+  let usk = await $.ajax({
+    url: `${hostname}/v2/request/key/${hidden[recipient_id].ts.toString()}`,
+    headers: { Authorization: 'Bearer ' + localJwt }
   })
 
-  irma.use(IrmaClient)
-  const usk = await irma.start()
+  // if JWT is invalid, we need to execute IRMA disclosure session, and retrieve usk again afterwards.
+  if (usk.status !== 'DONE' || usk.proofStatus !== 'VALID') {
+    log.info('JWT invalid or IRMA session not done.')
+    localJwt = await executeIrmaDisclosureSession(conjunction, hashConjunction)
+    // retrieve USK
+    usk = await $.ajax({
+      url: `${hostname}/v2/request/key/${hidden[recipient_id].ts.toString()}`,
+      headers: { Authorization: 'Bearer ' + localJwt }
+    })
+  } else {
+    log.info('JWT valid, continue.')
+  }
 
   let plain = new Uint8Array(0)
   const writable = new WritableStream({
@@ -213,38 +120,13 @@ async function successMessageReceived(mime: string, token: string) {
     }
   })
 
-  await unsealer.unseal(recipient_id, usk, writable)
+  await unsealer.unseal(recipient_id, usk.key, writable)
   const mail: string = new TextDecoder().decode(plain)
 
-  console.log('Mail content: ', mail)
-
+  // Parse inner mail via simpleParser
   let parsed = await simpleParser(mail)
   showMailContent(parsed.html)
   showAttachments(parsed.attachments)
-
-  let jsonInnerMail = {
-    sender: { emailAddress: { address: parsed.from.text } },
-    subject: parsed.subject,
-    createdDateTime: parsed.date,
-    body: {
-      contentType: htmlBodyType,
-      content: parsed.html
-    },
-    toRecipients: parsed.to.value.map((recipient) => {
-      return {
-        emailAddress: { address: recipient.address }
-      }
-    }),
-    hasAttachments: parsed.attachments.length > 0
-  }
-
-  if (parsed.cc !== undefined) {
-    jsonInnerMail['ccRecipients'] = parsed.cc.value.map((recipient) => {
-      return {
-        emailAddress: { address: recipient.address }
-      }
-    })
-  }
 
   const attachments: IAttachmentContent[] = parsed.attachments.map(
     (attachment) => {
@@ -263,9 +145,62 @@ async function successMessageReceived(mime: string, token: string) {
     log.info('Dialog API 1.2 supported')
   }
 
-  //showMailPopup(parsed.html)
-  //storeMailAsPlainLocally(token, jsonInnerMail, attachments, 'CryptifyReceived')
   replaceMailBody(token, mailbox.item, parsed.html, attachments)
+}
+
+async function executeIrmaDisclosureSession(
+  conjunction: object,
+  hashConjunction: string
+) {
+  const one_day = 60 * 60 * 24
+  const requestBody = {
+    con: conjunction,
+    validity: one_day // 1 day
+  }
+
+  const language = Office.context.displayLanguage.toLowerCase().startsWith('nl')
+    ? 'nl'
+    : 'en'
+
+  const irma = new IrmaCore({
+    debugging: true,
+    element: '#qrcode',
+    language: language,
+    session: {
+      url: hostname,
+      start: {
+        url: (o) => `${o.url}/v2/request/start`,
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody)
+      },
+      mapping: {
+        sessionPtr: (r) => {
+          const ptr = r.sessionPtr
+          ptr.u = `https://ihub.ru.nl/irma/1/${ptr.u}`
+          return ptr
+        }
+      },
+      result: {
+        url: (o, { sessionToken: token }) => `${o.url}/v2/request/jwt/${token}`,
+        parseResponse: (r) => {
+          return new Promise((resolve, reject) => {
+            if (r.status != '200') reject('not ok')
+            resolve(r.url)
+          })
+        }
+      }
+    }
+  })
+
+  irma.use(IrmaClient)
+  irma.use(IrmaWeb)
+  // disclose and retrieve JWT URL
+  const jwtUrl = await irma.start()
+  // retrieve JWT, add to local storage, and return
+  const localJwt = await $.ajax({ url: jwtUrl })
+  window.localStorage.setItem(`jwt_${hashConjunction}`, localJwt)
+  return localJwt
 }
 
 async function graphAPITokenCallback(token) {
@@ -287,21 +222,7 @@ async function graphAPITokenCallback(token) {
   }
 }
 
-function getItemRestId() {
-  if (Office.context.mailbox.diagnostics.hostName === 'OutlookIOS') {
-    // itemId is already REST-formatted.
-    return Office.context.mailbox.item.itemId
-  } else {
-    // Convert to an item ID for API v2.0.
-    return Office.context.mailbox.convertToRestId(
-      Office.context.mailbox.item.itemId,
-      Office.MailboxEnums.RestVersion.v2_0
-    )
-  }
-}
-
-// helper functions for attachment conversion and download
-function new_readable_stream_from_array(array) {
+function newReadableStreamFromArray(array) {
   return new ReadableStream({
     start(controller) {
       controller.enqueue(array)
@@ -331,6 +252,63 @@ function downloadBlobHandler(e) {
   const filename = target.innerHTML
   const data = $(target).data('blob')
   downloadBlobAsFile(data, filename)
+}
+
+function write(message) {
+  document.getElementById('info_message').style.display = 'none'
+  document.getElementById('decryptinfo').style.display = 'none'
+  document.getElementById('irmaapp').style.display = 'none'
+  document.getElementById('header_text').style.display = 'none'
+  document.getElementById('status-container').hidden = false
+  document.getElementById('status').innerHTML = message
+}
+
+function enablePolicyInfo(receiver: string) {
+  document.getElementById('item-policy').hidden = false
+  document.getElementById('item-policy').innerHTML = receiver
+}
+
+function enableSenderinfo(sender: string) {
+  document.getElementById('item-sender').hidden = false
+  document.getElementById('item-sender').innerHTML += sender
+}
+
+function showMailContent(message) {
+  document.getElementById('decryptinfo').style.display = 'none'
+  document.getElementById('irmaapp').style.display = 'none'
+  document.getElementById('idlock_svg').style.display = 'none'
+  document.getElementById('header_text').style.display = 'none'
+
+  document.getElementById('bg_decrypted_txt').style.display = 'block'
+  document.getElementById('idlock_svg_decrypt').style.display = 'block'
+
+  document.getElementById('info_message_text').innerHTML =
+    'Decrypted message from'
+  document.getElementById('decrypted-text').innerHTML = message
+}
+
+function showAttachments(attachments) {
+  for (let i = 0; i < attachments.length; i++) {
+    document.getElementById('attachments').style.display = 'flex'
+    // create for each attachment a "div" element, which we assign a click event, and the data as a blob object via jQueries data storage.
+    // why to use blob (uint8array) instead of base64 encoded string: https://blobfolio.com/2019/better-binary-batter-mixing-base64-and-uint8array/
+    // when the user clicks, the blob is attached to a temporary anchor element and triggered programmatically to download the file.
+    const attachment = attachments[i]
+    const blob = new Blob([attachment.content.buffer], {
+      type: attachment.contentType
+    })
+
+    const a = document
+      .getElementById('attachmentList')
+      .appendChild(document.createElement('div'))
+    a.innerHTML = attachment.filename
+    a.onclick = downloadBlobHandler
+    $(a).data('blob', blob)
+  }
+}
+
+async function getGraphAPIToken() {
+  showLoginPopup('/fallbackauthdialog.html')
 }
 
 var loginDialog

@@ -19,7 +19,8 @@ export function replaceMailBody(
   body: string,
   attachments: IAttachmentContent[]
 ) {
-  const messageUrl = `https://graph.microsoft.com/v1.0/me/messages/${item.itemId}`
+  const itemId = getItemRestId()
+  const messageUrl = `https://graph.microsoft.com/v1.0/me/messages/${itemId}`
   const payload = {
     body: {
       contentType: htmlBodyType,
@@ -36,7 +37,7 @@ export function replaceMailBody(
     },
     success: function (success) {
       console.log('PATCH message success: ', success)
-      removeAttachment(token, item.itemId, item.attachments[0].id, attachments)
+      removeAttachment(token, itemId, item.attachments[0].id, attachments)
     }
   }).fail(function ($xhr) {
     var data = $xhr.responseJSON
@@ -47,11 +48,11 @@ export function replaceMailBody(
 
 function removeAttachment(
   token: string,
-  messageId: string,
+  itemId: string,
   attachmentId: string,
   attachments: IAttachmentContent[]
 ) {
-  const attachmentUrl = `https://graph.microsoft.com/v1.0/me/messages/${messageId}/attachments/${attachmentId}`
+  const attachmentUrl = `https://graph.microsoft.com/v1.0/me/messages/${itemId}/attachments/${attachmentId}`
   $.ajax({
     type: 'DELETE',
     url: attachmentUrl,
@@ -61,7 +62,7 @@ function removeAttachment(
     success: function (success) {
       console.log('DELETE attachment success: ', success)
       attachments.forEach((attachment) => {
-        addAttachment(token, messageId, attachment)
+        addAttachment(token, itemId, attachment)
       })
     }
   }).fail(function ($xhr) {
@@ -263,4 +264,25 @@ export function showMailPopup(mailBody: string) {
 
 export function utilsFillMailPopup(content: string) {
   mailPopup.messageChild(content)
+}
+
+export function getItemRestId() {
+  if (Office.context.mailbox.diagnostics.hostName === 'OutlookIOS') {
+    // itemId is already REST-formatted.
+    return Office.context.mailbox.item.itemId
+  } else {
+    // Convert to an item ID for API v2.0.
+    return Office.context.mailbox.convertToRestId(
+      Office.context.mailbox.item.itemId,
+      Office.MailboxEnums.RestVersion.v2_0
+    )
+  }
+}
+
+export async function hashString(message: string): Promise<string> {
+  const msgArray = new TextEncoder().encode(message)
+  const hashBuffer = await crypto.subtle.digest('SHA-256', msgArray)
+  const hashArray = Array.from(new Uint8Array(hashBuffer))
+  const hashHex = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('')
+  return hashHex
 }

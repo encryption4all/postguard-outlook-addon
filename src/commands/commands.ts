@@ -185,7 +185,7 @@ async function encryptAndsendMail(token) {
   const policies = recipientEmails.reduce((total, recipient) => {
     total[recipient] = {
       ts: timestamp,
-      c: [{ t: email_attribute, v: recipient }]
+      con: [{ t: email_attribute, v: recipient }]
     }
     return total
   }, {})
@@ -194,7 +194,7 @@ async function encryptAndsendMail(token) {
   const ccPolicies = ccRecipientEmails.reduce((total, recipient) => {
     total[recipient] = {
       ts: timestamp,
-      c: [{ t: email_attribute, v: recipient }]
+      con: [{ t: email_attribute, v: recipient }]
     }
     return total
   }, {})
@@ -203,13 +203,13 @@ async function encryptAndsendMail(token) {
   const bccPolicies = bccRecipientEmails.reduce((total, recipient) => {
     total[recipient] = {
       ts: timestamp,
-      c: [{ t: email_attribute, v: recipient }]
+      con: [{ t: email_attribute, v: recipient }]
     }
     return total
   }, {})
 
   // Also encrypt for the sender, such that the sender can later decrypt as well.
-  policies[sender] = { ts: timestamp, c: [{ t: email_attribute, v: sender }] }
+  policies[sender] = { ts: timestamp, con: [{ t: email_attribute, v: sender }] }
 
   const allPolicies = { ...policies, ...ccPolicies, ...bccPolicies }
 
@@ -352,7 +352,7 @@ async function encryptAndsendMail(token) {
     }
   })
 
-  await mod.seal(pk.public_key, policies, readable, writable)
+  await mod.seal(pk.publicKey, policies, readable, writable)
   console.log('ct: ', ct)
 
   composeMail.setPayload(ct)

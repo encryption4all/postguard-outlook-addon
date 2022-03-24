@@ -38,10 +38,6 @@
   <Rule xsi:type="RuleCollection" Mode="Or">
     <Rule xsi:type="ItemIs" ItemType="Message" FormType="Edit"/>
   </Rule>
-  <Rule xsi:type="ItemHasRegularExpressionMatch"
-    PropertyName="BodyAsHTML"
-    RegExName="IrmaSealMail"
-    RegExValue="IRMASeal"/>
   <DisableEntityHighlighting>false</DisableEntityHighlighting>
   <VersionOverrides xmlns="http://schemas.microsoft.com/office/mailappversionoverrides" xsi:type="VersionOverridesV1_0">
     <Requirements>
@@ -70,7 +66,6 @@
                   </Icon>
                   <Action xsi:type="ShowTaskpane">
                     <SourceLocation resid="Taskpane.Url"/>
-                    <SupportsPinning>true</SupportsPinning>
                   </Action>
                 </Control>
               </Group>
@@ -110,17 +105,14 @@
       <bt:Urls>
         <bt:Url id="Encrypt.Url" DefaultValue="https://localhost:3000/commands.html"/>
         <bt:Url id="Taskpane.Url" DefaultValue="https://localhost:3000/taskpane.html"/>
-        <bt:Url id="Decrypt.Url" DefaultValue="https://localhost:3000/decrypt.html"/>
       </bt:Urls>
       <bt:ShortStrings>
         <bt:String id="GroupLabel" DefaultValue="IRMASeal Add-in"/>
         <bt:String id="TaskpaneButton.Label" DefaultValue="Show addon"/>
-        <bt:String id="DecryptButton.Label" DefaultValue="Decrypt email"/>
         <bt:String id="EncryptButton.Label" DefaultValue="Encrypt and send email"/>
       </bt:ShortStrings>
       <bt:LongStrings>
         <bt:String id="TaskpaneButton.Tooltip" DefaultValue="Opens a pane displaying all available properties."/>
-        <bt:String id="DecryptButton.Tooltip" DefaultValue="Decrypt the current email (if it is an IRMASeal email)"/>
         <bt:String id="EncryptButton.Tooltip" DefaultValue="Encrypt the current email with IRMASeal"/>
       </bt:LongStrings>
     </Resources>
@@ -182,6 +174,31 @@
               </OfficeTab>
             </ExtensionPoint>
           </DesktopFormFactor>
+          <MobileFormFactor>
+            <FunctionFile resid="Encrypt.Url"/>
+            <ExtensionPoint xsi:type="MobileMessageReadCommandSurface">
+              <Group id="Contoso.mobileGroup1">
+                <Label resid="GroupLabel"/>
+                <Control xsi:type="MobileButton" id="Contoso.mobileButton1">
+                  <Label resid="TaskpaneButton.Label"/>
+                  <Icon xsi:type="bt:MobileIconList">
+                    <bt:Image size="25" scale="1" resid="Icon.32x32" />
+                    <bt:Image size="25" scale="2" resid="Icon.32x32" />
+                    <bt:Image size="25" scale="3" resid="Icon.32x32" />
+                    <bt:Image size="32" scale="1" resid="Icon.32x32" />
+                    <bt:Image size="32" scale="2" resid="Icon.32x32" />
+                    <bt:Image size="32" scale="3" resid="Icon.32x32" />
+                    <bt:Image size="48" scale="1" resid="Icon.80x80" />
+                    <bt:Image size="48" scale="2" resid="Icon.80x80" />
+                    <bt:Image size="48" scale="3" resid="Icon.80x80" />
+                  </Icon>
+                  <Action xsi:type="ShowTaskpane">
+                    <SourceLocation resid="Taskpane.Url" />
+                  </Action>
+                </Control>
+              </Group>
+            </ExtensionPoint>
+          </MobileFormFactor>
         </Host>
       </Hosts>
       <Resources>
@@ -193,17 +210,14 @@
         <bt:Urls>
           <bt:Url id="Encrypt.Url" DefaultValue="https://localhost:3000/commands.html"/>
           <bt:Url id="Taskpane.Url" DefaultValue="https://localhost:3000/taskpane.html"/>
-          <bt:Url id="Decrypt.Url" DefaultValue="https://localhost:3000/decrypt.html"/>
         </bt:Urls>
         <bt:ShortStrings>
           <bt:String id="GroupLabel" DefaultValue="IRMASeal Add-in"/>
-          <bt:String id="TaskpaneButton.Label" DefaultValue="Show addon"/>
-          <bt:String id="DecryptButton.Label" DefaultValue="Decrypt email"/>
+          <bt:String id="TaskpaneButton.Label" DefaultValue="Decrypt email"/>
           <bt:String id="EncryptButton.Label" DefaultValue="Encrypt and send email"/>
         </bt:ShortStrings>
         <bt:LongStrings>
           <bt:String id="TaskpaneButton.Tooltip" DefaultValue="Opens a pane displaying all available properties."/>
-          <bt:String id="DecryptButton.Tooltip" DefaultValue="Decrypt the current email (if it is an IRMASeal email)"/>
           <bt:String id="EncryptButton.Tooltip" DefaultValue="Encrypt the current email with IRMASeal"/>
         </bt:LongStrings>
       </Resources>
