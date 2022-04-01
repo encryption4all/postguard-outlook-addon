@@ -104,7 +104,7 @@ function addAttachment(
   })
 }
 
-// get id from cryptify folder to create inner mail in that folder
+// get id from PostGuard folder to create inner mail in that folder
 // if it does not exist, create it
 export function storeMailAsPlainLocally(
   token: string,
@@ -131,7 +131,7 @@ export function storeMailAsPlainLocally(
       })
       if (!folderFound) {
         console.log('Folder not found, creating ...')
-        createCryptifyMailFolder(token, innerMail, attachments, folder_name)
+        createPostGuardMailFolder(token, innerMail, attachments, folder_name)
       }
     }
   }).fail(function ($xhr) {
@@ -141,7 +141,7 @@ export function storeMailAsPlainLocally(
   })
 }
 
-function createCryptifyMailFolder(token, innerMail, attachments, folder_name) {
+function createPostGuardMailFolder(token, innerMail, attachments, folder_name) {
   const createMailFoldersUrl = 'https://graph.microsoft.com/v1.0/me/mailFolders'
   const payload = {
     displayName: folder_name,

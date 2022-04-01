@@ -7,13 +7,12 @@
   <Version>1.0.0.0</Version>
   <ProviderName>IRMA</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
-  <DisplayName DefaultValue="IRMASeal outlook add-in"/>
-  <Description DefaultValue="IRMASeal - easy email encryption."/>
+  <DisplayName DefaultValue="PostGuard outlook add-in"/>
+  <Description DefaultValue="PostGuard - easy email encryption."/>
   <IconUrl DefaultValue="https://localhost:3000/assets/icon-64.png"/>
   <HighResolutionIconUrl DefaultValue="https://localhost:3000/assets/icon-128.png"/>
-  <SupportUrl DefaultValue="https://cryptify.nl"/>
+  <SupportUrl DefaultValue="https://PostGuard.app"/>
   <AppDomains>
-    <AppDomain>https://irmacrypt.nl</AppDomain>
     <AppDomain>https://login.microsoftonline.com</AppDomain>
     <AppDomain>https://login.windows.net</AppDomain>
     <AppDomain>https://main.irmaseal-pkg.ihub.ru.nl</AppDomain>
@@ -128,6 +127,9 @@
         <Host xsi:type="MailHost">
           <DesktopFormFactor>
             <FunctionFile resid="Encrypt.Url"/>
+            <ExtensionPoint xsi:type="Events">
+              <Event Type="ItemSend" FunctionExecution="synchronous" FunctionName="validatePreviouslySend" />
+            </ExtensionPoint>
             <ExtensionPoint xsi:type="MessageReadCommandSurface">
               <OfficeTab id="TabDefault">
                 <Group id="msgReadGroup">

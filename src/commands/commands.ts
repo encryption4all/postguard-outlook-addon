@@ -11,7 +11,8 @@ import {
   storeMailAsPlainLocally,
   IAttachmentContent,
   setEventError,
-  htmlBodyType
+  htmlBodyType,
+  getItemRestId
 } from '../helpers/utils'
 
 // eslint-disable-next-line no-undef
@@ -228,7 +229,7 @@ async function encryptAndsendMail(token) {
   /* 
     const client = await Client.build("https://irmacrypt.nl/pkg")
     const controller = new AbortController()
-    const cryptifyApiWrapper = new CryptifyApiWrapper(
+    const PostGuardApiWrapper = new PostGuardApiWrapper(
         client,
         recipientEmail,
         sender,
@@ -262,7 +263,7 @@ async function encryptAndsendMail(token) {
   let hasAttachments: boolean = false
 
   if (attachments !== undefined) {
-    let useCryptify = false
+    let usePostGuard = false
     for (let i = 0; i < attachments.length; i++) {
       const attachment = attachments[i]
       /*const fileBlob = new Blob([attachment.content], {
@@ -272,24 +273,24 @@ async function encryptAndsendMail(token) {
                 type: "application/octet-stream",
             })
 
-            // if attachment is too large, ask user if it should be encrypted via Cryptify
+            // if attachment is too large, ask user if it should be encrypted via PostGuard
             if (fileBlob.size > MAX_ATTACHMENT_SIZE) {
                 // TODO: Add confirmation dialog (https://theofficecontext.com/2017/06/14/dialogs-in-officejs/)
                 console.log(
                     `Attachment ${attachment.filename} larger than 1 MB`
                 )
-                useCryptify = true
-                const downloadUrl = await cryptifyApiWrapper.encryptAndUploadFile(
+                usePostGuard = true
+                const downloadUrl = await PostGuardApiWrapper.encryptAndUploadFile(
                     file,
                     controller
                 )
-                mailBody += `<p><a href="${downloadUrl}">Download ${attachment.filename} via Cryptify</a></p>`
+                mailBody += `<p><a href="${downloadUrl}">Download ${attachment.filename} via PostGuard</a></p>`
             }
             */
 
       if (!attachment.isInline) {
         hasAttachments = true
-        if (!useCryptify) {
+        if (!usePostGuard) {
           const input = new TextEncoder().encode(attachment.content)
           console.log('Attachment bytes length: ', input.byteLength)
           msg.setAttachment(
@@ -382,7 +383,12 @@ async function encryptAndsendMail(token) {
         persistent: true
       }
 
-      storeMailAsPlainLocally(token, jsonInnerMail, attachments, 'CryptifySend')
+      storeMailAsPlainLocally(
+        token,
+        jsonInnerMail,
+        attachments,
+        'PostGuardSend'
+      )
 
       Office.context.mailbox.item.notificationMessages.replaceAsync(
         'action',
@@ -452,6 +458,18 @@ function showLoginPopup(url) {
       )
     }
   )
+}
+
+// Entry point for add-in before send is allowed.
+// eslint-disable-next-line no-unused-vars
+function validateBody(event) {
+  // check if mail with this id has been decrypted before
+  const itemId = getItemRestId()
+  if (window.localStorage.getItem(`mailid_${itemId}`) === 'true') {
+    event.completed({ allowEvent: false })
+  } else {
+    event.completed({ allowEvent: true })
+  }
 }
 
 function getGlobal() {

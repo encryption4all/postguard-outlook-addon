@@ -22,6 +22,7 @@ import {
   IAttachmentContent,
   replaceMailBody
 } from '../helpers/utils'
+import jwtDecode, { JwtPayload } from 'jwt-decode'
 
 const getLogger = require('webpack-log')
 const log = getLogger({ name: 'taskpane-log' })
@@ -58,15 +59,15 @@ function checkIrmasealEmail() {
     if (attachmentContentType == 'application/irmaseal') {
       enableSenderinfo(item.sender.emailAddress)
       enablePolicyInfo(item.to[0].emailAddress)
-      console.log('IRMASeal email')
+      console.log('It is a PostGuard email!')
       getGraphAPIToken()
     } else {
-      console.log('No Cryptify email')
-      write('No Cryptify email, cannot decrypt.')
+      console.log('No PostGuard email')
+      write('No Postguard email, cannot decrypt.')
     }
   } else {
-    console.log('No Cryptify email')
-    write('No Cryptify email, cannot decrypt.')
+    console.log('No PostGuard email')
+    write('No PostGuard email, cannot decrypt.')
   }
 }
 
@@ -94,68 +95,80 @@ async function successMessageReceived(mime: string, token: string) {
     localJwt = await executeIrmaDisclosureSession(conjunction, hashConjunction)
   }
 
+  const decoded = jwtDecode<JwtPayload>(localJwt)
+  // if JWT is expired, create new IRMA session
+  if (Date.now() / 1000 > decoded.exp) {
+    log.info('JWT expired.')
+    localJwt = await executeIrmaDisclosureSession(conjunction, hashConjunction)
+  }
+
   // retrieve USK
-  let usk = await $.ajax({
+  const keyResp = await $.ajax({
     url: `${hostname}/v2/request/key/${hidden[recipient_id].ts.toString()}`,
     headers: { Authorization: 'Bearer ' + localJwt }
   })
 
-  // if JWT is invalid, we need to execute IRMA disclosure session, and retrieve usk again afterwards.
-  if (usk.status !== 'DONE' || usk.proofStatus !== 'VALID') {
-    log.info('JWT invalid or IRMA session not done.')
-    localJwt = await executeIrmaDisclosureSession(conjunction, hashConjunction)
-    // retrieve USK
-    usk = await $.ajax({
-      url: `${hostname}/v2/request/key/${hidden[recipient_id].ts.toString()}`,
-      headers: { Authorization: 'Bearer ' + localJwt }
-    })
+  if (keyResp.status !== 'DONE' || keyResp.proofStatus !== 'VALID') {
+    log.error('JWT invalid or IRMA session not done.')
   } else {
     log.info('JWT valid, continue.')
-  }
 
-  let plain = new Uint8Array(0)
-  const writable = new WritableStream({
-    write(chunk) {
-      plain = new Uint8Array([...plain, ...chunk])
-    }
-  })
-
-  await unsealer.unseal(recipient_id, usk.key, writable)
-  const mail: string = new TextDecoder().decode(plain)
-
-  // Parse inner mail via simpleParser
-  let parsed = await simpleParser(mail)
-  showMailContent(parsed.html)
-  showAttachments(parsed.attachments)
-
-  const attachments: IAttachmentContent[] = parsed.attachments.map(
-    (attachment) => {
-      const attachmentContent = Buffer.from(attachment.content).toString(
-        'base64'
-      )
-      return {
-        filename: attachment.filename,
-        content: attachmentContent,
-        isInline: false
+    let plain = new Uint8Array(0)
+    const writable = new WritableStream({
+      write(chunk) {
+        plain = new Uint8Array([...plain, ...chunk])
       }
+    })
+
+    await unsealer.unseal(recipient_id, keyResp.key, writable)
+    const mail: string = new TextDecoder().decode(plain)
+
+    // Parse inner mail via simpleParser
+    let parsed = await simpleParser(mail)
+    showMailContent(parsed.html)
+    showAttachments(parsed.attachments)
+
+    // store mail id such that on send feature can check if mail was encrypted before
+    // Bernard suggest to add custom header to decrypted mail, but cannot do so in Outlook ..
+    const itemId = getItemRestId()
+    window.localStorage.setItem(`mailid_${itemId}`, 'true')
+
+    const attachments: IAttachmentContent[] = parsed.attachments.map(
+      (attachment) => {
+        const attachmentContent = Buffer.from(attachment.content).toString(
+          'base64'
+        )
+        return {
+          filename: attachment.filename,
+          content: attachmentContent,
+          isInline: false
+        }
+      }
+    )
+
+    if (Office.context.requirements.isSetSupported('DialogApi', '1.2')) {
+      log.info('Dialog API 1.2 supported')
     }
-  )
 
-  if (Office.context.requirements.isSetSupported('DialogApi', '1.2')) {
-    log.info('Dialog API 1.2 supported')
+    replaceMailBody(token, mailbox.item, parsed.html, attachments)
   }
-
-  replaceMailBody(token, mailbox.item, parsed.html, attachments)
 }
 
 async function executeIrmaDisclosureSession(
   conjunction: object,
   hashConjunction: string
 ) {
-  const one_day = 60 * 60 * 24
+  // calculate diff in seconds between now and tomorrow 4 am
+  let tomorrow = new Date()
+  tomorrow.setDate(tomorrow.getDate() + 1)
+  tomorrow.setHours(4, 0, 0, 0)
+  const now = new Date()
+  const seconds = Math.floor((tomorrow.getTime() - now.getTime()) / 1000)
+  console.log('Diff in seconds: ', seconds)
+
   const requestBody = {
     con: conjunction,
-    validity: one_day // 1 day
+    validity: seconds
   }
 
   const language = Office.context.displayLanguage.toLowerCase().startsWith('nl')
