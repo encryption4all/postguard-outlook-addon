@@ -1,8 +1,10 @@
-/* eslint-disable no-undef */
 /*
- * Copyright (c) Microsoft Corporation. All rights reserved. Licensed under the MIT license.
- * See LICENSE in the project root for license information.
+ * Copyright (c) Microsoft. All rights reserved. Licensed under the MIT license. See full license in root of repo. -->
+ *
+ * This file shows how to use MSAL.js to get an access token to Microsoft Graph an pass it to the task pane.
  */
+
+/* global $, Office */
 
 // images references in the manifest
 import '../../assets/icon-16.png'
@@ -17,68 +19,81 @@ import * as IrmaCore from '@privacybydesign/irma-core'
 import * as IrmaClient from '@privacybydesign/irma-client'
 import * as IrmaWeb from '@privacybydesign/irma-web'
 import {
-  getItemRestId,
   hashString,
+  htmlBodyType,
   IAttachmentContent,
-  replaceMailBody
+  removeAttachment
 } from '../helpers/utils'
 import jwtDecode, { JwtPayload } from 'jwt-decode'
 
+// eslint-disable-next-line no-undef
 const getLogger = require('webpack-log')
 const log = getLogger({ name: 'taskpane-log' })
 
 const mod_promise = import('@e4a/irmaseal-wasm-bindings')
 const mod = await mod_promise
+// eslint-disable-next-line no-undef
 const simpleParser = require('mailparser').simpleParser
 
 const hostname = 'https://main.irmaseal-pkg.ihub.ru.nl'
 const email_attribute = 'pbdf.sidn-pbdf.email.email'
 
-/* global $, Office */
-var item: Office.MessageRead
-var mailbox: Office.Mailbox
+// eslint-disable-next-line no-undef
+var Buffer = require('buffer/').Buffer
 
-Office.onReady((info) => {
-  if (info.host === Office.HostType.Outlook) {
-    document.getElementById('sideload-msg').style.display = 'none'
-    document.getElementById('app-body').hidden = false
-    item = Office.context.mailbox.item
-    mailbox = Office.context.mailbox
-    $(function () {
-      checkIrmasealEmail()
-    })
-  }
-})
+var token: string
+var recipient: string
+var mailId: string
+var attachmentId: string
 
-// Get the body type of the composed item, and set data in
-// in the appropriate data type in the item body.
-function checkIrmasealEmail() {
-  // first attachment's content type must be 'application/irmaseal' to accept email as 'irmaseal' mail
-  if (item.attachments.length != 0) {
-    const attachmentName = item.attachments[0].name
-    const subjectTitle = item.subject
-    if (
-      attachmentName === 'postguard.encrypted' &&
-      subjectTitle === 'PostGuard encrypted email'
-    ) {
-      enableSenderinfo(item.sender.emailAddress)
-      enablePolicyInfo(item.to[0].emailAddress)
-      console.log('It is a PostGuard email!')
-      getGraphAPIToken()
-    } else {
-      console.log('No PostGuard email')
-      write('No Postguard email, cannot decrypt.')
-    }
-  } else {
-    console.log('No PostGuard email')
-    write('No PostGuard email, cannot decrypt.')
-  }
+Office.initialize = function () {
+  document.getElementById('info_message').style.display = 'none'
+  document.getElementById('header_text').style.display = 'none'
+  document.getElementById('decryptinfo').style.display = 'none'
+  document.getElementById('irmaapp').style.display = 'none'
+
+  console.log('Decrypt dialog openend!')
+  const urlParams = new URLSearchParams(window.location.search)
+  token = Buffer.from(urlParams.get('token'), 'base64').toString('utf-8')
+  recipient = urlParams.get('recipient')
+  mailId = urlParams.get('mailid')
+  attachmentId = urlParams.get('attachmentid')
+
+  $(function () {
+    getMailObject()
+  })
 }
 
-async function successMessageReceived(mime: string, token: string) {
-  const recipient_id = mailbox.userProfile.emailAddress
-  console.log('current identity: ', recipient_id)
-  const conjunction = [{ t: email_attribute, v: recipient_id }]
+function passMsgToParent(msg: string) {
+  Office.context.ui.messageParent(msg)
+}
+
+function getMailObject() {
+  var getMessageUrl =
+    'https://graph.microsoft.com/v1.0/me/messages/' + mailId + '/$value'
+
+  console.log('Try to receive MIME via ', getMessageUrl)
+
+  fetch(getMessageUrl, {
+    headers: new Headers({
+      Authorization: 'Bearer ' + token
+    })
+  })
+    .then((response) => {
+      if (response.ok) {
+        return response.text()
+      }
+      throw new Error('Something went wrong')
+    })
+    .then(successMailReceived)
+    .catch((_) =>
+      passMsgToParent('Error during decryption, please try again later.')
+    )
+}
+
+async function successMailReceived(mime) {
+  console.log('Success message received: ', mime)
+  const conjunction = [{ t: email_attribute, v: recipient }]
   const hashConjunction = await hashString(JSON.stringify(conjunction))
 
   const readMail = new ReadMail()
@@ -89,7 +104,12 @@ async function successMessageReceived(mime: string, token: string) {
   const unsealer = await mod.Unsealer.new(readable)
   const hidden = unsealer.get_hidden_policies()
 
+  document.getElementById('info_message').style.display = 'block'
+  document.getElementById('header_text').style.display = 'block'
+  document.getElementById('decryptinfo').style.display = 'block'
+  document.getElementById('irmaapp').style.display = 'block'
   document.getElementById('qrcodecontainer').style.display = 'block'
+  document.getElementById('loading').style.display = 'none'
 
   let localJwt = window.localStorage.getItem(`jwt_${hashConjunction}`)
 
@@ -108,7 +128,7 @@ async function successMessageReceived(mime: string, token: string) {
 
   // retrieve USK
   const keyResp = await $.ajax({
-    url: `${hostname}/v2/request/key/${hidden[recipient_id].ts.toString()}`,
+    url: `${hostname}/v2/request/key/${hidden[recipient].ts.toString()}`,
     headers: { Authorization: 'Bearer ' + localJwt }
   })
 
@@ -124,18 +144,13 @@ async function successMessageReceived(mime: string, token: string) {
       }
     })
 
-    await unsealer.unseal(recipient_id, keyResp.key, writable)
+    await unsealer.unseal(recipient, keyResp.key, writable)
     const mail: string = new TextDecoder().decode(plain)
 
     // Parse inner mail via simpleParser
     let parsed = await simpleParser(mail)
-    showMailContent(parsed.html)
+    showMailContent(parsed.subject, parsed.html)
     showAttachments(parsed.attachments)
-
-    // store mail id such that on send feature can check if mail was encrypted before
-    // Bernard suggest to add custom header to decrypted mail, but cannot do so in Outlook ..
-    const itemId = getItemRestId()
-    window.localStorage.setItem(`mailid_${itemId}`, 'true')
 
     const attachments: IAttachmentContent[] = parsed.attachments.map(
       (attachment) => {
@@ -150,12 +165,41 @@ async function successMessageReceived(mime: string, token: string) {
       }
     )
 
-    if (Office.context.requirements.isSetSupported('DialogApi', '1.2')) {
-      log.info('Dialog API 1.2 supported')
-    }
-
-    replaceMailBody(token, mailbox.item, parsed.html, attachments)
+    replaceMailBody(parsed.html, parsed.subject, attachments)
   }
+}
+
+function replaceMailBody(
+  body: string,
+  subject: string,
+  attachments: IAttachmentContent[]
+) {
+  const messageUrl = `https://graph.microsoft.com/v1.0/me/messages/${mailId}`
+  const payload = {
+    body: {
+      contentType: htmlBodyType,
+      content: body
+    },
+    subject: subject
+  }
+  $.ajax({
+    type: 'PATCH',
+    contentType: 'application/json',
+    url: messageUrl,
+    data: JSON.stringify(payload),
+    headers: {
+      Authorization: 'Bearer ' + token
+    },
+    success: function (success) {
+      console.log('PATCH message success: ', success)
+      passMsgToParent('Successfully decrypted the email with PostGuard')
+      removeAttachment(token, mailId, attachmentId, attachments)
+    }
+  }).fail(function ($xhr) {
+    var data = $xhr.responseJSON
+    console.log('Ajax error: ', data)
+    passMsgToParent('Error during decryption, please try again later.')
+  })
 }
 
 async function executeIrmaDisclosureSession(
@@ -220,25 +264,6 @@ async function executeIrmaDisclosureSession(
   return localJwt
 }
 
-async function graphAPITokenCallback(token) {
-  var getMessageUrl =
-    'https://graph.microsoft.com/v1.0/me/messages/' +
-    getItemRestId() +
-    '/$value'
-
-  console.log('Try to receive MIME')
-
-  try {
-    const mime = await $.ajax({
-      url: getMessageUrl,
-      headers: { Authorization: 'Bearer ' + token }
-    })
-    await successMessageReceived(mime, token)
-  } catch (error) {
-    console.error(error)
-  }
-}
-
 function newReadableStreamFromArray(array) {
   return new ReadableStream({
     start(controller) {
@@ -271,37 +296,19 @@ function downloadBlobHandler(e) {
   downloadBlobAsFile(data, filename)
 }
 
-function write(message) {
-  document.getElementById('info_message').style.display = 'none'
-  document.getElementById('decryptinfo').style.display = 'none'
-  document.getElementById('irmaapp').style.display = 'none'
-  document.getElementById('header_text').style.display = 'none'
-  document.getElementById('status-container').hidden = false
-  document.getElementById('status').innerHTML = message
-}
-
-function enablePolicyInfo(receiver: string) {
-  document.getElementById('item-policy').hidden = false
-  document.getElementById('item-policy').innerHTML = receiver
-}
-
-function enableSenderinfo(sender: string) {
-  document.getElementById('item-sender').hidden = false
-  document.getElementById('item-sender').innerHTML += sender
-}
-
-function showMailContent(message) {
+function showMailContent(subject: string, body: string) {
   document.getElementById('decryptinfo').style.display = 'none'
   document.getElementById('irmaapp').style.display = 'none'
   document.getElementById('idlock_svg').style.display = 'none'
   document.getElementById('header_text').style.display = 'none'
+  document.getElementById('info_message_text').style.display = 'none'
 
   document.getElementById('bg_decrypted_txt').style.display = 'block'
+  document.getElementById('bg_decrypted_subject').style.display = 'block'
   document.getElementById('idlock_svg_decrypt').style.display = 'block'
 
-  document.getElementById('info_message_text').innerHTML =
-    'Decrypted message from'
-  document.getElementById('decrypted-text').innerHTML = message
+  document.getElementById('decrypted-subject').innerHTML = subject
+  document.getElementById('decrypted-text').innerHTML = body
 }
 
 function showAttachments(attachments) {
@@ -322,55 +329,4 @@ function showAttachments(attachments) {
     a.onclick = downloadBlobHandler
     $(a).data('blob', blob)
   }
-}
-
-async function getGraphAPIToken() {
-  showLoginPopup('/fallbackauthdialog.html')
-}
-
-var loginDialog
-
-// This handler responds to the success or failure message that the pop-up dialog receives from the identity provider
-// and access token provider.
-async function processMessage(arg) {
-  let messageFromDialog = JSON.parse(arg.message)
-
-  if (messageFromDialog.status === 'success') {
-    // We now have a valid access token.
-    loginDialog.close()
-    console.log('Valid token: ', JSON.stringify(messageFromDialog.result))
-    console.log('Logginger: ', JSON.stringify(messageFromDialog.logging))
-    graphAPITokenCallback(messageFromDialog.result.accessToken)
-  } else {
-    // Something went wrong with authentication or the authorization of the web application.
-    loginDialog.close()
-    console.log(
-      'Message from dialog error: ',
-      JSON.stringify(messageFromDialog.error.toString())
-    )
-  }
-}
-
-// Use the Office dialog API to open a pop-up and display the sign-in page for the identity provider.
-function showLoginPopup(url) {
-  var fullUrl =
-    location.protocol +
-    '//' +
-    location.hostname +
-    (location.port ? ':' + location.port : '') +
-    url
-
-  // height and width are percentages of the size of the parent Office application, e.g., PowerPoint, Excel, Word, etc.
-  Office.context.ui.displayDialogAsync(
-    fullUrl,
-    { height: 60, width: 30 },
-    function (result) {
-      console.log('Dialog has initialized. Wiring up events')
-      loginDialog = result.value
-      loginDialog.addEventHandler(
-        Office.EventType.DialogMessageReceived,
-        processMessage
-      )
-    }
-  )
 }

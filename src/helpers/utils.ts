@@ -8,6 +8,7 @@ export interface IAttachmentContent {
   filename: string
   content: string
   isInline: boolean
+  id: string
 }
 
 // 1. replace mail body
@@ -46,7 +47,7 @@ export function replaceMailBody(
   })
 }
 
-function removeAttachment(
+export function removeAttachment(
   token: string,
   itemId: string,
   attachmentId: string,

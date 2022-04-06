@@ -66,7 +66,7 @@
     "@types/find-process": "1.2.0",
     "@types/jquery": "^3.5.5",
     "@types/node-fetch": "^2.6.1",
-    "@types/office-js": "^1.0.178",
+    "@types/office-js": "^1.0.245",
     "@types/office-runtime": "^1.0.17",
     "babel-loader": "^8.2.2",
     "babel-plugin-transform-runtime": "^6.23.0",

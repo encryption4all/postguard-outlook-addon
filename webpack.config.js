@@ -21,7 +21,7 @@ module.exports = async (env, options) => {
       utils: './src/helpers/utils.ts',
       taskpane: './src/taskpane/taskpane.ts',
       commands: './src/commands/commands.ts',
-      decrypt: './src/decrypt/decrypt.ts',
+      decrypt: './src/decryptdialog/decrypt.ts',
       fallbackauthdialog: './src/helpers/fallbackauthdialog.ts'
     },
     experiments: { syncWebAssembly: true, topLevelAwait: true },
@@ -86,6 +86,10 @@ module.exports = async (env, options) => {
             from: './src/taskpane/taskpane.css'
           },
           {
+            to: 'decrypt.css',
+            from: './src/decryptdialog/decrypt.css'
+          },
+          {
             to: '[name].' + buildType + '.[ext]',
             from: 'manifest*.xml',
             transform(content) {
@@ -107,7 +111,7 @@ module.exports = async (env, options) => {
       }),
       new HtmlWebpackPlugin({
         filename: 'decrypt.html',
-        template: './src/decrypt/decrypt.html',
+        template: './src/decryptdialog/decrypt.html',
         chunks: ['polyfill', 'decrypt']
       }),
       new HtmlWebpackPlugin({
