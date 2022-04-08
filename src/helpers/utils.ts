@@ -4,6 +4,12 @@ import * as MicrosoftGraph from '@microsoft/microsoft-graph-types'
 
 export const htmlBodyType: MicrosoftGraph.BodyType = 'html'
 
+import * as getLogger from 'webpack-log'
+const utilLog = getLogger({ name: 'PostGuard util log' })
+
+/**
+ * Interface to store attachment metadata and content
+ */
 export interface IAttachmentContent {
   filename: string
   content: string
@@ -11,9 +17,23 @@ export interface IAttachmentContent {
   id: string
 }
 
-// 1. replace mail body
-// 2. remove current attachment
-// 3. add attachments
+/**
+ * Handles an ajax error
+ * @param $xhr The error
+ */
+function handleAjaxError($xhr) {
+  var data = $xhr.responseJSON
+  utilLog.info('Ajax error: ', data)
+  setEventError()
+}
+
+/**
+ * Replaces the mail body
+ * @param token The authentication token for the Graph aPI
+ * @param item The mail item
+ * @param body The body of the mail
+ * @param attachments The decrypted attachments to be added to the mail
+ */
 export function replaceMailBody(
   token: string,
   item: any,
@@ -37,16 +57,19 @@ export function replaceMailBody(
       Authorization: 'Bearer ' + token
     },
     success: function (success) {
-      console.log('PATCH message success: ', success)
+      utilLog.info('PATCH message success: ', success)
       removeAttachment(token, itemId, item.attachments[0].id, attachments)
     }
-  }).fail(function ($xhr) {
-    var data = $xhr.responseJSON
-    console.log('Ajax error: ', data)
-    setEventError()
-  })
+  }).fail(handleAjaxError)
 }
 
+/**
+ * Removes an attachment
+ * @param token The authentication token for the Graph aPI
+ * @param itemId The id of the mail with the attachment
+ * @param attachmentId The attachment id
+ * @param attachments The decrypted attachments added to the mail later
+ */
 export function removeAttachment(
   token: string,
   itemId: string,
@@ -61,18 +84,20 @@ export function removeAttachment(
       Authorization: 'Bearer ' + token
     },
     success: function (success) {
-      console.log('DELETE attachment success: ', success)
+      utilLog.info('DELETE attachment success: ', success)
       attachments.forEach((attachment) => {
         addAttachment(token, itemId, attachment)
       })
     }
-  }).fail(function ($xhr) {
-    var data = $xhr.responseJSON
-    console.log('Ajax error: ', data)
-    setEventError()
-  })
+  }).fail(handleAjaxError)
 }
 
+/**
+ *
+ * @param token The authentication token for the Graph API
+ * @param messageId The id of the mail
+ * @param attachment The attachment
+ */
 function addAttachment(
   token: string,
   messageId: string,
@@ -96,22 +121,23 @@ function addAttachment(
       Authorization: 'Bearer ' + token
     },
     success: function (success) {
-      console.log('Add attachment success: ', success)
+      utilLog.info('Add attachment success: ', success)
     }
-  }).fail(function ($xhr) {
-    var data = $xhr.responseJSON
-    console.log('Ajax error: ', data)
-    setEventError()
-  })
+  }).fail(handleAjaxError)
 }
 
-// get id from PostGuard folder to create inner mail in that folder
-// if it does not exist, create it
+/**
+ * Stores decrypted mail locally by first checking if mail folder with folderName already exists
+ * @param token The authentication token for the Graph API
+ * @param innerMail The inner mail
+ * @param attachments The attachments passed to another function
+ * @param folderName The name of the folder
+ */
 export function storeMailAsPlainLocally(
   token: string,
   innerMail: MicrosoftGraph.Message,
   attachments: IAttachmentContent[],
-  folder_name: string
+  folderName: string
 ) {
   const mailFoldersUrl = 'https://graph.microsoft.com/v1.0/me/mailFolders'
   $.ajax({
@@ -121,31 +147,34 @@ export function storeMailAsPlainLocally(
       Authorization: 'Bearer ' + token
     },
     success: function (success) {
-      console.log('MailFolders: ', success)
+      utilLog.info('MailFolders: ', success)
       let folderFound = false
       success.value.forEach((folder) => {
-        if (!folderFound && folder.displayName === folder_name) {
+        if (!folderFound && folder.displayName === folderName) {
           folderFound = true
-          console.log('Folder exists with id ', folder.id)
+          utilLog.info('Folder exists with id ', folder.id)
           storeInnerMail(folder.id, innerMail, token, attachments)
         }
       })
       if (!folderFound) {
-        console.log('Folder not found, creating ...')
-        createPostGuardMailFolder(token, innerMail, attachments, folder_name)
+        utilLog.info('Folder not found, creating ...')
+        createPostGuardMailFolder(token, innerMail, attachments, folderName)
       }
     }
-  }).fail(function ($xhr) {
-    var data = $xhr.responseJSON
-    console.log('Ajax error: ', data)
-    setEventError()
-  })
+  }).fail(handleAjaxError)
 }
 
-function createPostGuardMailFolder(token, innerMail, attachments, folder_name) {
+/**
+ * Creates the postguard mail folder
+ * @param token The authentication token for the Graph API
+ * @param innerMail The inner mail
+ * @param attachments The attachments passed to another function
+ * @param folderName The name of the folder
+ */
+function createPostGuardMailFolder(token, innerMail, attachments, folderName) {
   const createMailFoldersUrl = 'https://graph.microsoft.com/v1.0/me/mailFolders'
   const payload = {
-    displayName: folder_name,
+    displayName: folderName,
     isHidden: false
   }
 
@@ -158,16 +187,19 @@ function createPostGuardMailFolder(token, innerMail, attachments, folder_name) {
       Authorization: 'Bearer ' + token
     },
     success: function (success) {
-      console.log('Created mailfolder succesfully!')
+      utilLog.info('Created mailfolder succesfully!')
       storeInnerMail(success.id, innerMail, token, attachments)
     }
-  }).fail(function ($xhr) {
-    var data = $xhr.responseJSON
-    console.log('Ajax error: ', data)
-    setEventError()
-  })
+  }).fail(handleAjaxError)
 }
 
+/**
+ * Store the inner mail
+ * @param folderId The folder id the mail is stored in
+ * @param innerMail The inner mail
+ * @param token The authentication token for the Graph API
+ * @param attachments The attachments passed to another function
+ */
 function storeInnerMail(
   folderId,
   innerMail,
@@ -185,18 +217,21 @@ function storeInnerMail(
       Authorization: 'Bearer ' + token
     },
     success: function (success) {
-      console.log('Createmail success: ', success)
+      utilLog.info('Createmail success: ', success)
       attachments.forEach((attachment) => {
         storeAttachment(folderId, success.id, token, attachment)
       })
     }
-  }).fail(function ($xhr) {
-    var data = $xhr.responseJSON
-    console.log('Ajax error: ', data)
-    setEventError()
-  })
+  }).fail(handleAjaxError)
 }
 
+/**
+ * Adds an attachment to a mail
+ * @param folderId Id of the folder the mail is stored in
+ * @param messageId Id of the mail
+ * @param token Authentication token for Graph API
+ * @param attachment The attachment to be stored
+ */
 function storeAttachment(
   folderId,
   messageId,
@@ -221,52 +256,35 @@ function storeAttachment(
       Authorization: 'Bearer ' + token
     },
     success: function (success) {
-      console.log('Create attachment success: ', success)
+      utilLog.info('Create attachment success: ', success)
     }
-  }).fail(function ($xhr) {
-    var data = $xhr.responseJSON
-    console.log('Ajax error: ', data)
-    setEventError()
-  })
+  }).fail(handleAjaxError)
 }
 
+/**
+ * Sets event error for decryption
+ */
 export function setEventError() {
-  const message: Office.NotificationMessageDetails = {
-    type: Office.MailboxEnums.ItemNotificationMessageType.ErrorMessage,
-    message: 'Error during encryption, please contact your administrator.'
-  }
-
-  Office.context.mailbox.item.notificationMessages.replaceAsync(
-    'action',
-    message
-  )
-}
-
-var mailPopup
-
-export function showMailPopup(mailBody: string) {
-  var fullUrl =
-    location.protocol +
-    '//' +
-    location.hostname +
-    (location.port ? ':' + location.port : '') +
-    '/emailpopup.html'
-
-  window.localStorage.setItem('mailBody', mailBody)
-  Office.context.ui.displayDialogAsync(
-    fullUrl,
-    { height: 60, width: 60 },
-    function (asyncResult) {
-      mailPopup = asyncResult.value
-      mailPopup.messageChild(mailBody)
+  const msg = 'Error during encryption, please contact your administrator.'
+  // if mailbox is available, current context is the main window, and not a dialog
+  if (Office.context.mailbox !== undefined) {
+    const message: Office.NotificationMessageDetails = {
+      type: Office.MailboxEnums.ItemNotificationMessageType.ErrorMessage,
+      message: msg
     }
-  )
+    Office.context.mailbox.item.notificationMessages.replaceAsync(
+      'action',
+      message
+    )
+  } else {
+    Office.context.ui.messageParent(msg)
+  }
 }
 
-export function utilsFillMailPopup(content: string) {
-  mailPopup.messageChild(content)
-}
-
+/**
+ * Determines the item id of the current mail item
+ * @returns The item id of the current mail item
+ */
 export function getItemRestId() {
   if (Office.context.mailbox.diagnostics.hostName === 'OutlookIOS') {
     // itemId is already REST-formatted.
@@ -280,10 +298,50 @@ export function getItemRestId() {
   }
 }
 
+/**
+ * Calculates a hash for a message
+ * @param message The message
+ * @returns The hash
+ */
 export async function hashString(message: string): Promise<string> {
   const msgArray = new TextEncoder().encode(message)
   const hashBuffer = await crypto.subtle.digest('SHA-256', msgArray)
   const hashArray = Array.from(new Uint8Array(hashBuffer))
   const hashHex = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('')
   return hashHex
+}
+
+/**
+ * Checks if the email is a Postguard mail based on the attachment content type
+ * @return True or false
+ */
+export function isPostGuardEmail(): boolean {
+  if (Office.context.mailbox.item.attachments.length != 0) {
+    const attachmentContentType =
+      Office.context.mailbox.item.attachments[0].contentType
+    if (attachmentContentType == 'application/irmaseal') {
+      utilLog.info('It is a PostGuard email!')
+      return true
+    } else {
+      utilLog.info('No PostGuard email')
+      return false
+    }
+  } else {
+    utilLog.info('No PostGuard email')
+    return false
+  }
+}
+
+/**
+ * Creates a readable stream from an array
+ * @param array The array to be converted into a stream
+ * @returns The readable stream
+ */
+export function newReadableStreamFromArray(array) {
+  return new ReadableStream({
+    start(controller) {
+      controller.enqueue(array)
+      controller.close()
+    }
+  })
 }

@@ -115,14 +115,14 @@ module.exports = async (env, options) => {
         chunks: ['polyfill', 'decrypt']
       }),
       new HtmlWebpackPlugin({
+        filename: 'success.html',
+        template: './src/successdialog/success.html',
+        chunks: ['polyfill', 'decrypt']
+      }),
+      new HtmlWebpackPlugin({
         filename: 'fallbackauthdialog.html',
         template: './src/helpers/fallbackauthdialog.html',
         chunks: ['polyfill', 'fallbackauthdialog']
-      }),
-      new HtmlWebpackPlugin({
-        filename: 'emailpopup.html',
-        template: './src/emailpopup/emailpopup.html',
-        chunks: ['polyfill']
       })
     ],
     devServer: {

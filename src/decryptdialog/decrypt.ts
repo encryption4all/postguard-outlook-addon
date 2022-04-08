@@ -22,13 +22,14 @@ import {
   hashString,
   htmlBodyType,
   IAttachmentContent,
+  newReadableStreamFromArray,
   removeAttachment
 } from '../helpers/utils'
 import jwtDecode, { JwtPayload } from 'jwt-decode'
 
 // eslint-disable-next-line no-undef
 const getLogger = require('webpack-log')
-const log = getLogger({ name: 'taskpane-log' })
+const decryptLog = getLogger({ name: 'PostGuard decrypt log' })
 
 const mod_promise = import('@e4a/irmaseal-wasm-bindings')
 const mod = await mod_promise
@@ -46,13 +47,11 @@ var recipient: string
 var mailId: string
 var attachmentId: string
 
+/**
+ * Initialization function which also extracts the URL params
+ */
 Office.initialize = function () {
-  document.getElementById('info_message').style.display = 'none'
-  document.getElementById('header_text').style.display = 'none'
-  document.getElementById('decryptinfo').style.display = 'none'
-  document.getElementById('irmaapp').style.display = 'none'
-
-  console.log('Decrypt dialog openend!')
+  decryptLog.info('Decrypt dialog openend!')
   const urlParams = new URLSearchParams(window.location.search)
   token = Buffer.from(urlParams.get('token'), 'base64').toString('utf-8')
   recipient = urlParams.get('recipient')
@@ -64,15 +63,34 @@ Office.initialize = function () {
   })
 }
 
+/**
+ * Passes a message to the parent
+ * @param msg The message
+ */
 function passMsgToParent(msg: string) {
   Office.context.ui.messageParent(msg)
 }
 
+/**
+ * Handles an jQuery ajax error
+ * @param $xhr The error
+ */
+function handleAjaxError($xhr) {
+  var data = $xhr.responseJSON
+  decryptLog.error('Ajax error: ', data)
+  passMsgToParent(
+    'Error during decryption, please try again or contact your administrator.'
+  )
+}
+
+/**
+ * Gets the mail object as MIME
+ */
 function getMailObject() {
   var getMessageUrl =
     'https://graph.microsoft.com/v1.0/me/messages/' + mailId + '/$value'
 
-  console.log('Try to receive MIME via ', getMessageUrl)
+  decryptLog.info('Try to receive MIME via ', getMessageUrl)
 
   fetch(getMessageUrl, {
     headers: new Headers({
@@ -86,13 +104,21 @@ function getMailObject() {
       throw new Error('Something went wrong')
     })
     .then(successMailReceived)
-    .catch((_) =>
-      passMsgToParent('Error during decryption, please try again later.')
-    )
+    // eslint-disable-next-line no-unused-vars
+    .catch((err) => {
+      decryptLog.error(err)
+      passMsgToParent(
+        'Error during decryption, please try again or contact your administrator.'
+      )
+    })
 }
 
+/**
+ * Handling decryption of the mail after it has been received
+ * @param mime The mime message
+ */
 async function successMailReceived(mime) {
-  console.log('Success message received: ', mime)
+  decryptLog.info('Success MIME mail received')
   const conjunction = [{ t: email_attribute, v: recipient }]
   const hashConjunction = await hashString(JSON.stringify(conjunction))
 
@@ -104,25 +130,20 @@ async function successMailReceived(mime) {
   const unsealer = await mod.Unsealer.new(readable)
   const hidden = unsealer.get_hidden_policies()
 
-  document.getElementById('info_message').style.display = 'block'
-  document.getElementById('header_text').style.display = 'block'
-  document.getElementById('decryptinfo').style.display = 'block'
-  document.getElementById('irmaapp').style.display = 'block'
-  document.getElementById('qrcodecontainer').style.display = 'block'
-  document.getElementById('loading').style.display = 'none'
-
   let localJwt = window.localStorage.getItem(`jwt_${hashConjunction}`)
 
   // if JWT in local storage is null, we need to execute IRMA disclosure session
   if (localJwt === null) {
-    log.info('JWT not stored within localStorage.')
+    decryptLog.info(
+      'JWT not stored within localStorage, starting IRMA session ...'
+    )
     localJwt = await executeIrmaDisclosureSession(conjunction, hashConjunction)
   }
 
   const decoded = jwtDecode<JwtPayload>(localJwt)
   // if JWT is expired, create new IRMA session
   if (Date.now() / 1000 > decoded.exp) {
-    log.info('JWT expired.')
+    decryptLog.info('JWT expired.')
     localJwt = await executeIrmaDisclosureSession(conjunction, hashConjunction)
   }
 
@@ -133,9 +154,10 @@ async function successMailReceived(mime) {
   })
 
   if (keyResp.status !== 'DONE' || keyResp.proofStatus !== 'VALID') {
-    log.error('JWT invalid or IRMA session not done.')
+    decryptLog.error('JWT invalid or IRMA session not done.')
+    passMsgToParent('IRMA session not done, please try again')
   } else {
-    log.info('JWT valid, continue.')
+    decryptLog.info('JWT valid, continue.')
 
     let plain = new Uint8Array(0)
     const writable = new WritableStream({
@@ -169,6 +191,12 @@ async function successMailReceived(mime) {
   }
 }
 
+/**
+ * Replaces the mail body of the current mail
+ * @param body The body of the decrypted mail
+ * @param subject The subject of the decrypted mail
+ * @param attachments The attachments of the decrypted mail
+ */
 function replaceMailBody(
   body: string,
   subject: string,
@@ -191,31 +219,41 @@ function replaceMailBody(
       Authorization: 'Bearer ' + token
     },
     success: function (success) {
-      console.log('PATCH message success: ', success)
+      decryptLog.info('PATCH message success: ', success)
       passMsgToParent('Successfully decrypted the email with PostGuard')
       removeAttachment(token, mailId, attachmentId, attachments)
     }
-  }).fail(function ($xhr) {
-    var data = $xhr.responseJSON
-    console.log('Ajax error: ', data)
-    passMsgToParent('Error during decryption, please try again later.')
-  })
+  }).fail(handleAjaxError)
 }
 
+/**
+ * Executes an IRMA disclosure session based on the policy
+ * @param policy The policy
+ * @param hashPolicy The hash of the policy
+ * @returns The JWT of the IRMA session
+ */
 async function executeIrmaDisclosureSession(
-  conjunction: object,
-  hashConjunction: string
+  policy: object,
+  hashPolicy: string
 ) {
+  // show HTML elements needed
+  document.getElementById('info_message').style.display = 'block'
+  document.getElementById('header_text').style.display = 'block'
+  document.getElementById('decryptinfo').style.display = 'block'
+  document.getElementById('irmaapp').style.display = 'block'
+  document.getElementById('qrcodecontainer').style.display = 'block'
+  document.getElementById('loading').style.display = 'none'
+
   // calculate diff in seconds between now and tomorrow 4 am
   let tomorrow = new Date()
   tomorrow.setDate(tomorrow.getDate() + 1)
   tomorrow.setHours(4, 0, 0, 0)
   const now = new Date()
   const seconds = Math.floor((tomorrow.getTime() - now.getTime()) / 1000)
-  console.log('Diff in seconds: ', seconds)
+  decryptLog.info('Diff in seconds until 4 am tomorrow: ', seconds)
 
   const requestBody = {
-    con: conjunction,
+    con: policy,
     validity: seconds
   }
 
@@ -260,19 +298,15 @@ async function executeIrmaDisclosureSession(
   const jwtUrl = await irma.start()
   // retrieve JWT, add to local storage, and return
   const localJwt = await $.ajax({ url: jwtUrl })
-  window.localStorage.setItem(`jwt_${hashConjunction}`, localJwt)
+  window.localStorage.setItem(`jwt_${hashPolicy}`, localJwt)
   return localJwt
 }
 
-function newReadableStreamFromArray(array) {
-  return new ReadableStream({
-    start(controller) {
-      controller.enqueue(array)
-      controller.close()
-    }
-  })
-}
-
+/**
+ * Downloading the attachment
+ * @param blob The binary data of the attachment
+ * @param filename The name of the attachment
+ */
 const downloadBlobAsFile = function (blob: Blob, filename: string) {
   const contentType = 'application/octet-stream'
   if (!blob) {
@@ -289,6 +323,10 @@ const downloadBlobAsFile = function (blob: Blob, filename: string) {
   a.dispatchEvent(e)
 }
 
+/**
+ * Handler for downloading the attachment
+ * @param e The event
+ */
 function downloadBlobHandler(e) {
   const target = e.target
   const filename = target.innerHTML
@@ -296,12 +334,18 @@ function downloadBlobHandler(e) {
   downloadBlobAsFile(data, filename)
 }
 
+/**
+ * Show the content of the mail
+ * @param subject The subject of the mail
+ * @param body The body of the mail
+ */
 function showMailContent(subject: string, body: string) {
   document.getElementById('decryptinfo').style.display = 'none'
   document.getElementById('irmaapp').style.display = 'none'
   document.getElementById('idlock_svg').style.display = 'none'
   document.getElementById('header_text').style.display = 'none'
   document.getElementById('info_message_text').style.display = 'none'
+  document.getElementById('loading').style.display = 'none'
 
   document.getElementById('bg_decrypted_txt').style.display = 'block'
   document.getElementById('bg_decrypted_subject').style.display = 'block'
@@ -311,6 +355,10 @@ function showMailContent(subject: string, body: string) {
   document.getElementById('decrypted-text').innerHTML = body
 }
 
+/**
+ * Show the attachments
+ * @param attachments The attachments
+ */
 function showAttachments(attachments) {
   for (let i = 0; i < attachments.length; i++) {
     document.getElementById('attachments').style.display = 'flex'

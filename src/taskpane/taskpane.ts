@@ -20,12 +20,13 @@ import {
   getItemRestId,
   hashString,
   IAttachmentContent,
+  isPostGuardEmail,
   replaceMailBody
 } from '../helpers/utils'
 import jwtDecode, { JwtPayload } from 'jwt-decode'
 
 const getLogger = require('webpack-log')
-const log = getLogger({ name: 'taskpane-log' })
+const log = getLogger({ name: 'PostGuard decrypt log' })
 
 const mod_promise = import('@e4a/irmaseal-wasm-bindings')
 const mod = await mod_promise
@@ -45,35 +46,16 @@ Office.onReady((info) => {
     item = Office.context.mailbox.item
     mailbox = Office.context.mailbox
     $(function () {
-      checkIrmasealEmail()
+      if (isPostGuardEmail()) {
+        getGraphAPIToken()
+        enableSenderinfo(item.sender.emailAddress)
+        enablePolicyInfo(item.to[0].emailAddress)
+      } else {
+        write('No Postguard email, cannot decrypt.')
+      }
     })
   }
 })
-
-// Get the body type of the composed item, and set data in
-// in the appropriate data type in the item body.
-function checkIrmasealEmail() {
-  // first attachment's content type must be 'application/irmaseal' to accept email as 'irmaseal' mail
-  if (item.attachments.length != 0) {
-    const attachmentName = item.attachments[0].name
-    const subjectTitle = item.subject
-    if (
-      attachmentName === 'postguard.encrypted' &&
-      subjectTitle === 'PostGuard encrypted email'
-    ) {
-      enableSenderinfo(item.sender.emailAddress)
-      enablePolicyInfo(item.to[0].emailAddress)
-      console.log('It is a PostGuard email!')
-      getGraphAPIToken()
-    } else {
-      console.log('No PostGuard email')
-      write('No Postguard email, cannot decrypt.')
-    }
-  } else {
-    console.log('No PostGuard email')
-    write('No PostGuard email, cannot decrypt.')
-  }
-}
 
 async function successMessageReceived(mime: string, token: string) {
   const recipient_id = mailbox.userProfile.emailAddress

@@ -3,7 +3,9 @@
  * See LICENSE in the project root for license information.
  */
 
-/* global Office */
+/* global $, Office */
+
+import 'web-streams-polyfill'
 
 import { ComposeMail } from '@e4a/irmaseal-mail-utils/dist/index'
 import { createMimeMessage } from 'mimetext'
@@ -11,7 +13,9 @@ import {
   storeMailAsPlainLocally,
   IAttachmentContent,
   htmlBodyType,
-  getItemRestId
+  getItemRestId,
+  isPostGuardEmail,
+  newReadableStreamFromArray
 } from '../helpers/utils'
 
 // eslint-disable-next-line no-undef
@@ -22,11 +26,17 @@ var globalEvent
 var isEncryptMode: boolean = false
 
 const hostname = 'https://main.irmaseal-pkg.ihub.ru.nl'
+const email_attribute = 'pbdf.sidn-pbdf.email.email'
+
 const mod_promise = import('@e4a/irmaseal-wasm-bindings')
 
-// in bytes (1024 x 1024 = 1 MB)
-// const MAX_ATTACHMENT_SIZE = 1024 * 1024
+import * as getLogger from 'webpack-log'
+const encryptLog = getLogger({ name: 'PostGuard encrypt log' })
+const decryptLog = getLogger({ name: 'PostGuard decrypt log' })
 
+/**
+ * The initialization function
+ */
 Office.initialize = () => {
   Office.onReady(() => {
     mailboxItem = Office.context.mailbox.item
@@ -37,8 +47,8 @@ Office.initialize = () => {
 }
 
 /**
- * Entry point function.
- * @param event
+ * Entry point function for encryption
+ * @param event The AddinCommands Event
  */
 // eslint-disable-next-line no-unused-vars
 function encrypt(event: Office.AddinCommands.Event) {
@@ -60,21 +70,26 @@ function encrypt(event: Office.AddinCommands.Event) {
   showLoginPopup('/fallbackauthdialog.html')
 }
 
-// Get recipient mail
+/**
+ * Gets the To of the current mail item
+ * @returns The To as an array of string
+ */
 function getRecipientEmails(): Promise<string[]> {
-  return new Promise(function (resolve, reject) {
+  return new Promise(function (resolve) {
     mailboxItem.to.getAsync((recipients) => {
       let recipientMails = new Array()
       recipients.value.forEach((recipient) => {
         recipientMails.push(recipient.emailAddress)
       })
-      if (recipientMails.length !== 0) resolve(recipientMails)
-      else reject('No recipient email')
+      resolve(recipientMails)
     })
   })
 }
 
-// Get cc recipient mail
+/**
+ * Gets the Ccs of the current mail item
+ * @returns The Ccs as an array of string
+ */
 function getCcRecipientEmails(): Promise<string[]> {
   return new Promise(function (resolve) {
     mailboxItem.cc.getAsync((recipients) => {
@@ -87,7 +102,10 @@ function getCcRecipientEmails(): Promise<string[]> {
   })
 }
 
-// Get bcc recipient mail
+/**
+ * Gets the Bccs of the current mail item
+ * @returns The Bccs as an array of string
+ */
 function getBccRecipientEmails(): Promise<string[]> {
   return new Promise(function (resolve) {
     mailboxItem.bcc.getAsync((recipients) => {
@@ -100,27 +118,37 @@ function getBccRecipientEmails(): Promise<string[]> {
   })
 }
 
-// Gets the mail body
+/**
+ * Gets the body of the current mail item
+ * @returns The body
+ */
 async function getMailBody(): Promise<string> {
   return new Promise(function (resolve, reject) {
     mailboxItem.body.getAsync(Office.CoercionType.Html, (asyncResult) => {
-      let returnBody: string
-      const body: string = asyncResult.value
-      const pattern = /<body[^>]*>((.|[\n\r])*)<\/body>/im
-      const arrayMatches = pattern.exec(body)
-      if (arrayMatches === null) {
-        returnBody = body
+      if (asyncResult.status == Office.AsyncResultStatus.Failed) {
+        reject('Subject async failed')
       } else {
-        const mailBody = arrayMatches[1]
-        returnBody = mailBody
+        let returnBody: string
+        const body: string = asyncResult.value
+        const pattern = /<body[^>]*>((.|[\n\r])*)<\/body>/im
+        const arrayMatches = pattern.exec(body)
+        if (arrayMatches === null) {
+          returnBody = body
+        } else {
+          const mailBody = arrayMatches[1]
+          returnBody = mailBody
+        }
+        if (returnBody !== '') resolve(returnBody)
+        else reject('Please add text to the body in the email')
       }
-      if (returnBody !== '') resolve(returnBody)
-      else reject('No body in email')
     })
   })
 }
 
-// Gets the mail subject
+/**
+ * Gets the subject from the current mail item
+ * @returns The subject
+ */
 async function getMailSubject(): Promise<string> {
   return new Promise(function (resolve, reject) {
     mailboxItem.subject.getAsync((asyncResult) => {
@@ -129,40 +157,45 @@ async function getMailSubject(): Promise<string> {
       } else {
         const subject: string = asyncResult.value
         if (subject !== '') resolve(subject)
-        else reject('No subject in email')
+        else reject('Please add a subject to the email')
       }
     })
   })
 }
 
+/**
+ * Collects all metadata and content of attachment belonging to the current mail item
+ * @returns Array of IAttachmentContent objects
+ */
 async function getMailAttachments(): Promise<IAttachmentContent[]> {
   return new Promise(function (resolve, reject) {
     mailboxItem.getAttachmentsAsync(async (asyncResult) => {
       if (asyncResult.status == Office.AsyncResultStatus.Failed) {
         reject('Attachments async failed')
       } else {
-        if (asyncResult.value.length > 0) {
-          let attachmentsArray = []
-          let content = ''
-          for (var i = 0; i < asyncResult.value.length; i++) {
-            var attachment = asyncResult.value[i]
-            content = await getMailAttachmentContent(attachment.id)
-            attachmentsArray.push({
-              filename: attachment.name,
-              content: content,
-              isInline: attachment.isInline,
-              id: attachment.id
-            })
-          }
-          resolve(attachmentsArray)
-        } else {
-          reject('No attachments in email')
+        let attachmentsArray = []
+        let content = ''
+        for (var i = 0; i < asyncResult.value.length; i++) {
+          var attachment = asyncResult.value[i]
+          content = await getMailAttachmentContent(attachment.id)
+          attachmentsArray.push({
+            filename: attachment.name,
+            content: content,
+            isInline: attachment.isInline,
+            id: attachment.id
+          })
         }
+        resolve(attachmentsArray)
       }
     })
   })
 }
 
+/**
+ * Returns promise containing content of the attachment
+ * @param attachmentId ID of the attachment
+ * @returns Promise containing content of the attachment
+ */
 async function getMailAttachmentContent(attachmentId: string): Promise<string> {
   return new Promise(function (resolve, reject) {
     mailboxItem.getAttachmentContentAsync(attachmentId, (asyncResult) => {
@@ -178,10 +211,13 @@ async function getMailAttachmentContent(attachmentId: string): Promise<string> {
   })
 }
 
-// Encrypts and sends the mail
-async function encryptAndsendMail(token) {
-  let pk
+/**
+ * Gets public key from PKG, or local storage if PKG is not available
+ * @returns The public key
+ */
+async function getPublicKey(): Promise<any> {
   const response = await fetch(`${hostname}/v2/parameters`)
+  let pk
 
   // if response is not ok, try to get PK from localStorage
   if (!response.ok || (response.status < 200 && response.status > 299)) {
@@ -189,22 +225,39 @@ async function encryptAndsendMail(token) {
     if (cachedPK) {
       pk = JSON.parse(cachedPK)
     } else {
-      // if PK also not available in localStorage remove it
-      const errorMsg = `Cannot retrieve publickey from ${hostname} and not stored within localStorage`
-      showInfoMessage(errorMsg)
-      return Promise.reject(errorMsg)
+      throw 'Cannot retrieve public key'
     }
+  } else {
+    pk = await response.json()
+    window.localStorage.setItem('pk', JSON.stringify(pk))
   }
+  return pk
+}
 
-  pk = await response.json()
-  window.localStorage.setItem('pk', JSON.stringify(pk))
+/**
+ * Encrypts and sends the email
+ * @param token The authentication token for the Graph API
+ */
+async function encryptAndSendEmail(token) {
+  const pk = await getPublicKey()
+
   const [mod] = await Promise.all([mod_promise])
 
   const sender = Office.context.mailbox.userProfile.emailAddress
-  const email_attribute = 'pbdf.sidn-pbdf.email.email'
+
   const timestamp = Math.round(Date.now() / 1000)
 
   const recipientEmails: string[] = await getRecipientEmails()
+  const ccRecipientEmails: string[] = await getCcRecipientEmails()
+  const bccRecipientEmails: string[] = await getBccRecipientEmails()
+  const allRecipientsCount =
+    recipientEmails.length +
+    ccRecipientEmails.length +
+    bccRecipientEmails.length
+
+  if (allRecipientsCount == 0) {
+    throw 'Please add recipients to the email.'
+  }
 
   const policies = recipientEmails.reduce((total, recipient) => {
     total[recipient] = {
@@ -214,7 +267,6 @@ async function encryptAndsendMail(token) {
     return total
   }, {})
 
-  const ccRecipientEmails: string[] = await getCcRecipientEmails()
   const ccPolicies = ccRecipientEmails.reduce((total, recipient) => {
     total[recipient] = {
       ts: timestamp,
@@ -223,7 +275,6 @@ async function encryptAndsendMail(token) {
     return total
   }, {})
 
-  const bccRecipientEmails: string[] = await getBccRecipientEmails()
   const bccPolicies = bccRecipientEmails.reduce((total, recipient) => {
     total[recipient] = {
       ts: timestamp,
@@ -237,30 +288,27 @@ async function encryptAndsendMail(token) {
 
   const allPolicies = { ...policies, ...ccPolicies, ...bccPolicies }
 
-  console.log('Encrypting using the following policies: ', allPolicies)
+  encryptLog.info('Encrypting using the following policies: ', allPolicies)
 
   let mailBody = await getMailBody()
 
   const mailSubject = await getMailSubject()
-  console.log('Mail subject: ', mailSubject)
+  encryptLog.info('Mail subject: ', mailSubject)
 
-  let attachments: IAttachmentContent[]
-  await getMailAttachments()
-    .then((attas) => (attachments = attas))
-    .catch((error) => console.log(error))
+  let attachments: IAttachmentContent[] = await getMailAttachments()
 
   // Use createMimeMessage to create inner MIME mail
   const msg = createMimeMessage()
   msg.setSender(sender)
   msg.setSubject(mailSubject)
 
-  msg.setRecipient(recipientEmails)
+  recipientEmails.length > 0 && msg.setRecipient(recipientEmails)
   ccRecipientEmails.length > 0 && msg.setCc(ccRecipientEmails)
   bccRecipientEmails.length > 0 && msg.setBcc(bccRecipientEmails)
 
   // ComposeMail only used for outer mail
   const composeMail = new ComposeMail()
-  composeMail.setSubject(mailSubject)
+  composeMail.setSubject('PostGuard encrypted email')
   composeMail.setSender(sender)
 
   recipientEmails.forEach((recipientEmail) => {
@@ -274,25 +322,20 @@ async function encryptAndsendMail(token) {
   })
 
   let hasAttachments: boolean = false
-  let isAlreadyEncrypted: boolean = false
 
   if (attachments !== undefined) {
-    let usePostGuard = false
     for (let i = 0; i < attachments.length; i++) {
       const attachment = attachments[i]
-      isAlreadyEncrypted = attachment.filename === 'postguard.encrypted'
 
       if (!attachment.isInline) {
         hasAttachments = true
-        if (!usePostGuard) {
-          const input = new TextEncoder().encode(attachment.content)
-          console.log('Attachment bytes length: ', input.byteLength)
-          msg.setAttachment(
-            attachment.filename,
-            'application/octet-stream',
-            attachment.content
-          )
-        }
+        const input = new TextEncoder().encode(attachment.content)
+        encryptLog.info('Attachment bytes length: ', input.byteLength)
+        msg.setAttachment(
+          attachment.filename,
+          'application/octet-stream',
+          attachment.content
+        )
       } else {
         // replace inline image in body
         const imageContentIDToReplace = `cid:${attachment.filename}@.*"`
@@ -300,131 +343,171 @@ async function encryptAndsendMail(token) {
         mailBody = mailBody.replace(
           regex,
           `data:image;base64,${attachment.content}"`
-          //attachment.filename + '"'
         )
       }
     }
   }
 
-  if (!isAlreadyEncrypted) {
-    let jsonInnerMail = {
-      sender: { emailAddress: { address: sender } },
-      subject: mailSubject,
-      body: {
-        contentType: htmlBodyType,
-        content: mailBody
-      },
-      toRecipients: recipientEmails.map((recipient) => {
-        return {
-          emailAddress: { address: recipient }
-        }
-      }),
-      ccRecipients: ccRecipientEmails.map((recipient) => {
-        return {
-          emailAddress: { address: recipient }
-        }
-      }),
-      bccRecipients: bccRecipientEmails.map((recipient) => {
-        return {
-          emailAddress: { address: recipient }
-        }
-      }),
-      hasAttachments: hasAttachments
+  encryptLog.info('Mailbody: ', mailBody)
+  msg.setMessage('text/html', mailBody)
+
+  // encrypt inner MIME mail
+  const innerMail = msg.asRaw()
+  const plainBytes: Uint8Array = new TextEncoder().encode(innerMail)
+  const readable = newReadableStreamFromArray(plainBytes)
+  let ct = new Uint8Array(0)
+  const writable = new WritableStream({
+    write(chunk) {
+      ct = new Uint8Array([...ct, ...chunk])
     }
+  })
 
-    console.log('Mailbody: ', mailBody)
-    msg.setMessage('text/html', mailBody)
+  await mod.seal(pk.publicKey, policies, readable, writable)
 
-    // encrypt inner MIME mail
-    const innerMail = msg.asRaw()
-    const plainBytes: Uint8Array = new TextEncoder().encode(innerMail)
-    const readable = new_readable_stream_from_array(plainBytes)
-    let ct = new Uint8Array(0)
-    const writable = new WritableStream({
-      write(chunk) {
-        ct = new Uint8Array([...ct, ...chunk])
+  // get outer mail to send email via Graph API
+  composeMail.setPayload(ct)
+  const outerMail = composeMail.getMimeMail()
+  const message = Buffer.from(outerMail).toString('base64')
+  const sendMessageUrl = 'https://graph.microsoft.com/v1.0/me/sendMail'
+  encryptLog.info('Trying to send email via ', sendMessageUrl)
+
+  $.ajax({
+    type: 'POST',
+    contentType: 'text/plain',
+    url: sendMessageUrl,
+    data: message,
+    headers: {
+      Authorization: 'Bearer ' + token
+    },
+    success: function () {
+      encryptLog.info(
+        'Sendmail success, now trying to store mail locally, and clear mail'
+      )
+
+      let jsonInnerMail = {
+        sender: { emailAddress: { address: sender } },
+        subject: mailSubject,
+        body: {
+          contentType: htmlBodyType,
+          content: mailBody
+        },
+        toRecipients: recipientEmails.map((recipient) => {
+          return {
+            emailAddress: { address: recipient }
+          }
+        }),
+        ccRecipients: ccRecipientEmails.map((recipient) => {
+          return {
+            emailAddress: { address: recipient }
+          }
+        }),
+        bccRecipients: bccRecipientEmails.map((recipient) => {
+          return {
+            emailAddress: { address: recipient }
+          }
+        }),
+        hasAttachments: hasAttachments
       }
-    })
 
-    await mod.seal(pk.publicKey, policies, readable, writable)
+      storeMailAsPlainLocally(
+        token,
+        jsonInnerMail,
+        attachments,
+        'PostGuard Sent Items'
+      )
 
-    Office.context.mailbox.item.subject.setAsync(
-      'PostGuard encrypted email',
-      function (asyncResult) {
+      clearCurrentEmail(attachments)
+
+      successMsgAndDialog()
+    }
+  }).fail(function ($xhr) {
+    var data = $xhr.responseJSON
+    encryptLog.error('Ajax error send mail: ', data)
+    throw 'Error when sending mail, please try again or contact administrator'
+  })
+}
+
+/**
+ * Adds info message to email and shows dialog that message is successfully encrypted and send
+ */
+function successMsgAndDialog() {
+  showInfoMessage('Successfully encrypted and send email')
+  var fullUrl =
+    'https://' +
+    location.hostname +
+    (location.port ? ':' + location.port : '') +
+    '/success.html'
+
+  Office.context.ui.displayDialogAsync(
+    fullUrl,
+    { height: 20, width: 30 },
+    // eslint-disable-next-line no-unused-vars
+    function (result) {
+      encryptLog.info('Successdialog has initialized.')
+    }
+  )
+}
+
+/**
+ * Clears the current mail, which means that to, cc, bcc, subject, body and attachments are removed
+ * @param attachments The attachments of the mail
+ */
+
+function clearCurrentEmail(attachments) {
+  mailboxItem.to.setAsync([], function (asyncResult) {
+    if (asyncResult.status === Office.AsyncResultStatus.Failed) {
+      encryptLog.error(
+        'Clearing subject failed with error: ' + asyncResult.error.message
+      )
+    }
+  })
+  mailboxItem.cc.setAsync([], function (asyncResult) {
+    if (asyncResult.status === Office.AsyncResultStatus.Failed) {
+      encryptLog.error(
+        'Clearing subject failed with error: ' + asyncResult.error.message
+      )
+    }
+  })
+  mailboxItem.bcc.setAsync([], function (asyncResult) {
+    if (asyncResult.status === Office.AsyncResultStatus.Failed) {
+      encryptLog.error(
+        'Clearing subject failed with error: ' + asyncResult.error.message
+      )
+    }
+  })
+  mailboxItem.subject.setAsync('', function (asyncResult) {
+    if (asyncResult.status === Office.AsyncResultStatus.Failed) {
+      encryptLog.error(
+        'Clearing subject failed with error: ' + asyncResult.error.message
+      )
+    }
+  })
+  mailboxItem.body.setAsync('', (asyncResult) => {
+    if (asyncResult.status === Office.AsyncResultStatus.Failed) {
+      encryptLog.error(
+        'Clearing body failed with error: ' + asyncResult.error.message
+      )
+    }
+  })
+  if (attachments !== undefined) {
+    for (let i = 0; i < attachments.length; i++) {
+      const attachment = attachments[i]
+      mailboxItem.removeAttachmentAsync(attachment.id, (asyncResult) => {
         if (asyncResult.status === Office.AsyncResultStatus.Failed) {
-          console.log(
-            'Changing subject failed with error: ' + asyncResult.error.message
-          )
-        } else {
-          mailboxItem.body.setAsync(
-            '<b>This is a PostGuard encrypted email</b>',
-            { coercionType: Office.CoercionType.Html },
-            (asyncResult) => {
-              if (asyncResult.status === Office.AsyncResultStatus.Failed) {
-                console.log(
-                  'Changing body failed with error: ' +
-                    asyncResult.error.message
-                )
-              } else {
-                const b64 = Buffer.from(ct).toString('base64')
-                mailboxItem.addFileAttachmentFromBase64Async(
-                  b64,
-                  'postguard.encrypted',
-                  (asyncResult) => {
-                    if (
-                      asyncResult.status === Office.AsyncResultStatus.Failed
-                    ) {
-                      console.log(
-                        'Adding attachment failed with error: ' +
-                          asyncResult.error.message
-                      )
-                    } else {
-                      storeMailAsPlainLocally(
-                        token,
-                        jsonInnerMail,
-                        attachments,
-                        'PostGuard'
-                      )
-
-                      showInfoMessage(
-                        'Successfully encrypted email, press Send to send the email'
-                      )
-
-                      if (attachments !== undefined) {
-                        for (let i = 0; i < attachments.length; i++) {
-                          const attachment = attachments[i]
-                          mailboxItem.removeAttachmentAsync(
-                            attachment.id,
-                            (asyncResult) => {
-                              if (
-                                asyncResult.status ===
-                                Office.AsyncResultStatus.Failed
-                              ) {
-                                console.log(
-                                  'Changing subject failed with error: ' +
-                                    asyncResult.error.message
-                                )
-                              }
-                            }
-                          )
-                        }
-                      }
-                    }
-                  }
-                )
-              }
-            }
+          encryptLog.error(
+            'Clearing attachment failed with error: ' +
+              asyncResult.error.message
           )
         }
-      }
-    )
-  } else {
-    showInfoMessage(
-      'Mail is already encrypted with PostGuard, cannot encrypt again. Please send the email.'
-    )
+      })
+    }
   }
 }
 
+/**
+ * Displays a message
+ * @param msg The message to be displayes
+ */
 function showInfoMessage(msg: string) {
   const msgDetails: Office.NotificationMessageDetails = {
     type: Office.MailboxEnums.ItemNotificationMessageType.InformationalMessage,
@@ -432,9 +515,6 @@ function showInfoMessage(msg: string) {
     icon: 'Icon.80x80',
     persistent: true
   }
-
-  console.log('Info msg: ', msg)
-
   Office.context.mailbox.item.notificationMessages.replaceAsync(
     'action',
     msgDetails
@@ -442,42 +522,42 @@ function showInfoMessage(msg: string) {
   globalEvent.completed()
 }
 
-function new_readable_stream_from_array(array) {
-  return new ReadableStream({
-    start(controller) {
-      controller.enqueue(array)
-      controller.close()
-    }
-  })
-}
-
 var loginDialog
 
-// This handler responds to the success or failure message that the pop-up dialog receives from the identity provider
-// and access token provider.
+/**
+ *  This handler responds to the success or failure message that the pop-up dialog receives from the identity provider and access token provider.
+ * @param arg The arg object passed from the dialog
+ */
+
 async function processMessage(arg) {
   let messageFromDialog = JSON.parse(arg.message)
 
   if (messageFromDialog.status === 'success') {
-    // We now have a valid access token.
-    console.log('Trying to close login dialog')
     loginDialog.close()
-    console.log('Valid token: ', JSON.stringify(messageFromDialog.result))
-    console.log('Logginger: ', JSON.stringify(messageFromDialog.logging))
     if (isEncryptMode) {
-      encryptAndsendMail(messageFromDialog.result.accessToken)
+      encryptAndSendEmail(messageFromDialog.result.accessToken).catch((err) => {
+        encryptLog.error(err.message)
+        showInfoMessage(err.message)
+      })
     } else {
       showDecryptPopup(messageFromDialog.result.accessToken)
     }
   } else {
     // Something went wrong with authentication or the authorization of the web application.
     loginDialog.close()
-    console.log('Error: ', JSON.stringify(messageFromDialog.error.toString()))
+    encryptLog.error(
+      'Error: ',
+      JSON.stringify(messageFromDialog.error.toString())
+    )
   }
 }
 
-// Use the Office dialog API to open a pop-up and display the sign-in page for the identity provider.
-function showLoginPopup(url) {
+/**
+ * Use the Office dialog API to open a pop-up and display the sign-in page for the identity provider.
+ * @param url The HTML url pointing to the login popup
+ */
+
+function showLoginPopup(url: string) {
   var fullUrl =
     location.protocol +
     '//' +
@@ -489,7 +569,7 @@ function showLoginPopup(url) {
     fullUrl,
     { height: 60, width: 30 },
     function (result) {
-      console.log('Dialog has initialized. Wiring up events')
+      encryptLog.info('Logindialog has initialized.')
       loginDialog = result.value
       loginDialog.addEventHandler(
         Office.EventType.DialogMessageReceived,
@@ -520,6 +600,10 @@ g.decrypt = decrypt
 // eslint-disable-next-line no-unused-vars
 var decryptDialog: Office.Dialog
 
+/**
+ * Decrypts current message via popup
+ * @param event The AddinCommands Event
+ */
 function decrypt(event: Office.AddinCommands.Event) {
   const message: Office.NotificationMessageDetails = {
     type: Office.MailboxEnums.ItemNotificationMessageType.InformationalMessage,
@@ -535,51 +619,21 @@ function decrypt(event: Office.AddinCommands.Event) {
     message
   )
 
-  if (isIrmasealEmail()) {
+  if (isPostGuardEmail()) {
     showLoginPopup('/fallbackauthdialog.html')
   } else {
-    globalEvent.completed()
-    const message: Office.NotificationMessageDetails = {
-      type: Office.MailboxEnums.ItemNotificationMessageType
-        .InformationalMessage,
-      message: 'Not a PostGuard email, cannot decrypt.',
-      icon: 'Icon.80x80',
-      persistent: true
-    }
-    Office.context.mailbox.item.notificationMessages.replaceAsync(
-      'action',
-      message
-    )
+    showInfoMessage('Not a PostGuard email, cannot decrypt.')
   }
 }
 
-// first attachment name must be 'postguard.encrypted', and subject must be 'PostGuard encrypted email'
-function isIrmasealEmail() {
-  const item = Office.context.mailbox.item
-  if (item.attachments.length != 0) {
-    const attachmentName = item.attachments[0].name
-    const subjectTitle = item.subject
-    if (
-      attachmentName === 'postguard.encrypted' &&
-      subjectTitle === 'PostGuard encrypted email'
-    ) {
-      console.log('It is a PostGuard email!')
-      return true
-    } else {
-      console.log('No PostGuard email')
-      return false
-    }
-  } else {
-    console.log('No PostGuard email')
-    return false
-  }
-}
-
-function showDecryptPopup(token) {
+/**
+ * Displays the decrypt popup
+ * @param token Authentication token for Graph API
+ */
+function showDecryptPopup(token: string) {
   const b64 = Buffer.from(token).toString('base64')
   const fullUrl =
-    location.protocol +
-    '//' +
+    'https://' +
     location.hostname +
     (location.port ? ':' + location.port : '') +
     '/decrypt.html' +
@@ -601,10 +655,10 @@ function showDecryptPopup(token) {
         if (result.error.code === 12007) {
           showDecryptPopup(token) // Recursive call
         } else {
-          console.log('Other error: ', result.error)
+          decryptLog.error('Other error: ', result.error)
         }
       } else {
-        console.log('Decryptdialog has initialized, ', result)
+        decryptLog.info('Decryptdialog has initialized, ', result)
         decryptDialog = result.value
         decryptDialog.addEventHandler(
           Office.EventType.DialogMessageReceived,
@@ -615,16 +669,11 @@ function showDecryptPopup(token) {
   )
 }
 
-function processDecryptMessage(msg) {
-  globalEvent.completed()
-  const message: Office.NotificationMessageDetails = {
-    type: Office.MailboxEnums.ItemNotificationMessageType.InformationalMessage,
-    message: msg.message,
-    icon: 'Icon.80x80',
-    persistent: true
-  }
-  Office.context.mailbox.item.notificationMessages.replaceAsync(
-    'action',
-    message
-  )
+/**
+ * Event handler function receiving message form decrypt dialog
+ * Passing message on to showInfoMessage function
+ * @param arg object passed from decrypt dialog.
+ */
+function processDecryptMessage(arg) {
+  showInfoMessage(arg.message)
 }

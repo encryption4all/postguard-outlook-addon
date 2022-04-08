@@ -109,11 +109,11 @@
       <bt:ShortStrings>
         <bt:String id="GroupLabel" DefaultValue="PostGuard Add-in"/>
         <bt:String id="TaskpaneButton.Label" DefaultValue="Decrypt email"/>
-        <bt:String id="EncryptButton.Label" DefaultValue="Encrypt email"/>
+        <bt:String id="EncryptButton.Label" DefaultValue="Encrypt and Send email"/>
       </bt:ShortStrings>
       <bt:LongStrings>
-        <bt:String id="TaskpaneButton.Tooltip" DefaultValue="Opens a pane to decrypt the selected email."/>
-        <bt:String id="EncryptButton.Tooltip" DefaultValue="Encrypt the current email with PostGuard."/>
+        <bt:String id="TaskpaneButton.Tooltip" DefaultValue="Opens a dialog to decrypt the selected email."/>
+        <bt:String id="EncryptButton.Tooltip" DefaultValue="Encrypt and send the current email with PostGuard."/>
       </bt:LongStrings>
     </Resources>
 
@@ -216,11 +216,11 @@
         <bt:ShortStrings>
           <bt:String id="GroupLabel" DefaultValue="PostGuard Add-in"/>
           <bt:String id="TaskpaneButton.Label" DefaultValue="Decrypt email"/>
-          <bt:String id="EncryptButton.Label" DefaultValue="Encrypt email"/>
+          <bt:String id="EncryptButton.Label" DefaultValue="Encrypt and Send email"/>
         </bt:ShortStrings>
         <bt:LongStrings>
-          <bt:String id="TaskpaneButton.Tooltip" DefaultValue="Opens a pane to decrypt the current email."/>
-          <bt:String id="EncryptButton.Tooltip" DefaultValue="Encrypt the current email with PostGuard"/>
+          <bt:String id="TaskpaneButton.Tooltip" DefaultValue="Opens a dialog to decrypt the selected email."/>
+          <bt:String id="EncryptButton.Tooltip" DefaultValue="Encrypt and send the current email with PostGuard."/>
         </bt:LongStrings>
       </Resources>
 
