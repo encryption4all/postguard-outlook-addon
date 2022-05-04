@@ -4,11 +4,13 @@ const devCerts = require('office-addin-dev-certs')
 const { CleanWebpackPlugin } = require('clean-webpack-plugin')
 const CopyWebpackPlugin = require('copy-webpack-plugin')
 const HtmlWebpackPlugin = require('html-webpack-plugin')
+const ReplaceInFileWebpackPlugin = require('replace-in-file-webpack-plugin')
 
 const webpack = require('webpack')
 
 const urlDev = 'localhost:3000/'
 const urlProd = 'irmaseal.z6.web.core.windows.net/' // CHANGE THIS TO YOUR PRODUCTION DEPLOYMENT LOCATION
+const appIdProd = '6ee2a054-1d61-405d-8e5d-c2daf25c5833' // CHANGE TO APP ID used in App registration of RU account
 
 module.exports = async (env, options) => {
   const dev = options.mode === 'development'
@@ -116,14 +118,31 @@ module.exports = async (env, options) => {
       }),
       new HtmlWebpackPlugin({
         filename: 'success.html',
-        template: './src/successdialog/success.html',
+        template: './src/dialogs/success.html',
         chunks: ['polyfill', 'decrypt']
+      }),
+      new HtmlWebpackPlugin({
+        filename: 'bcc.html',
+        template: './src/dialogs/bcc.html',
+        chunks: ['polyfill', 'commands']
       }),
       new HtmlWebpackPlugin({
         filename: 'fallbackauthdialog.html',
         template: './src/helpers/fallbackauthdialog.html',
         chunks: ['polyfill', 'fallbackauthdialog']
       })
+      /*new ReplaceInFileWebpackPlugin([
+        {
+          dir: 'dist',
+          files: ['fallbackauthdialog.js'],
+          rules: [
+            {
+              search: 'clientId:"6ee2a054-1d61-405d-8e5d-c2daf25c5833"',
+              replace: `clientId:"${appIdProd}"`
+            }
+          ]
+        }
+      ])*/
     ],
     devServer: {
       headers: {

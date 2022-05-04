@@ -4,13 +4,13 @@
   xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0"
   xmlns:mailappor="http://schemas.microsoft.com/office/mailappversionoverrides/1.0" xsi:type="MailApp">
   <Id>7274321f-8067-4844-ae11-dabe76ad38c0</Id>
-  <Version>1.0.0.0</Version>
+  <Version>0.0.1</Version>
   <ProviderName>IRMA</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
   <DisplayName DefaultValue="PostGuard outlook add-in"/>
   <Description DefaultValue="PostGuard - easy email encryption."/>
-  <IconUrl DefaultValue="https://localhost:3000/assets/icon-64.png"/>
-  <HighResolutionIconUrl DefaultValue="https://localhost:3000/assets/icon-128.png"/>
+  <IconUrl DefaultValue="https://localhost:3000/assets/64.png"/>
+  <HighResolutionIconUrl DefaultValue="https://localhost:3000/assets/128.png"/>
   <SupportUrl DefaultValue="https://PostGuard.app"/>
   <AppDomains>
     <AppDomain>https://login.microsoftonline.com</AppDomain>
@@ -98,9 +98,9 @@
     </Hosts>
     <Resources>
       <bt:Images>
-        <bt:Image id="Icon.16x16" DefaultValue="https://localhost:3000/assets/icon-16.png"/>
-        <bt:Image id="Icon.32x32" DefaultValue="https://localhost:3000/assets/icon-32.png"/>
-        <bt:Image id="Icon.80x80" DefaultValue="https://localhost:3000/assets/icon-80.png"/>
+        <bt:Image id="Icon.16x16" DefaultValue="https://localhost:3000/assets/16.png"/>
+        <bt:Image id="Icon.32x32" DefaultValue="https://localhost:3000/assets/32.png"/>
+        <bt:Image id="Icon.80x80" DefaultValue="https://localhost:3000/assets/80.png"/>
       </bt:Images>
       <bt:Urls>
         <bt:Url id="Encrypt.Url" DefaultValue="https://localhost:3000/commands.html"/>
@@ -128,9 +128,6 @@
         <Host xsi:type="MailHost">
           <DesktopFormFactor>
             <FunctionFile resid="Encrypt.Url"/>
-            <ExtensionPoint xsi:type="Events">
-              <Event Type="ItemSend" FunctionExecution="synchronous" FunctionName="validatePreviouslySend" />
-            </ExtensionPoint>
             <ExtensionPoint xsi:type="MessageReadCommandSurface">
               <OfficeTab id="TabDefault">
                 <Group id="msgReadGroup">
@@ -149,6 +146,9 @@
                     <Action xsi:type="ExecuteFunction">
                       <FunctionName>decrypt</FunctionName>
                     </Action>
+                    <!--Action xsi:type="ShowTaskpane">
+                      <SourceLocation resid="Taskpane.Url" />
+                    </Action-->
                   </Control>
                 </Group>
               </OfficeTab>
@@ -184,15 +184,15 @@
                 <Control xsi:type="MobileButton" id="Contoso.mobileButton1">
                   <Label resid="TaskpaneButton.Label"/>
                   <Icon xsi:type="bt:MobileIconList">
-                    <bt:Image size="25" scale="1" resid="Icon.32x32" />
-                    <bt:Image size="25" scale="2" resid="Icon.32x32" />
-                    <bt:Image size="25" scale="3" resid="Icon.32x32" />
+                    <bt:Image size="25" scale="1" resid="Icon.25x25" />
+                    <bt:Image size="25" scale="2" resid="Icon.25x25" />
+                    <bt:Image size="25" scale="3" resid="Icon.25x25" />
                     <bt:Image size="32" scale="1" resid="Icon.32x32" />
                     <bt:Image size="32" scale="2" resid="Icon.32x32" />
                     <bt:Image size="32" scale="3" resid="Icon.32x32" />
-                    <bt:Image size="48" scale="1" resid="Icon.80x80" />
-                    <bt:Image size="48" scale="2" resid="Icon.80x80" />
-                    <bt:Image size="48" scale="3" resid="Icon.80x80" />
+                    <bt:Image size="48" scale="1" resid="Icon.48x48" />
+                    <bt:Image size="48" scale="2" resid="Icon.48x48" />
+                    <bt:Image size="48" scale="3" resid="Icon.48x48" />
                   </Icon>
                   <Action xsi:type="ShowTaskpane">
                     <SourceLocation resid="Taskpane.Url" />
@@ -205,9 +205,11 @@
       </Hosts>
       <Resources>
         <bt:Images>
-          <bt:Image id="Icon.16x16" DefaultValue="https://localhost:3000/assets/icon-16.png"/>
-          <bt:Image id="Icon.32x32" DefaultValue="https://localhost:3000/assets/icon-32.png"/>
-          <bt:Image id="Icon.80x80" DefaultValue="https://localhost:3000/assets/icon-80.png"/>
+          <bt:Image id="Icon.16x16" DefaultValue="https://localhost:3000/assets/16.png"/>
+          <bt:Image id="Icon.25x25" DefaultValue="https://localhost:3000/assets/25.png"/>
+          <bt:Image id="Icon.32x32" DefaultValue="https://localhost:3000/assets/32.png"/>
+          <bt:Image id="Icon.48x48" DefaultValue="https://localhost:3000/assets/48.png"/>
+          <bt:Image id="Icon.80x80" DefaultValue="https://localhost:3000/assets/80.png"/>
         </bt:Images>
         <bt:Urls>
           <bt:Url id="Encrypt.Url" DefaultValue="https://localhost:3000/commands.html"/>
@@ -215,27 +217,14 @@
         </bt:Urls>
         <bt:ShortStrings>
           <bt:String id="GroupLabel" DefaultValue="PostGuard Add-in"/>
-          <bt:String id="TaskpaneButton.Label" DefaultValue="Decrypt email"/>
-          <bt:String id="EncryptButton.Label" DefaultValue="Encrypt and Send email"/>
+          <bt:String id="TaskpaneButton.Label" DefaultValue="Decrypt Email"/>
+          <bt:String id="EncryptButton.Label" DefaultValue="Send encrypted Email"/>
         </bt:ShortStrings>
         <bt:LongStrings>
-          <bt:String id="TaskpaneButton.Tooltip" DefaultValue="Opens a dialog to decrypt the selected email."/>
-          <bt:String id="EncryptButton.Tooltip" DefaultValue="Encrypt and send the current email with PostGuard."/>
+          <bt:String id="TaskpaneButton.Tooltip" DefaultValue="Decrypts the selected email with PostGuard."/>
+          <bt:String id="EncryptButton.Tooltip" DefaultValue="Encrypts and sends the current email with PostGuard."/>
         </bt:LongStrings>
       </Resources>
-
-      <WebApplicationInfo>
-        <Id>6ee2a054-1d61-405d-8e5d-c2daf25c5833</Id>
-        <Resource>api://localhost:3000/6ee2a054-1d61-405d-8e5d-c2daf25c5833</Resource>
-        <Scopes>
-          <Scope>mail.send</Scope>
-          <Scope>openid</Scope>
-          <Scope>profile</Scope>
-          <Scope>mail.read</Scope>
-          <Scope>mail.readwrite</Scope>
-          <Scope>mail.readbasic</Scope>
-        </Scopes>
-      </WebApplicationInfo>
 
     </VersionOverrides>
 

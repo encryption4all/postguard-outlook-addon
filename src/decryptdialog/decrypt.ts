@@ -7,9 +7,9 @@
 /* global $, Office */
 
 // images references in the manifest
-import '../../assets/icon-16.png'
-import '../../assets/icon-32.png'
-import '../../assets/icon-80.png'
+import '../../assets/16.png'
+import '../../assets/32.png'
+import '../../assets/80.png'
 
 import 'web-streams-polyfill'
 
@@ -19,6 +19,7 @@ import * as IrmaCore from '@privacybydesign/irma-core'
 import * as IrmaClient from '@privacybydesign/irma-client'
 import * as IrmaWeb from '@privacybydesign/irma-web'
 import {
+  getGlobal,
   hashString,
   htmlBodyType,
   IAttachmentContent,
@@ -36,31 +37,32 @@ const mod = await mod_promise
 // eslint-disable-next-line no-undef
 const simpleParser = require('mailparser').simpleParser
 
-const hostname = 'https://main.irmaseal-pkg.ihub.ru.nl'
+const hostname = 'https://stable.irmaseal-pkg.ihub.ru.nl'
 const email_attribute = 'pbdf.sidn-pbdf.email.email'
 
 // eslint-disable-next-line no-undef
 var Buffer = require('buffer/').Buffer
 
-var token: string
-var recipient: string
-var mailId: string
-var attachmentId: string
+const g = getGlobal() as any
 
 /**
  * Initialization function which also extracts the URL params
  */
 Office.initialize = function () {
-  decryptLog.info('Decrypt dialog openend!')
-  const urlParams = new URLSearchParams(window.location.search)
-  token = Buffer.from(urlParams.get('token'), 'base64').toString('utf-8')
-  recipient = urlParams.get('recipient')
-  mailId = urlParams.get('mailid')
-  attachmentId = urlParams.get('attachmentid')
+  if (Office.context.mailbox === undefined) {
+    decryptLog.info('Decrypt dialog openend!')
+    const urlParams = new URLSearchParams(window.location.search)
+    g.token = Buffer.from(urlParams.get('token'), 'base64').toString('utf-8')
+    g.recipient = urlParams.get('recipient')
+    g.mailId = urlParams.get('mailid')
+    g.attachmentId = urlParams.get('attachmentid')
+    g.msgFunc = passMsgToParent
+    g.sender = urlParams.get('sender')
 
-  $(function () {
-    getMailObject()
-  })
+    $(function () {
+      getMailObject()
+    })
+  }
 }
 
 /**
@@ -68,7 +70,9 @@ Office.initialize = function () {
  * @param msg The message
  */
 function passMsgToParent(msg: string) {
-  Office.context.ui.messageParent(msg)
+  if (Office.context.mailbox === undefined) {
+    Office.context.ui.messageParent(msg)
+  }
 }
 
 /**
@@ -78,9 +82,9 @@ function passMsgToParent(msg: string) {
 function handleAjaxError($xhr) {
   var data = $xhr.responseJSON
   decryptLog.error('Ajax error: ', data)
-  passMsgToParent(
+  const msg =
     'Error during decryption, please try again or contact your administrator.'
-  )
+  g.msgFunc(msg)
 }
 
 /**
@@ -88,20 +92,20 @@ function handleAjaxError($xhr) {
  */
 function getMailObject() {
   var getMessageUrl =
-    'https://graph.microsoft.com/v1.0/me/messages/' + mailId + '/$value'
+    'https://graph.microsoft.com/v1.0/me/messages/' + g.mailId + '/$value'
 
   decryptLog.info('Try to receive MIME via ', getMessageUrl)
 
   fetch(getMessageUrl, {
     headers: new Headers({
-      Authorization: 'Bearer ' + token
+      Authorization: 'Bearer ' + g.token
     })
   })
     .then((response) => {
       if (response.ok) {
         return response.text()
       }
-      throw new Error('Something went wrong')
+      throw new Error('Something went wrong when tryng to get MIME')
     })
     .then(successMailReceived)
     // eslint-disable-next-line no-unused-vars
@@ -117,9 +121,9 @@ function getMailObject() {
  * Handling decryption of the mail after it has been received
  * @param mime The mime message
  */
-async function successMailReceived(mime) {
+export async function successMailReceived(mime) {
   decryptLog.info('Success MIME mail received')
-  const conjunction = [{ t: email_attribute, v: recipient }]
+  const conjunction = [{ t: email_attribute, v: g.recipient }]
   const hashConjunction = await hashString(JSON.stringify(conjunction))
 
   const readMail = new ReadMail()
@@ -129,6 +133,11 @@ async function successMailReceived(mime) {
 
   const unsealer = await mod.Unsealer.new(readable)
   const hidden = unsealer.get_hidden_policies()
+
+  if (!hidden[g.recipient]) {
+    passMsgToParent('Decrypton failed. Identifier not found in header.')
+    return
+  }
 
   let localJwt = window.localStorage.getItem(`jwt_${hashConjunction}`)
 
@@ -149,13 +158,16 @@ async function successMailReceived(mime) {
 
   // retrieve USK
   const keyResp = await $.ajax({
-    url: `${hostname}/v2/request/key/${hidden[recipient].ts.toString()}`,
-    headers: { Authorization: 'Bearer ' + localJwt }
+    url: `${hostname}/v2/request/key/${hidden[g.recipient].ts.toString()}`,
+    headers: {
+      'X-Postguard-Client-Version': `Outlook, ${Office.context.diagnostics.version}, pg4ol, 0.0.1`,
+      Authorization: 'Bearer ' + localJwt
+    }
   })
 
   if (keyResp.status !== 'DONE' || keyResp.proofStatus !== 'VALID') {
     decryptLog.error('JWT invalid or IRMA session not done.')
-    passMsgToParent('IRMA session not done, please try again')
+    g.msgFunc('IRMA session not done, please try again')
   } else {
     decryptLog.info('JWT valid, continue.')
 
@@ -166,12 +178,41 @@ async function successMailReceived(mime) {
       }
     })
 
-    await unsealer.unseal(recipient, keyResp.key, writable)
+    await unsealer.unseal(g.recipient, keyResp.key, writable)
     const mail: string = new TextDecoder().decode(plain)
 
     // Parse inner mail via simpleParser
     let parsed = await simpleParser(mail)
-    showMailContent(parsed.subject, parsed.html)
+    const body = parsed.html ? parsed.html : parsed.textAsHtml
+
+    let to = ''
+    if (parsed.to !== undefined) {
+      to = parsed.to.value
+        .map(function (to) {
+          return to.address
+        })
+        .join(',')
+    }
+
+    console.log('To: ', to)
+
+    let cc = ''
+    if (parsed.cc !== undefined) {
+      cc = parsed.cc.value
+        .map(function (cc) {
+          return cc.address
+        })
+        .join(',')
+    }
+
+    showMailContent(
+      parsed.subject,
+      body,
+      parsed.from.value[0].address,
+      to,
+      cc,
+      parsed.date.toLocaleString()
+    )
     showAttachments(parsed.attachments)
 
     const attachments: IAttachmentContent[] = parsed.attachments.map(
@@ -187,7 +228,7 @@ async function successMailReceived(mime) {
       }
     )
 
-    replaceMailBody(parsed.html, parsed.subject, attachments)
+    replaceMailBody(body, parsed.subject, attachments)
   }
 }
 
@@ -202,7 +243,7 @@ function replaceMailBody(
   subject: string,
   attachments: IAttachmentContent[]
 ) {
-  const messageUrl = `https://graph.microsoft.com/v1.0/me/messages/${mailId}`
+  const messageUrl = `https://graph.microsoft.com/v1.0/me/messages/${g.mailId}`
   const payload = {
     body: {
       contentType: htmlBodyType,
@@ -216,12 +257,12 @@ function replaceMailBody(
     url: messageUrl,
     data: JSON.stringify(payload),
     headers: {
-      Authorization: 'Bearer ' + token
+      Authorization: 'Bearer ' + g.token
     },
     success: function (success) {
       decryptLog.info('PATCH message success: ', success)
       passMsgToParent('Successfully decrypted the email with PostGuard')
-      removeAttachment(token, mailId, attachmentId, attachments)
+      removeAttachment(g.token, g.mailId, g.attachmentId, attachments)
     }
   }).fail(handleAjaxError)
 }
@@ -243,25 +284,30 @@ async function executeIrmaDisclosureSession(
   document.getElementById('irmaapp').style.display = 'block'
   document.getElementById('qrcodecontainer').style.display = 'block'
   document.getElementById('loading').style.display = 'none'
+  enableSenderinfo(g.sender)
 
   // calculate diff in seconds between now and tomorrow 4 am
   let tomorrow = new Date()
   tomorrow.setDate(tomorrow.getDate() + 1)
   tomorrow.setHours(4, 0, 0, 0)
   const now = new Date()
-  const seconds = Math.floor((tomorrow.getTime() - now.getTime()) / 1000)
-  decryptLog.info('Diff in seconds until 4 am tomorrow: ', seconds)
+  const seconds =
+    Math.floor((tomorrow.getTime() - now.getTime()) / 1000) % 86400
+  decryptLog.info('Diff in seconds until 4 am: ', seconds)
 
   const requestBody = {
     con: policy,
     validity: seconds
   }
-
   const language = Office.context.displayLanguage.toLowerCase().startsWith('nl')
     ? 'nl'
     : 'en'
 
   const irma = new IrmaCore({
+    translations: {
+      header: '',
+      helper: ''
+    },
     debugging: true,
     element: '#qrcode',
     language: language,
@@ -270,7 +316,10 @@ async function executeIrmaDisclosureSession(
       start: {
         url: (o) => `${o.url}/v2/request/start`,
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Postguard-Client-Version': `Outlook, ${Office.context.diagnostics.version}, pg4ol, 0.0.1`
+        },
         body: JSON.stringify(requestBody)
       },
       mapping: {
@@ -339,20 +388,34 @@ function downloadBlobHandler(e) {
  * @param subject The subject of the mail
  * @param body The body of the mail
  */
-function showMailContent(subject: string, body: string) {
+function showMailContent(
+  subject: string,
+  body: string,
+  from: string,
+  to: string,
+  cc: string,
+  received: string
+) {
   document.getElementById('decryptinfo').style.display = 'none'
   document.getElementById('irmaapp').style.display = 'none'
-  document.getElementById('idlock_svg').style.display = 'none'
   document.getElementById('header_text').style.display = 'none'
-  document.getElementById('info_message_text').style.display = 'none'
+  document.getElementById('info_message').style.display = 'none'
   document.getElementById('loading').style.display = 'none'
 
-  document.getElementById('bg_decrypted_txt').style.display = 'block'
-  document.getElementById('bg_decrypted_subject').style.display = 'block'
-  document.getElementById('idlock_svg_decrypt').style.display = 'block'
+  document.getElementById('app-body').style.backgroundColor = '#D7E4E9'
+  document.getElementById('center').className = 'leftAndMargin'
+  document.getElementById('decrypted').style.display = 'block'
+  document.getElementById('decrypted_subject').innerHTML = subject
+  document.getElementById('decrypted_text').innerHTML = body
+  document.getElementById('decrypted_from').innerHTML += from
 
-  document.getElementById('decrypted-subject').innerHTML = subject
-  document.getElementById('decrypted-text').innerHTML = body
+  if (to.length > 0) document.getElementById('decrypted_to').innerHTML += to
+  else document.getElementById('decrypted_to').style.display = 'none'
+
+  if (cc.length > 0) document.getElementById('decrypted_cc').innerHTML += cc
+  else document.getElementById('decrypted_cc').style.display = 'none'
+
+  document.getElementById('decrypted_received').innerHTML += received
 }
 
 /**
@@ -377,4 +440,13 @@ function showAttachments(attachments) {
     a.onclick = downloadBlobHandler
     $(a).data('blob', blob)
   }
+}
+
+/**
+ * Enables sender information
+ * @param sender The sender of the mail
+ */
+function enableSenderinfo(sender: string) {
+  document.getElementById('item-sender').hidden = false
+  document.getElementById('item-sender').innerHTML += sender
 }

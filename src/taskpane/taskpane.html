@@ -290,6 +290,8 @@
         <b>Status:</b> <label id="status"></label>
       </p>
 
+      <div id="loading">Loading ...</div>
+
       <div id="info_message">
         <p id="info_message_text">Encrypted message from</p>
         <p class="blue" id="item-sender"></p>
@@ -314,17 +316,6 @@
               Scan the QR code with the <b>IRMA app</b> to disclose your email
               address.
             </p>
-          </div>
-
-          <div id="attributes">
-            <table class="smaller">
-              <tr>
-                <td>e-mail address:</td>
-                <td>
-                  <div class="blue" hidden="true" id="item-policy"></div>
-                </td>
-              </tr>
-            </table>
           </div>
 
           <div id="qrcodecontainer">
@@ -354,7 +345,10 @@
           </div>
         </div>
       </div>
-
+      <div id="bg_decrypted_subject">
+        Subject:
+        <div id="decrypted-subject"></div>
+      </div>
       <div id="bg_decrypted_txt">
         <div id="decrypted-text"></div>
       </div>

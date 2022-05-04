@@ -77,6 +77,7 @@ export function removeAttachment(
   attachments: IAttachmentContent[]
 ) {
   const attachmentUrl = `https://graph.microsoft.com/v1.0/me/messages/${itemId}/attachments/${attachmentId}`
+  utilLog.info(`AttachmentURL: ${attachmentUrl}`)
   $.ajax({
     type: 'DELETE',
     url: attachmentUrl,
@@ -262,10 +263,10 @@ function storeAttachment(
 }
 
 /**
- * Sets event error for decryption
+ * Sets event error for encryption
  */
 export function setEventError() {
-  const msg = 'Error during encryption, please contact your administrator.'
+  const msg = 'PostGuard error, please try again or contact your administrator.'
   // if mailbox is available, current context is the main window, and not a dialog
   if (Office.context.mailbox !== undefined) {
     const message: Office.NotificationMessageDetails = {
@@ -319,7 +320,7 @@ export function isPostGuardEmail(): boolean {
   if (Office.context.mailbox.item.attachments.length != 0) {
     const attachmentContentType =
       Office.context.mailbox.item.attachments[0].contentType
-    if (attachmentContentType == 'application/irmaseal') {
+    if (attachmentContentType == 'application/postguard') {
       utilLog.info('It is a PostGuard email!')
       return true
     } else {
@@ -344,4 +345,15 @@ export function newReadableStreamFromArray(array) {
       controller.close()
     }
   })
+}
+
+export function getGlobal() {
+  return typeof self !== 'undefined'
+    ? self
+    : typeof window !== 'undefined'
+    ? window
+    : typeof global !== 'undefined'
+    ? // eslint-disable-next-line no-undef
+      global
+    : undefined
 }

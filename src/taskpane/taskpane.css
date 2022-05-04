@@ -130,11 +130,13 @@ p {
   margin-top: 16px;
   text-align: center;
   font-size: 16px;
+  display: none;
 }
 
 #header_text {
   margin-top: 10px;
   text-align: center;
+  display: none;
 }
 
 .blue {
@@ -198,6 +200,11 @@ p {
   display: none;
 }
 
+#bg_decrypted_subject {
+  padding: 15px;
+  margin: 15px;
+  display: none;
+}
 #idlock_svg_decrypt {
   display: none;
 }
@@ -226,6 +233,16 @@ p {
   height: 250px;
 }
 
-#showPopupContainer {
+#loading {
+  padding: 15px;
+  margin: 15px;
+  background-color: #f1f1f1;
+}
+
+#decryptinfo {
+  display: none;
+}
+
+#irmaapp {
   display: none;
 }

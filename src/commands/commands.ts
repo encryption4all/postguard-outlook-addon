@@ -15,7 +15,8 @@ import {
   htmlBodyType,
   getItemRestId,
   isPostGuardEmail,
-  newReadableStreamFromArray
+  newReadableStreamFromArray,
+  getGlobal
 } from '../helpers/utils'
 
 // eslint-disable-next-line no-undef
@@ -25,7 +26,7 @@ var mailboxItem: Office.MessageCompose
 var globalEvent
 var isEncryptMode: boolean = false
 
-const hostname = 'https://main.irmaseal-pkg.ihub.ru.nl'
+const hostname = 'https://stable.irmaseal-pkg.ihub.ru.nl'
 const email_attribute = 'pbdf.sidn-pbdf.email.email'
 
 const mod_promise = import('@e4a/irmaseal-wasm-bindings')
@@ -54,7 +55,7 @@ Office.initialize = () => {
 function encrypt(event: Office.AddinCommands.Event) {
   const message: Office.NotificationMessageDetails = {
     type: Office.MailboxEnums.ItemNotificationMessageType.InformationalMessage,
-    message: 'Encrypting email with IRMASeal',
+    message: 'Encrypting email with PostGuard',
     icon: 'Icon.80x80',
     persistent: true
   }
@@ -216,7 +217,16 @@ async function getMailAttachmentContent(attachmentId: string): Promise<string> {
  * @returns The public key
  */
 async function getPublicKey(): Promise<any> {
-  const response = await fetch(`${hostname}/v2/parameters`)
+  let response
+  try {
+    response = await fetch(`${hostname}/v2/parameters`, {
+      headers: {
+        'X-Postguard-Client-Version': `Outlook, ${Office.context.diagnostics.version}, pg4ol, 0.0.1`
+      }
+    })
+  } catch (e) {
+    encryptLog.error(e)
+  }
   let pk
 
   // if response is not ok, try to get PK from localStorage
@@ -250,10 +260,14 @@ async function encryptAndSendEmail(token) {
   const recipientEmails: string[] = await getRecipientEmails()
   const ccRecipientEmails: string[] = await getCcRecipientEmails()
   const bccRecipientEmails: string[] = await getBccRecipientEmails()
-  const allRecipientsCount =
-    recipientEmails.length +
-    ccRecipientEmails.length +
-    bccRecipientEmails.length
+
+  // if BCC recipients available , abort operations
+  if (bccRecipientEmails.length > 0) {
+    bccMsgAndDialog()
+    return
+  }
+
+  const allRecipientsCount = recipientEmails.length + ccRecipientEmails.length
 
   if (allRecipientsCount == 0) {
     throw 'Please add recipients to the email.'
@@ -275,18 +289,10 @@ async function encryptAndSendEmail(token) {
     return total
   }, {})
 
-  const bccPolicies = bccRecipientEmails.reduce((total, recipient) => {
-    total[recipient] = {
-      ts: timestamp,
-      con: [{ t: email_attribute, v: recipient }]
-    }
-    return total
-  }, {})
-
   // Also encrypt for the sender, such that the sender can later decrypt as well.
   policies[sender] = { ts: timestamp, con: [{ t: email_attribute, v: sender }] }
 
-  const allPolicies = { ...policies, ...ccPolicies, ...bccPolicies }
+  const allPolicies = { ...policies, ...ccPolicies }
 
   encryptLog.info('Encrypting using the following policies: ', allPolicies)
 
@@ -308,7 +314,7 @@ async function encryptAndSendEmail(token) {
 
   // ComposeMail only used for outer mail
   const composeMail = new ComposeMail()
-  composeMail.setSubject('PostGuard encrypted email')
+  composeMail.setSubject('PostGuard Encrypted Email')
   composeMail.setSender(sender)
 
   recipientEmails.forEach((recipientEmail) => {
@@ -428,10 +434,33 @@ async function encryptAndSendEmail(token) {
 }
 
 /**
+ * Adds info message to email and shows dialog that PostGuard does not support BCC yet
+ */
+function bccMsgAndDialog() {
+  showInfoMessage(
+    'PostGuard does not support using BCCs currently. Please remove BCCs, or send the mail unencrypted.'
+  )
+  /*var fullUrl =
+    'https://' +
+    location.hostname +
+    (location.port ? ':' + location.port : '') +
+    '/bcc.html'
+
+  Office.context.ui.displayDialogAsync(
+    fullUrl,
+    { height: 20, width: 30 },
+    // eslint-disable-next-line no-unused-vars
+    function (result) {
+      encryptLog.info('Bccdialog has initialized.')
+    }
+  )*/
+}
+
+/**
  * Adds info message to email and shows dialog that message is successfully encrypted and send
  */
 function successMsgAndDialog() {
-  showInfoMessage('Successfully encrypted and send email')
+  showInfoMessage('Successfully encrypted and sent')
   var fullUrl =
     'https://' +
     location.hostname +
@@ -440,7 +469,7 @@ function successMsgAndDialog() {
 
   Office.context.ui.displayDialogAsync(
     fullUrl,
-    { height: 20, width: 30 },
+    { height: 40, width: 30 },
     // eslint-disable-next-line no-unused-vars
     function (result) {
       encryptLog.info('Successdialog has initialized.')
@@ -535,9 +564,10 @@ async function processMessage(arg) {
   if (messageFromDialog.status === 'success') {
     loginDialog.close()
     if (isEncryptMode) {
+      g.msgFunc = showInfoMessage
       encryptAndSendEmail(messageFromDialog.result.accessToken).catch((err) => {
-        encryptLog.error(err.message)
-        showInfoMessage(err.message)
+        encryptLog.error(err)
+        showInfoMessage(err)
       })
     } else {
       showDecryptPopup(messageFromDialog.result.accessToken)
@@ -579,24 +609,12 @@ function showLoginPopup(url: string) {
   )
 }
 
-function getGlobal() {
-  return typeof self !== 'undefined'
-    ? self
-    : typeof window !== 'undefined'
-    ? window
-    : typeof global !== 'undefined'
-    ? // eslint-disable-next-line no-undef
-      global
-    : undefined
-}
-
 const g = getGlobal() as any
 
 // the add-in command functions need to be available in global scope
 g.encrypt = encrypt
 g.decrypt = decrypt
 
-// DECRYPTION TEST IN DIALOG
 // eslint-disable-next-line no-unused-vars
 var decryptDialog: Office.Dialog
 
@@ -644,18 +662,21 @@ function showDecryptPopup(token: string) {
     '&recipient=' +
     Office.context.mailbox.userProfile.emailAddress +
     '&attachmentid=' +
-    Office.context.mailbox.item.attachments[0].id
+    Office.context.mailbox.item.attachments[0].id +
+    '&sender=' +
+    Office.context.mailbox.item.sender.emailAddress
 
   // height and width are percentages of the size of the parent Office application, e.g., PowerPoint, Excel, Word, etc.
   Office.context.ui.displayDialogAsync(
     fullUrl,
-    { height: 50, width: 10 },
+    { height: 60, width: 40 },
     function (result) {
       if (result.status === Office.AsyncResultStatus.Failed) {
         if (result.error.code === 12007) {
           showDecryptPopup(token) // Recursive call
         } else {
-          decryptLog.error('Other error: ', result.error)
+          decryptLog.error('Decryptdialog error: ', result.error)
+          showInfoMessage(result.error.message)
         }
       } else {
         decryptLog.info('Decryptdialog has initialized, ', result)
