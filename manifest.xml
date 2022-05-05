@@ -5,18 +5,16 @@
   xmlns:mailappor="http://schemas.microsoft.com/office/mailappversionoverrides/1.0" xsi:type="MailApp">
   <Id>7274321f-8067-4844-ae11-dabe76ad38c0</Id>
   <Version>0.0.1</Version>
-  <ProviderName>IRMA</ProviderName>
+  <ProviderName>PostGuard</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
   <DisplayName DefaultValue="PostGuard outlook add-in"/>
-  <Description DefaultValue="PostGuard - easy email encryption."/>
+  <Description DefaultValue="PostGuard - easy and secure emailing"/>
   <IconUrl DefaultValue="https://localhost:3000/assets/64.png"/>
   <HighResolutionIconUrl DefaultValue="https://localhost:3000/assets/128.png"/>
-  <SupportUrl DefaultValue="https://PostGuard.app"/>
+  <SupportUrl DefaultValue="https://PostGuard.eu"/>
   <AppDomains>
     <AppDomain>https://login.microsoftonline.com</AppDomain>
     <AppDomain>https://login.windows.net</AppDomain>
-    <AppDomain>https://main.irmaseal-pkg.ihub.ru.nl</AppDomain>
-    <AppDomain>https://stable.irmaseal-pkg.ihub.ru.nl</AppDomain>
   </AppDomains>
   <Hosts>
     <Host Name="Mailbox"/>

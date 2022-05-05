@@ -127,18 +127,9 @@ async function getMailBody(): Promise<string> {
   return new Promise(function (resolve, reject) {
     mailboxItem.body.getAsync(Office.CoercionType.Html, (asyncResult) => {
       if (asyncResult.status == Office.AsyncResultStatus.Failed) {
-        reject('Subject async failed')
+        reject('Body async failed')
       } else {
-        let returnBody: string
-        const body: string = asyncResult.value
-        const pattern = /<body[^>]*>((.|[\n\r])*)<\/body>/im
-        const arrayMatches = pattern.exec(body)
-        if (arrayMatches === null) {
-          returnBody = body
-        } else {
-          const mailBody = arrayMatches[1]
-          returnBody = mailBody
-        }
+        let returnBody: string = asyncResult.value
         if (returnBody !== '') resolve(returnBody)
         else reject('Please add text to the body in the email')
       }
@@ -270,7 +261,7 @@ async function encryptAndSendEmail(token) {
   const allRecipientsCount = recipientEmails.length + ccRecipientEmails.length
 
   if (allRecipientsCount == 0) {
-    throw 'Please add recipients to the email.'
+    throw 'Please add recipients to the email!'
   }
 
   const policies = recipientEmails.reduce((total, recipient) => {
@@ -288,9 +279,6 @@ async function encryptAndSendEmail(token) {
     }
     return total
   }, {})
-
-  // Also encrypt for the sender, such that the sender can later decrypt as well.
-  policies[sender] = { ts: timestamp, con: [{ t: email_attribute, v: sender }] }
 
   const allPolicies = { ...policies, ...ccPolicies }
 
@@ -438,7 +426,7 @@ async function encryptAndSendEmail(token) {
  */
 function bccMsgAndDialog() {
   showInfoMessage(
-    'PostGuard does not support using BCCs currently. Please remove BCCs, or send the mail unencrypted.'
+    'PostGuard does not support BCCs. Please remove BCCs, or send the mail unencrypted.'
   )
   /*var fullUrl =
     'https://' +
@@ -625,7 +613,7 @@ var decryptDialog: Office.Dialog
 function decrypt(event: Office.AddinCommands.Event) {
   const message: Office.NotificationMessageDetails = {
     type: Office.MailboxEnums.ItemNotificationMessageType.InformationalMessage,
-    message: 'Decrypting email via PostGuard',
+    message: 'Decrypting email with PostGuard',
     icon: 'Icon.80x80',
     persistent: true
   }
@@ -640,7 +628,7 @@ function decrypt(event: Office.AddinCommands.Event) {
   if (isPostGuardEmail()) {
     showLoginPopup('/fallbackauthdialog.html')
   } else {
-    showInfoMessage('Not a PostGuard email, cannot decrypt.')
+    showInfoMessage('This is not a PostGuard Email, cannot decrypt.')
   }
 }
 
@@ -650,6 +638,7 @@ function decrypt(event: Office.AddinCommands.Event) {
  */
 function showDecryptPopup(token: string) {
   const b64 = Buffer.from(token).toString('base64')
+
   const fullUrl =
     'https://' +
     location.hostname +
@@ -662,14 +651,16 @@ function showDecryptPopup(token: string) {
     '&recipient=' +
     Office.context.mailbox.userProfile.emailAddress +
     '&attachmentid=' +
-    Office.context.mailbox.item.attachments[0].id +
+    Office.context.mailbox.item.attachments[0].id
+      .replace('/', '-')
+      .replace('+', '_') +
     '&sender=' +
     Office.context.mailbox.item.sender.emailAddress
 
   // height and width are percentages of the size of the parent Office application, e.g., PowerPoint, Excel, Word, etc.
   Office.context.ui.displayDialogAsync(
     fullUrl,
-    { height: 60, width: 40 },
+    { height: 70, width: 30 },
     function (result) {
       if (result.status === Office.AsyncResultStatus.Failed) {
         if (result.error.code === 12007) {

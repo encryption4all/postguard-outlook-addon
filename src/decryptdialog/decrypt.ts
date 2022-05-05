@@ -27,6 +27,7 @@ import {
   removeAttachment
 } from '../helpers/utils'
 import jwtDecode, { JwtPayload } from 'jwt-decode'
+import sanitizeHtml from 'sanitize-html'
 
 // eslint-disable-next-line no-undef
 const getLogger = require('webpack-log')
@@ -58,6 +59,8 @@ Office.initialize = function () {
     g.attachmentId = urlParams.get('attachmentid')
     g.msgFunc = passMsgToParent
     g.sender = urlParams.get('sender')
+
+    console.log('Attachment id after: ', g.attachmentId)
 
     $(function () {
       getMailObject()
@@ -122,7 +125,7 @@ function getMailObject() {
  * @param mime The mime message
  */
 export async function successMailReceived(mime) {
-  decryptLog.info('Success MIME mail received')
+  decryptLog.info('Success MIME mail received: ', mime)
   const conjunction = [{ t: email_attribute, v: g.recipient }]
   const hashConjunction = await hashString(JSON.stringify(conjunction))
 
@@ -261,7 +264,7 @@ function replaceMailBody(
     },
     success: function (success) {
       decryptLog.info('PATCH message success: ', success)
-      passMsgToParent('Successfully decrypted the email with PostGuard')
+      passMsgToParent('Successfully decrypted this Email with PostGuard')
       removeAttachment(g.token, g.mailId, g.attachmentId, attachments)
     }
   }).fail(handleAjaxError)
@@ -406,8 +409,11 @@ function showMailContent(
   document.getElementById('center').className = 'leftAndMargin'
   document.getElementById('decrypted').style.display = 'block'
   document.getElementById('decrypted_subject').innerHTML = subject
-  document.getElementById('decrypted_text').innerHTML = body
   document.getElementById('decrypted_from').innerHTML += from
+
+  const sanitizeBody = sanitizeHtml(body)
+  console.log(`Sanitize body: ${sanitizeBody}`)
+  document.getElementById('decrypted_text').innerHTML = sanitizeBody
 
   if (to.length > 0) document.getElementById('decrypted_to').innerHTML += to
   else document.getElementById('decrypted_to').style.display = 'none'

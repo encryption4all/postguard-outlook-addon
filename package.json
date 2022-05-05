@@ -51,6 +51,7 @@
     "process": "^0.11.10",
     "qrcode": "^1.4.4",
     "regenerator-runtime": "^0.13.7",
+    "sanitize-html": "^2.7.0",
     "stream-browserify": "^3.0.0",
     "util": "^0.10.4",
     "web-streams-polyfill": "^3.0.3"
