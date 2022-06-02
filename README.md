@@ -1,5 +1,8 @@
 # PostGuard addon for Outlook
 
+| :exclamation:  We are still in alpha development, thus use at your own risk and not for production purposes! |
+|--------------------------------------------------------------------------------------------------------------|
+
 The PostGuard addon utilizes E2E identity-based encryption to secure e-mails. This allows for easy-to-use encryption without the burden of key management.
 
 Anyone can encrypt without prior setup using this system. For decryption, a user requests a decryption key from trusted third party. To do so, the user must authenticate using [IRMA](https://irma.app/), a privacy-friendly decentralized identity platform based on the Idemix protocol. Any combination of attributes in the IRMA ecosystem can be used to encrypt e-mails, which allows for detailed access control over the e-mail's content.
