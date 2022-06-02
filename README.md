@@ -1,4 +1,4 @@
-# PostGuard addon for Ouytlook
+# PostGuard addon for Outlook
 
 The PostGuard addon utilizes E2E identity-based encryption to secure e-mails. This allows for easy-to-use encryption without the burden of key management.
 
