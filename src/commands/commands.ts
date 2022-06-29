@@ -26,7 +26,7 @@ var mailboxItem: Office.MessageCompose
 var globalEvent
 var isEncryptMode: boolean = false
 
-const hostname = 'https://stable.irmaseal-pkg.ihub.ru.nl'
+const hostname = 'https://main.irmaseal-pkg.ihub.ru.nl'
 const email_attribute = 'pbdf.sidn-pbdf.email.email'
 
 const mod_promise = import('@e4a/irmaseal-wasm-bindings')
@@ -80,7 +80,7 @@ function getRecipientEmails(): Promise<string[]> {
     mailboxItem.to.getAsync((recipients) => {
       let recipientMails = new Array()
       recipients.value.forEach((recipient) => {
-        recipientMails.push(recipient.emailAddress)
+        recipientMails.push(recipient.emailAddress.toLowerCase())
       })
       resolve(recipientMails)
     })
@@ -96,7 +96,7 @@ function getCcRecipientEmails(): Promise<string[]> {
     mailboxItem.cc.getAsync((recipients) => {
       let recipientMails = new Array()
       recipients.value.forEach((recipient) => {
-        recipientMails.push(recipient.emailAddress)
+        recipientMails.push(recipient.emailAddress.toLowerCase())
       })
       resolve(recipientMails)
     })
@@ -112,7 +112,7 @@ function getBccRecipientEmails(): Promise<string[]> {
     mailboxItem.bcc.getAsync((recipients) => {
       let recipientMails = new Array()
       recipients.value.forEach((recipient) => {
-        recipientMails.push(recipient.emailAddress)
+        recipientMails.push(recipient.emailAddress.toLowerCase())
       })
       resolve(recipientMails)
     })
@@ -407,7 +407,7 @@ async function encryptAndSendEmail(token) {
         token,
         jsonInnerMail,
         attachments,
-        'PostGuard Sent Items'
+        'PostGuard Sent'
       )
 
       clearCurrentEmail(attachments)

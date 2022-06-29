@@ -38,7 +38,7 @@ const mod = await mod_promise
 // eslint-disable-next-line no-undef
 const simpleParser = require('mailparser').simpleParser
 
-const hostname = 'https://stable.irmaseal-pkg.ihub.ru.nl'
+const hostname = 'https://main.irmaseal-pkg.ihub.ru.nl'
 const email_attribute = 'pbdf.sidn-pbdf.email.email'
 
 // eslint-disable-next-line no-undef
@@ -59,8 +59,6 @@ Office.initialize = function () {
     g.attachmentId = urlParams.get('attachmentid')
     g.msgFunc = passMsgToParent
     g.sender = urlParams.get('sender')
-
-    console.log('Attachment id after: ', g.attachmentId)
 
     $(function () {
       getMailObject()
@@ -115,7 +113,9 @@ function getMailObject() {
     .catch((err) => {
       decryptLog.error(err)
       passMsgToParent(
-        'Error during decryption, please try again or contact your administrator.'
+        'Error during decryption, please try again or contact your administrator (' +
+          err +
+          ')'
       )
     })
 }
