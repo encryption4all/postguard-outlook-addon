@@ -3,381 +3,359 @@
 
 <!DOCTYPE html>
 <html>
-    <head>
-        <meta charset="UTF-8" />
-        <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>IRMASeal Outlook Add-In</title>
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PostGuard Outlook Add-In - Decrypt Panels</title>
 
-        <!-- Office JavaScript API -->
-        <script
-            type="text/javascript"
-            src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"
-        ></script>
+    <!-- Office JavaScript API -->
+    <script
+      type="text/javascript"
+      src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"
+    ></script>
 
-        <!-- JQuery JS API -->
-        <script src="https://code.jquery.com/jquery.min.js"></script>
+    <!-- JQuery JS API -->
+    <script src="https://code.jquery.com/jquery.min.js"></script>
 
-        <!-- For more information on Office UI Fabric, visit https://developer.microsoft.com/fabric. -->
-        <link
-            rel="stylesheet"
-            href="https://static2.sharepointonline.com/files/fabric/office-ui-fabric-core/9.6.1/css/fabric.min.css"
-        />
+    <!-- For more information on Office UI Fabric, visit https://developer.microsoft.com/fabric. -->
+    <link
+      rel="stylesheet"
+      href="https://static2.sharepointonline.com/files/fabric/office-ui-fabric-core/9.6.1/css/fabric.min.css"
+    />
 
-        <!-- Fonts -->
-        <link rel="preconnect" href="https://fonts.gstatic.com" />
-        <link
-            href="https://fonts.googleapis.com/css2?family=Karla:wght@300;700&family=Roboto:wght@100&display=swap"
-            rel="stylesheet"
-        />
+    <!-- Fonts>
+    <link rel="preconnect" href="https://fonts.gstatic.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Karla:wght@300;700&family=Roboto:wght@100&display=swap"
+      rel="stylesheet"
+    /-->
 
-        <!-- CSS -->
-        <link href="taskpane.css" rel="stylesheet" type="text/css" />
-    </head>
+    <!-- CSS -->
+    <link href="taskpane.css" rel="stylesheet" type="text/css" />
+  </head>
 
-    <body class="ms-font-m ms-welcome ms-Fabric">
-        <section id="sideload-msg" class="ms-welcome__main">
-            <h2 class="ms-font-xl">
-                Please sideload your add-in to see app body.
-            </h2>
-        </section>
-        <main id="app-body" hidden="true" class="bg">
-            <div class="center">
-                <div id="idlock_svg">
-                    <svg
-                        width="71"
-                        height="52"
-                        viewBox="0 0 71 52"
-                        fill="none"
-                        xmlns="http://www.w3.org/2000/svg"
-                    >
-                        <mask
-                            id="mask0"
-                            mask-type="alpha"
-                            maskUnits="userSpaceOnUse"
-                            x="0"
-                            y="0"
-                            width="71"
-                            height="52"
-                        >
-                            <path
-                                d="M66.7877 51.8H4.3877C2.1877 51.8 0.387695 50 0.387695 47.8V4C0.387695 1.8 2.1877 0 4.3877 0H66.7877C68.9877 0 70.7877 1.8 70.7877 4V47.8C70.8877 50 68.9877 51.8 66.7877 51.8Z"
-                                fill="#E9E9EA"
-                            />
-                        </mask>
-                        <g mask="url(#mask0)">
-                            <path
-                                d="M66.7877 51.8H4.3877C2.1877 51.8 0.387695 50 0.387695 47.8V4C0.387695 1.8 2.1877 0 4.3877 0H66.7877C68.9877 0 70.7877 1.8 70.7877 4V47.8C70.8877 50 68.9877 51.8 66.7877 51.8Z"
-                                fill="#E9E9EA"
-                            />
-                            <path
-                                d="M30.2874 36L1.48739 6.9C-0.612609 4.9 0.287391 0 4.98739 0C4.98739 0 4.98739 0 5.08739 0H67.3874C67.3874 0 67.3874 0 67.4874 0C70.3874 0 71.9874 4.7 70.0874 6.9L30.2874 36Z"
-                                fill="#CFCFCE"
-                            />
-                            <path
-                                d="M9.08789 51.8L30.2879 36L46.3879 51.8H9.08789Z"
-                                fill="#F1F1F1"
-                            />
-                            <g filter="url(#filter0_d)">
-                                <path
-                                    d="M35.7874 31.9L1.48739 6.9C-0.612609 4.9 0.287391 0 4.98739 0C4.98739 0 4.98739 0 5.08739 0H67.3874C67.3874 0 67.3874 0 67.4874 0C70.3874 0 71.9874 4.7 70.0874 6.9L35.7874 31.9Z"
-                                    fill="#F1F1F1"
-                                />
-                            </g>
-                            <path
-                                d="M30.1279 36.0205L9.14941 51.8931"
-                                stroke="white"
-                                stroke-width="0.5"
-                            />
-                            <g filter="url(#filter1_d)">
-                                <path
-                                    d="M29.1035 24.7062V20.009C29.1035 17.4755 31.7634 13.9292 35.6478 14.0981C39.5322 14.267 41.981 17.2117 41.981 19.745V24.7062"
-                                    stroke="#0074DF"
-                                    stroke-width="3"
-                                />
-                                <rect
-                                    x="24.1406"
-                                    y="24.7051"
-                                    width="22.8984"
-                                    height="18.7156"
-                                    rx="2"
-                                    fill="#0074DF"
-                                />
-                            </g>
-                            <path
-                                d="M33.6857 35.9692C32.8091 36.2353 31.4416 37.1181 31.0479 37.8433L30.9727 38.4449L30.9727 38.9383H40.5944C40.5895 38.7105 40.636 38.1809 40.5152 37.8793C40.3167 37.0733 37.2588 35.7342 37.1918 35.7342V35.1742C37.3849 35.0597 37.5632 34.5104 37.6524 34.1106C37.6737 34.0153 38.1603 34.3395 38.0982 32.6635C38.6521 30.4346 37.6524 30.9264 37.6524 30.7214C37.5343 30.0545 37.579 29.6372 35.6316 29.5327C32.9689 29.5565 32.9736 31.6046 33.5163 32.6946C33.4676 32.7227 33.3651 33.0828 33.4912 33.56C33.7308 34.1157 33.7201 33.9704 33.896 34.163C34.0669 34.8039 34.3693 34.9224 34.3693 35.2429V35.7342C34.0635 35.8604 34.0381 35.8622 33.6857 35.9692Z"
-                                fill="#F1F1F1"
-                            />
-                        </g>
-                        <defs>
-                            <filter
-                                id="filter0_d"
-                                x="-5.58301"
-                                y="-6"
-                                width="90.4948"
-                                height="51.9"
-                                filterUnits="userSpaceOnUse"
-                                color-interpolation-filters="sRGB"
-                            >
-                                <feFlood
-                                    flood-opacity="0"
-                                    result="BackgroundImageFix"
-                                />
-                                <feColorMatrix
-                                    in="SourceAlpha"
-                                    type="matrix"
-                                    values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0"
-                                />
-                                <feOffset dx="4" dy="4" />
-                                <feGaussianBlur stdDeviation="5" />
-                                <feColorMatrix
-                                    type="matrix"
-                                    values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.15 0"
-                                />
-                                <feBlend
-                                    mode="normal"
-                                    in2="BackgroundImageFix"
-                                    result="effect1_dropShadow"
-                                />
-                                <feBlend
-                                    mode="normal"
-                                    in="SourceGraphic"
-                                    in2="effect1_dropShadow"
-                                    result="shape"
-                                />
-                            </filter>
-                            <filter
-                                id="filter1_d"
-                                x="22.1406"
-                                y="10.5923"
-                                width="34.8984"
-                                height="42.8284"
-                                filterUnits="userSpaceOnUse"
-                                color-interpolation-filters="sRGB"
-                            >
-                                <feFlood
-                                    flood-opacity="0"
-                                    result="BackgroundImageFix"
-                                />
-                                <feColorMatrix
-                                    in="SourceAlpha"
-                                    type="matrix"
-                                    values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0"
-                                />
-                                <feOffset dx="4" dy="4" />
-                                <feGaussianBlur stdDeviation="3" />
-                                <feColorMatrix
-                                    type="matrix"
-                                    values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.25 0"
-                                />
-                                <feBlend
-                                    mode="normal"
-                                    in2="BackgroundImageFix"
-                                    result="effect1_dropShadow"
-                                />
-                                <feBlend
-                                    mode="normal"
-                                    in="SourceGraphic"
-                                    in2="effect1_dropShadow"
-                                    result="shape"
-                                />
-                            </filter>
-                        </defs>
-                    </svg>
-                </div>
+  <body class="ms-font-m ms-welcome ms-Fabric">
+    <section id="sideload-msg" class="ms-welcome__main">
+      <h2 class="ms-font-xl">Please sideload your add-in to see app body.</h2>
+    </section>
+    <main id="app-body" hidden="true" class="bg">
+      <div class="center">
+        <div id="idlock_svg">
+          <svg
+            width="71"
+            height="52"
+            viewBox="0 0 71 52"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <mask
+              id="mask0"
+              mask-type="alpha"
+              maskUnits="userSpaceOnUse"
+              x="0"
+              y="0"
+              width="71"
+              height="52"
+            >
+              <path
+                d="M66.7877 51.8H4.3877C2.1877 51.8 0.387695 50 0.387695 47.8V4C0.387695 1.8 2.1877 0 4.3877 0H66.7877C68.9877 0 70.7877 1.8 70.7877 4V47.8C70.8877 50 68.9877 51.8 66.7877 51.8Z"
+                fill="#E9E9EA"
+              />
+            </mask>
+            <g mask="url(#mask0)">
+              <path
+                d="M66.7877 51.8H4.3877C2.1877 51.8 0.387695 50 0.387695 47.8V4C0.387695 1.8 2.1877 0 4.3877 0H66.7877C68.9877 0 70.7877 1.8 70.7877 4V47.8C70.8877 50 68.9877 51.8 66.7877 51.8Z"
+                fill="#E9E9EA"
+              />
+              <path
+                d="M30.2874 36L1.48739 6.9C-0.612609 4.9 0.287391 0 4.98739 0C4.98739 0 4.98739 0 5.08739 0H67.3874C67.3874 0 67.3874 0 67.4874 0C70.3874 0 71.9874 4.7 70.0874 6.9L30.2874 36Z"
+                fill="#CFCFCE"
+              />
+              <path
+                d="M9.08789 51.8L30.2879 36L46.3879 51.8H9.08789Z"
+                fill="#F1F1F1"
+              />
+              <g filter="url(#filter0_d)">
+                <path
+                  d="M35.7874 31.9L1.48739 6.9C-0.612609 4.9 0.287391 0 4.98739 0C4.98739 0 4.98739 0 5.08739 0H67.3874C67.3874 0 67.3874 0 67.4874 0C70.3874 0 71.9874 4.7 70.0874 6.9L35.7874 31.9Z"
+                  fill="#F1F1F1"
+                />
+              </g>
+              <path
+                d="M30.1279 36.0205L9.14941 51.8931"
+                stroke="white"
+                stroke-width="0.5"
+              />
+              <g filter="url(#filter1_d)">
+                <path
+                  d="M29.1035 24.7062V20.009C29.1035 17.4755 31.7634 13.9292 35.6478 14.0981C39.5322 14.267 41.981 17.2117 41.981 19.745V24.7062"
+                  stroke="#0074DF"
+                  stroke-width="3"
+                />
+                <rect
+                  x="24.1406"
+                  y="24.7051"
+                  width="22.8984"
+                  height="18.7156"
+                  rx="2"
+                  fill="#0074DF"
+                />
+              </g>
+              <path
+                d="M33.6857 35.9692C32.8091 36.2353 31.4416 37.1181 31.0479 37.8433L30.9727 38.4449L30.9727 38.9383H40.5944C40.5895 38.7105 40.636 38.1809 40.5152 37.8793C40.3167 37.0733 37.2588 35.7342 37.1918 35.7342V35.1742C37.3849 35.0597 37.5632 34.5104 37.6524 34.1106C37.6737 34.0153 38.1603 34.3395 38.0982 32.6635C38.6521 30.4346 37.6524 30.9264 37.6524 30.7214C37.5343 30.0545 37.579 29.6372 35.6316 29.5327C32.9689 29.5565 32.9736 31.6046 33.5163 32.6946C33.4676 32.7227 33.3651 33.0828 33.4912 33.56C33.7308 34.1157 33.7201 33.9704 33.896 34.163C34.0669 34.8039 34.3693 34.9224 34.3693 35.2429V35.7342C34.0635 35.8604 34.0381 35.8622 33.6857 35.9692Z"
+                fill="#F1F1F1"
+              />
+            </g>
+            <defs>
+              <filter
+                id="filter0_d"
+                x="-5.58301"
+                y="-6"
+                width="90.4948"
+                height="51.9"
+                filterUnits="userSpaceOnUse"
+                color-interpolation-filters="sRGB"
+              >
+                <feFlood flood-opacity="0" result="BackgroundImageFix" />
+                <feColorMatrix
+                  in="SourceAlpha"
+                  type="matrix"
+                  values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0"
+                />
+                <feOffset dx="4" dy="4" />
+                <feGaussianBlur stdDeviation="5" />
+                <feColorMatrix
+                  type="matrix"
+                  values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.15 0"
+                />
+                <feBlend
+                  mode="normal"
+                  in2="BackgroundImageFix"
+                  result="effect1_dropShadow"
+                />
+                <feBlend
+                  mode="normal"
+                  in="SourceGraphic"
+                  in2="effect1_dropShadow"
+                  result="shape"
+                />
+              </filter>
+              <filter
+                id="filter1_d"
+                x="22.1406"
+                y="10.5923"
+                width="34.8984"
+                height="42.8284"
+                filterUnits="userSpaceOnUse"
+                color-interpolation-filters="sRGB"
+              >
+                <feFlood flood-opacity="0" result="BackgroundImageFix" />
+                <feColorMatrix
+                  in="SourceAlpha"
+                  type="matrix"
+                  values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0"
+                />
+                <feOffset dx="4" dy="4" />
+                <feGaussianBlur stdDeviation="3" />
+                <feColorMatrix
+                  type="matrix"
+                  values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.25 0"
+                />
+                <feBlend
+                  mode="normal"
+                  in2="BackgroundImageFix"
+                  result="effect1_dropShadow"
+                />
+                <feBlend
+                  mode="normal"
+                  in="SourceGraphic"
+                  in2="effect1_dropShadow"
+                  result="shape"
+                />
+              </filter>
+            </defs>
+          </svg>
+        </div>
 
-                <div id="idlock_svg_decrypt">
-                    <svg
-                        width="71"
-                        height="78"
-                        viewBox="0 0 71 78"
-                        fill="none"
-                        xmlns="http://www.w3.org/2000/svg"
-                    >
-                        <path
-                            d="M66.5074 76.7197H4.10736C1.90736 76.7197 0.107361 74.9197 0.107361 72.7197V28.9197C0.107361 26.7197 1.90736 24.9197 4.10736 24.9197H66.5074C68.7074 24.9197 70.5074 26.7197 70.5074 28.9197V72.7197C70.6074 74.9197 68.7074 76.7197 66.5074 76.7197Z"
-                            fill="#E9E9EA"
-                        />
-                        <path
-                            d="M8.80756 76.7197L35.2925 56.5426L60.2633 76.7197H8.80756Z"
-                            fill="#F1F1F1"
-                        />
-                        <path
-                            d="M35.4778 0.825953L1.17776 25.826C-0.92224 27.826 -0.0222406 32.726 4.67776 32.726C4.67776 32.726 4.67776 32.726 4.77776 32.726H67.0778C67.0778 32.726 67.0778 32.726 67.1778 32.726C70.0778 32.726 71.6778 28.026 69.7778 25.826L35.4778 0.825953Z"
-                            fill="#E9E9EA"
-                        />
-                        <path
-                            d="M35.1958 56.5426L8.86908 76.8127"
-                            stroke="white"
-                            stroke-width="0.5"
-                        />
-                        <path
-                            d="M0.157776 28.9354L6.47614 30.0841L35.1958 45.88L63.054 30.0841L70.2339 28.9354"
-                            stroke="white"
-                            stroke-width="0.5"
-                        />
-                        <g filter="url(#filter0_i)">
-                            <path
-                                d="M1.22817 25.7938L35.5282 0.793823L69.8282 25.7938C70.5405 26.6187 70.7609 27.7949 70.6052 28.9431L62.9114 30.1959L35.0545 45.88L6.5734 30.0398L0.179755 28.9233C0.0609913 27.7468 0.425363 26.5584 1.22817 25.7938Z"
-                                fill="#C2C2C2"
-                            />
-                        </g>
-                        <path
-                            d="M0.208191 28.9032L6.52655 30.052L35.2462 45.8478L63.1044 30.052L70.2843 28.9032"
-                            stroke="white"
-                            stroke-width="0.5"
-                        />
-                        <path
-                            d="M40.9268 49.7999V42.761C40.9268 40.2275 43.5868 36.6813 47.4711 36.8502C51.3555 37.0191 53.8043 39.9638 53.8043 42.4971V47.4583"
-                            stroke="#0074DF"
-                            stroke-width="3"
-                        />
-                        <rect
-                            x="23.0865"
-                            y="49.759"
-                            width="22.8984"
-                            height="18.7156"
-                            rx="2"
-                            fill="#0074DF"
-                        />
-                        <path
-                            d="M32.6318 61.0234C31.7553 61.2895 30.3877 62.1723 29.994 62.8975L29.9188 63.4991L29.9188 63.9925H39.5406C39.5357 63.7647 39.5822 63.2351 39.4614 62.9335C39.2629 62.1275 36.205 60.7884 36.1379 60.7884V60.2284C36.3311 60.1139 36.5094 59.5646 36.5986 59.1648C36.6198 59.0695 37.1065 59.3937 37.0443 57.7177C37.5983 55.4888 36.5986 55.9806 36.5986 55.7756C36.4805 55.1087 36.5252 54.6914 34.5778 54.5869C31.9151 54.6107 31.9197 56.6588 32.4625 57.7488C32.4138 57.7769 32.3112 58.137 32.4374 58.6142C32.6769 59.1699 32.6663 59.0246 32.8422 59.2172C33.0131 59.8581 33.3154 59.9766 33.3154 60.2971V60.7884C33.0097 60.9146 32.9842 60.9164 32.6318 61.0234Z"
-                            fill="#F1F1F1"
-                        />
-                        <defs>
-                            <filter
-                                id="filter0_i"
-                                x="-0.842224"
-                                y="-5.20618"
-                                width="71.4948"
-                                height="51.0862"
-                                filterUnits="userSpaceOnUse"
-                                color-interpolation-filters="sRGB"
-                            >
-                                <feFlood
-                                    flood-opacity="0"
-                                    result="BackgroundImageFix"
-                                />
-                                <feBlend
-                                    mode="normal"
-                                    in="SourceGraphic"
-                                    in2="BackgroundImageFix"
-                                    result="shape"
-                                />
-                                <feColorMatrix
-                                    in="SourceAlpha"
-                                    type="matrix"
-                                    values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0"
-                                    result="hardAlpha"
-                                />
-                                <feOffset dx="-1" dy="-6" />
-                                <feGaussianBlur stdDeviation="5" />
-                                <feComposite
-                                    in2="hardAlpha"
-                                    operator="arithmetic"
-                                    k2="-1"
-                                    k3="1"
-                                />
-                                <feColorMatrix
-                                    type="matrix"
-                                    values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.15 0"
-                                />
-                                <feBlend
-                                    mode="normal"
-                                    in2="shape"
-                                    result="effect1_innerShadow"
-                                />
-                            </filter>
-                        </defs>
-                    </svg>
-                </div>
-            </div>
+        <div id="idlock_svg_decrypt">
+          <svg
+            width="71"
+            height="78"
+            viewBox="0 0 71 78"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M66.5074 76.7197H4.10736C1.90736 76.7197 0.107361 74.9197 0.107361 72.7197V28.9197C0.107361 26.7197 1.90736 24.9197 4.10736 24.9197H66.5074C68.7074 24.9197 70.5074 26.7197 70.5074 28.9197V72.7197C70.6074 74.9197 68.7074 76.7197 66.5074 76.7197Z"
+              fill="#E9E9EA"
+            />
+            <path
+              d="M8.80756 76.7197L35.2925 56.5426L60.2633 76.7197H8.80756Z"
+              fill="#F1F1F1"
+            />
+            <path
+              d="M35.4778 0.825953L1.17776 25.826C-0.92224 27.826 -0.0222406 32.726 4.67776 32.726C4.67776 32.726 4.67776 32.726 4.77776 32.726H67.0778C67.0778 32.726 67.0778 32.726 67.1778 32.726C70.0778 32.726 71.6778 28.026 69.7778 25.826L35.4778 0.825953Z"
+              fill="#E9E9EA"
+            />
+            <path
+              d="M35.1958 56.5426L8.86908 76.8127"
+              stroke="white"
+              stroke-width="0.5"
+            />
+            <path
+              d="M0.157776 28.9354L6.47614 30.0841L35.1958 45.88L63.054 30.0841L70.2339 28.9354"
+              stroke="white"
+              stroke-width="0.5"
+            />
+            <g filter="url(#filter0_i)">
+              <path
+                d="M1.22817 25.7938L35.5282 0.793823L69.8282 25.7938C70.5405 26.6187 70.7609 27.7949 70.6052 28.9431L62.9114 30.1959L35.0545 45.88L6.5734 30.0398L0.179755 28.9233C0.0609913 27.7468 0.425363 26.5584 1.22817 25.7938Z"
+                fill="#C2C2C2"
+              />
+            </g>
+            <path
+              d="M0.208191 28.9032L6.52655 30.052L35.2462 45.8478L63.1044 30.052L70.2843 28.9032"
+              stroke="white"
+              stroke-width="0.5"
+            />
+            <path
+              d="M40.9268 49.7999V42.761C40.9268 40.2275 43.5868 36.6813 47.4711 36.8502C51.3555 37.0191 53.8043 39.9638 53.8043 42.4971V47.4583"
+              stroke="#0074DF"
+              stroke-width="3"
+            />
+            <rect
+              x="23.0865"
+              y="49.759"
+              width="22.8984"
+              height="18.7156"
+              rx="2"
+              fill="#0074DF"
+            />
+            <path
+              d="M32.6318 61.0234C31.7553 61.2895 30.3877 62.1723 29.994 62.8975L29.9188 63.4991L29.9188 63.9925H39.5406C39.5357 63.7647 39.5822 63.2351 39.4614 62.9335C39.2629 62.1275 36.205 60.7884 36.1379 60.7884V60.2284C36.3311 60.1139 36.5094 59.5646 36.5986 59.1648C36.6198 59.0695 37.1065 59.3937 37.0443 57.7177C37.5983 55.4888 36.5986 55.9806 36.5986 55.7756C36.4805 55.1087 36.5252 54.6914 34.5778 54.5869C31.9151 54.6107 31.9197 56.6588 32.4625 57.7488C32.4138 57.7769 32.3112 58.137 32.4374 58.6142C32.6769 59.1699 32.6663 59.0246 32.8422 59.2172C33.0131 59.8581 33.3154 59.9766 33.3154 60.2971V60.7884C33.0097 60.9146 32.9842 60.9164 32.6318 61.0234Z"
+              fill="#F1F1F1"
+            />
+            <defs>
+              <filter
+                id="filter0_i"
+                x="-0.842224"
+                y="-5.20618"
+                width="71.4948"
+                height="51.0862"
+                filterUnits="userSpaceOnUse"
+                color-interpolation-filters="sRGB"
+              >
+                <feFlood flood-opacity="0" result="BackgroundImageFix" />
+                <feBlend
+                  mode="normal"
+                  in="SourceGraphic"
+                  in2="BackgroundImageFix"
+                  result="shape"
+                />
+                <feColorMatrix
+                  in="SourceAlpha"
+                  type="matrix"
+                  values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0"
+                  result="hardAlpha"
+                />
+                <feOffset dx="-1" dy="-6" />
+                <feGaussianBlur stdDeviation="5" />
+                <feComposite
+                  in2="hardAlpha"
+                  operator="arithmetic"
+                  k2="-1"
+                  k3="1"
+                />
+                <feColorMatrix
+                  type="matrix"
+                  values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.15 0"
+                />
+                <feBlend
+                  mode="normal"
+                  in2="shape"
+                  result="effect1_innerShadow"
+                />
+              </filter>
+            </defs>
+          </svg>
+        </div>
+      </div>
 
-            <div class="center">
-                <p id="idlock_txt">IDlock</p>
-            </div>
+      <div class="center">
+        <p id="idlock_txt">PostGuard mail</p>
+      </div>
 
-            <div id="info_message">
-                <p id="info_message_text">Encrypted message from</p>
-                <p class="blue" id="item-sender"></p>
-                <p id="expires" class="smaller gray">
-                    Expires on July 05, 2021
-                </p>
-            </div>
+      <p id="status-container" hidden="true">
+        <b>Status:</b> <label id="status"></label>
+      </p>
 
-            <div class="instructions_container" id="decryptinfo">
-                <div class="left">
-                    <img src="/assets/irma_logo.svg" id="logo" />
-                </div>
+      <div id="loading">Loading ...</div>
 
-                <div class="right">
-                    <div>
-                        <p>
-                            Decrypt the message by disclosing the following
-                            personal data from your IRMA app:
-                        </p>
-                    </div>
+      <div id="info_message">
+        <p id="info_message_text">Encrypted message from</p>
+        <p class="blue" id="item-sender"></p>
+      </div>
 
-                    <div id="attributes">
-                        <table class="smaller">
-                            <tr>
-                                <td>e-mail address:</td>
-                                <td>
-                                    <div
-                                        class="blue"
-                                        hidden="true"
-                                        id="item-policy"
-                                    ></div>
-                                </td>
-                            </tr>
-                        </table>
-                    </div>
+      <div id="header_text">
+        <h3>Get your PostGuard Key</h3>
+        <p>
+          To decrypt and read PostGuard encrypted emails you need your PostGuard
+          key.
+        </p>
+      </div>
 
-                    <div
-                        role="button"
-                        id="run"
-                        hidden="true"
-                        class="ms-welcome__action ms-Button ms-Button--hero ms-font-xl"
-                    >
-                        <span class="ms-Button-label"
-                            >Show QR Code & Scan with IRMA
-                        </span>
-                    </div>
-                    <p hidden="true">
-                        <b>Status:</b> <label id="item-status"></label>
-                    </p>
-                </div>
-            </div>
+      <div class="instructions_container" id="decryptinfo">
+        <div class="left">
+          <img src="/assets/irma_logo.svg" id="logo" />
+        </div>
 
-            <div class="instructions_container" id="irmaapp">
-                <div class="left"></div>
+        <div class="right">
+          <div>
+            <p>
+              Scan the QR code with the <b>IRMA app</b> to disclose your email
+              address.
+            </p>
+          </div>
 
-                <div class="right">
-                    <div id="download_irma">
-                        <p>Not yet downloaded the IRMA app?</p>
-                        <a
-                            href="https://play.google.com/store/apps/details?id=org.irmacard.cardemu&hl=en&gl=US&pcampaignid=pcampaignidMKT-Other-global-all-co-prtnr-py-PartBadge-Mar2515-1"
-                            ><img
-                                alt="Get it on Google Play"
-                                src="/assets/google-play-badge.png"
-                        /></a>
-                        <a
-                            href="https://apps.apple.com/us/app/irma-authentication/id1294092994?itsct=apps_box_badge&amp;itscg=30200"
-                            ><img
-                                src="/assets/download-on-the-app-store-badge.png"
-                                alt="Download on the App Store"
-                        /></a>
-                    </div>
-                </div>
-            </div>
+          <div id="qrcodecontainer">
+            <div id="qrcode"></div>
+          </div>
+        </div>
+      </div>
 
-            <div id="bg_decrypted_txt">
-                <p id="decrypted-text"></p>
-            </div>
-            <div id="attachments">
-                <p>Attachments (click to download):</p>
-                <div id="attachmentList"></div>
-            </div>
-        </main>
-    </body>
+      <div class="instructions_container" id="irmaapp">
+        <div class="left"></div>
+
+        <div class="right">
+          <div id="download_irma">
+            <p><b>Not yet downloaded the IRMA app?</b></p>
+            <a
+              href="https://play.google.com/store/apps/details?id=org.irmacard.cardemu&hl=en&gl=US&pcampaignid=pcampaignidMKT-Other-global-all-co-prtnr-py-PartBadge-Mar2515-1"
+              ><img
+                alt="Get it on Google Play"
+                src="/assets/google-play-badge.png"
+            /></a>
+            <a
+              href="https://apps.apple.com/us/app/irma-authentication/id1294092994?itsct=apps_box_badge&amp;itscg=30200"
+              ><img
+                src="/assets/download-on-the-app-store-badge.png"
+                alt="Download on the App Store"
+            /></a>
+          </div>
+        </div>
+      </div>
+      <div id="bg_decrypted_subject">
+        Subject:
+        <div id="decrypted-subject"></div>
+      </div>
+      <div id="bg_decrypted_txt">
+        <div id="decrypted-text"></div>
+      </div>
+      <div id="attachments">
+        <p>Attachments (click to download):</p>
+        <div id="attachmentList"></div>
+      </div>
+    </main>
+  </body>
 </html>

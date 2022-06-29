@@ -4,16 +4,15 @@
   xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0"
   xmlns:mailappor="http://schemas.microsoft.com/office/mailappversionoverrides/1.0" xsi:type="MailApp">
   <Id>7274321f-8067-4844-ae11-dabe76ad38c0</Id>
-  <Version>1.0.0.0</Version>
-  <ProviderName>IRMA</ProviderName>
+  <Version>0.0.1</Version>
+  <ProviderName>PostGuard</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
-  <DisplayName DefaultValue="IRMASeal outlook add-in"/>
-  <Description DefaultValue="IRMASeal - easy email encryption."/>
-  <IconUrl DefaultValue="https://localhost:3000/assets/icon-64.png"/>
-  <HighResolutionIconUrl DefaultValue="https://localhost:3000/assets/icon-128.png"/>
-  <SupportUrl DefaultValue="https://irma.app"/>
+  <DisplayName DefaultValue="PostGuard outlook add-in"/>
+  <Description DefaultValue="PostGuard - easy and secure emailing"/>
+  <IconUrl DefaultValue="https://localhost:3000/assets/64.png"/>
+  <HighResolutionIconUrl DefaultValue="https://localhost:3000/assets/128.png"/>
+  <SupportUrl DefaultValue="https://PostGuard.eu"/>
   <AppDomains>
-    <AppDomain>https://irmacrypt.nl</AppDomain>
     <AppDomain>https://login.microsoftonline.com</AppDomain>
     <AppDomain>https://login.windows.net</AppDomain>
   </AppDomains>
@@ -37,10 +36,6 @@
   <Rule xsi:type="RuleCollection" Mode="Or">
     <Rule xsi:type="ItemIs" ItemType="Message" FormType="Edit"/>
   </Rule>
-  <Rule xsi:type="ItemHasRegularExpressionMatch"
-    PropertyName="BodyAsHTML"
-    RegExName="IrmaSealMail"
-    RegExValue="IRMASeal"/>
   <DisableEntityHighlighting>false</DisableEntityHighlighting>
   <VersionOverrides xmlns="http://schemas.microsoft.com/office/mailappversionoverrides" xsi:type="VersionOverridesV1_0">
     <Requirements>
@@ -69,7 +64,6 @@
                   </Icon>
                   <Action xsi:type="ShowTaskpane">
                     <SourceLocation resid="Taskpane.Url"/>
-                    <SupportsPinning>true</SupportsPinning>
                   </Action>
                 </Control>
               </Group>
@@ -102,25 +96,22 @@
     </Hosts>
     <Resources>
       <bt:Images>
-        <bt:Image id="Icon.16x16" DefaultValue="https://localhost:3000/assets/icon-16.png"/>
-        <bt:Image id="Icon.32x32" DefaultValue="https://localhost:3000/assets/icon-32.png"/>
-        <bt:Image id="Icon.80x80" DefaultValue="https://localhost:3000/assets/icon-80.png"/>
+        <bt:Image id="Icon.16x16" DefaultValue="https://localhost:3000/assets/16.png"/>
+        <bt:Image id="Icon.32x32" DefaultValue="https://localhost:3000/assets/32.png"/>
+        <bt:Image id="Icon.80x80" DefaultValue="https://localhost:3000/assets/80.png"/>
       </bt:Images>
       <bt:Urls>
         <bt:Url id="Encrypt.Url" DefaultValue="https://localhost:3000/commands.html"/>
         <bt:Url id="Taskpane.Url" DefaultValue="https://localhost:3000/taskpane.html"/>
-        <bt:Url id="Decrypt.Url" DefaultValue="https://localhost:3000/decrypt.html"/>
       </bt:Urls>
       <bt:ShortStrings>
-        <bt:String id="GroupLabel" DefaultValue="IRMASeal Add-in"/>
-        <bt:String id="TaskpaneButton.Label" DefaultValue="Show addon"/>
-        <bt:String id="DecryptButton.Label" DefaultValue="Decrypt email"/>
-        <bt:String id="EncryptButton.Label" DefaultValue="Encrypt and send email"/>
+        <bt:String id="GroupLabel" DefaultValue="PostGuard Add-in"/>
+        <bt:String id="TaskpaneButton.Label" DefaultValue="Decrypt email"/>
+        <bt:String id="EncryptButton.Label" DefaultValue="Encrypt and Send email"/>
       </bt:ShortStrings>
       <bt:LongStrings>
-        <bt:String id="TaskpaneButton.Tooltip" DefaultValue="Opens a pane displaying all available properties."/>
-        <bt:String id="DecryptButton.Tooltip" DefaultValue="Decrypt the current email (if it is an IRMASeal email)"/>
-        <bt:String id="EncryptButton.Tooltip" DefaultValue="Encrypt the current email with IRMASeal"/>
+        <bt:String id="TaskpaneButton.Tooltip" DefaultValue="Opens a dialog to decrypt the selected email."/>
+        <bt:String id="EncryptButton.Tooltip" DefaultValue="Encrypt and send the current email with PostGuard."/>
       </bt:LongStrings>
     </Resources>
 
@@ -150,10 +141,12 @@
                       <bt:Image size="32" resid="Icon.32x32"/>
                       <bt:Image size="80" resid="Icon.80x80"/>
                     </Icon>
-                    <Action xsi:type="ShowTaskpane">
-                      <SourceLocation resid="Taskpane.Url"/>
-                      <SupportsPinning>true</SupportsPinning>
+                    <Action xsi:type="ExecuteFunction">
+                      <FunctionName>decrypt</FunctionName>
                     </Action>
+                    <!--Action xsi:type="ShowTaskpane">
+                      <SourceLocation resid="Taskpane.Url" />
+                    </Action-->
                   </Control>
                 </Group>
               </OfficeTab>
@@ -181,42 +174,55 @@
               </OfficeTab>
             </ExtensionPoint>
           </DesktopFormFactor>
+          <MobileFormFactor>
+            <FunctionFile resid="Encrypt.Url"/>
+            <ExtensionPoint xsi:type="MobileMessageReadCommandSurface">
+              <Group id="Contoso.mobileGroup1">
+                <Label resid="GroupLabel"/>
+                <Control xsi:type="MobileButton" id="Contoso.mobileButton1">
+                  <Label resid="TaskpaneButton.Label"/>
+                  <Icon xsi:type="bt:MobileIconList">
+                    <bt:Image size="25" scale="1" resid="Icon.25x25" />
+                    <bt:Image size="25" scale="2" resid="Icon.25x25" />
+                    <bt:Image size="25" scale="3" resid="Icon.25x25" />
+                    <bt:Image size="32" scale="1" resid="Icon.32x32" />
+                    <bt:Image size="32" scale="2" resid="Icon.32x32" />
+                    <bt:Image size="32" scale="3" resid="Icon.32x32" />
+                    <bt:Image size="48" scale="1" resid="Icon.48x48" />
+                    <bt:Image size="48" scale="2" resid="Icon.48x48" />
+                    <bt:Image size="48" scale="3" resid="Icon.48x48" />
+                  </Icon>
+                  <Action xsi:type="ShowTaskpane">
+                    <SourceLocation resid="Taskpane.Url" />
+                  </Action>
+                </Control>
+              </Group>
+            </ExtensionPoint>
+          </MobileFormFactor>
         </Host>
       </Hosts>
       <Resources>
         <bt:Images>
-          <bt:Image id="Icon.16x16" DefaultValue="https://localhost:3000/assets/icon-16.png"/>
-          <bt:Image id="Icon.32x32" DefaultValue="https://localhost:3000/assets/icon-32.png"/>
-          <bt:Image id="Icon.80x80" DefaultValue="https://localhost:3000/assets/icon-80.png"/>
+          <bt:Image id="Icon.16x16" DefaultValue="https://localhost:3000/assets/16.png"/>
+          <bt:Image id="Icon.25x25" DefaultValue="https://localhost:3000/assets/25.png"/>
+          <bt:Image id="Icon.32x32" DefaultValue="https://localhost:3000/assets/32.png"/>
+          <bt:Image id="Icon.48x48" DefaultValue="https://localhost:3000/assets/48.png"/>
+          <bt:Image id="Icon.80x80" DefaultValue="https://localhost:3000/assets/80.png"/>
         </bt:Images>
         <bt:Urls>
           <bt:Url id="Encrypt.Url" DefaultValue="https://localhost:3000/commands.html"/>
           <bt:Url id="Taskpane.Url" DefaultValue="https://localhost:3000/taskpane.html"/>
-          <bt:Url id="Decrypt.Url" DefaultValue="https://localhost:3000/decrypt.html"/>
         </bt:Urls>
         <bt:ShortStrings>
-          <bt:String id="GroupLabel" DefaultValue="IRMASeal Add-in"/>
-          <bt:String id="TaskpaneButton.Label" DefaultValue="Show addon"/>
-          <bt:String id="DecryptButton.Label" DefaultValue="Decrypt email"/>
-          <bt:String id="EncryptButton.Label" DefaultValue="Encrypt and send email"/>
+          <bt:String id="GroupLabel" DefaultValue="PostGuard Add-in"/>
+          <bt:String id="TaskpaneButton.Label" DefaultValue="Decrypt Email"/>
+          <bt:String id="EncryptButton.Label" DefaultValue="Send encrypted Email"/>
         </bt:ShortStrings>
         <bt:LongStrings>
-          <bt:String id="TaskpaneButton.Tooltip" DefaultValue="Opens a pane displaying all available properties."/>
-          <bt:String id="DecryptButton.Tooltip" DefaultValue="Decrypt the current email (if it is an IRMASeal email)"/>
-          <bt:String id="EncryptButton.Tooltip" DefaultValue="Encrypt the current email with IRMASeal"/>
+          <bt:String id="TaskpaneButton.Tooltip" DefaultValue="Decrypts the selected email with PostGuard."/>
+          <bt:String id="EncryptButton.Tooltip" DefaultValue="Encrypts and sends the current email with PostGuard."/>
         </bt:LongStrings>
       </Resources>
-
-      <WebApplicationInfo>
-        <Id>6ee2a054-1d61-405d-8e5d-c2daf25c5833</Id>
-        <Resource>api://localhost:3000/6ee2a054-1d61-405d-8e5d-c2daf25c5833</Resource>
-        <Scopes>
-          <Scope>mail.send</Scope>
-          <Scope>openid</Scope>
-          <Scope>profile</Scope>
-          <Scope>mail.read</Scope>
-        </Scopes>
-      </WebApplicationInfo>
 
     </VersionOverrides>
 

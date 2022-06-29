@@ -1,60 +1,91 @@
 {
-    "version": "0.2.0",
-    "configurations": [
-        {
-            "name": "Attach to Office Add-in (Edge Chromium)",
-            "type": "edge",
-            "request": "attach",
-            "useWebView": "advanced",
-            "port": 9229,
-            "timeout": 600000,
-            "webRoot": "${workspaceRoot}",
-            "trace": "verbose"
-        },
-        {
-            "type": "office-addin",
-            "request": "attach",
-            "name": "Attach to Office Add-ins (Legacy)",
-            "port": 9222,
-            "trace": "verbose",
-            "url": "https://localhost:3000/taskpane.html?_host_Info=Outlook$Win32$16.02$en-US$$$$0",
-            "webRoot": "${workspaceFolder}",
-            "timeout": 45000
-        },
-        {
-            "name": "Debug Office Add-in (Edge Chromium)",
-            "type": "edge",
-            "request": "attach",
-            "useWebView": "advanced",
-            "port": 9229,
-            "timeout": 60000,
-            "webRoot": "${workspaceRoot}",
-            "sourceMapPathOverrides": {
-                "webpack:///./*": "${webRoot}/*" // Example: "webpack:///./src/app.js" -> "/Users/me/project/src/app.js",
-            },
-            "address": "127.0.0.1"
-        },
-        {
-            "name": "Outlook Desktop (Edge Legacy)",
-            "type": "office-addin",
-            "request": "attach",
-            "url": "https://localhost:3000/taskpane.html?_host_Info=Outlook$Win32$16.01$en-US$$$$0",
-            "port": 9222,
-            "timeout": 600000,
-            "webRoot": "${workspaceRoot}",
-            "preLaunchTask": "Debug: Outlook Desktop",
-            "postDebugTask": "Stop Debug"
-        },
-        {
-            "name": "Outlook Desktop (Edge Chromium)",
-            "type": "pwa-msedge",
-            "request": "attach",
-            "useWebView": true,
-            "port": 9229,
-            "timeout": 600000,
-            "webRoot": "${workspaceRoot}",
-            "preLaunchTask": "Debug: Outlook Desktop",
-            "postDebugTask": "Stop Debug"
-        }
-    ]
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Outlook Desktop (Edge Chromium)",
+      "type": "pwa-msedge",
+      "request": "attach",
+      "useWebView": true,
+      "port": 9229,
+      "timeout": 600000,
+      "webRoot": "${workspaceRoot}",
+      "preLaunchTask": "Debug: Outlook Desktop"
+    },
+    {
+      "name": "Attach to Office Add-in (Edge Chromium)",
+      "type": "pwa-msedge",
+      "request": "attach",
+      "useWebView": true,
+      "port": 9222,
+      "timeout": 600000,
+      "webRoot": "${workspaceRoot}",
+      "trace": true
+    },
+    {
+      "name": "Debug Office Add-in (Edge Chromium)",
+      "type": "edge",
+      "request": "attach",
+      "useWebView": "advanced",
+      "port": 9229,
+      "timeout": 60000,
+      "webRoot": "${workspaceRoot}",
+      "sourceMapPathOverrides": {
+        "webpack:///./*": "${webRoot}/*"
+      },
+      "address": "127.0.0.1"
+    },
+    {
+      "name": "Outlook Desktop (Edge Legacy)",
+      "type": "office-addin",
+      "request": "attach",
+      "url": "https://localhost:3000/taskpane.html?_host_Info=Outlook$Win32$16.01$en-US$$$$0",
+      "port": 9222,
+      "timeout": 600000,
+      "webRoot": "${workspaceRoot}",
+      "preLaunchTask": "Debug: Outlook Desktop",
+      "postDebugTask": "Stop Debug"
+    },
+    {
+      "type": "pwa-msedge",
+      "name": "Launch Microsoft Edge",
+      "request": "launch",
+      "runtimeArgs": ["--remote-debugging-port=9222"],
+      "url": "c:\\Users\\dostk\\.vscode\\extensions\\ms-edgedevtools.vscode-edge-devtools-1.4.7\\out\\startpage\\index.html", // Provide your project's url to finish configuring
+      "presentation": {
+        "hidden": true
+      }
+    },
+    {
+      "type": "pwa-msedge",
+      "name": "Launch Microsoft Edge in headless mode",
+      "request": "launch",
+      "runtimeArgs": ["--headless", "--remote-debugging-port=9222"],
+      "url": "c:\\Users\\dostk\\.vscode\\extensions\\ms-edgedevtools.vscode-edge-devtools-1.4.7\\out\\startpage\\index.html", // Provide your project's url to finish configuring
+      "presentation": {
+        "hidden": true
+      }
+    },
+    {
+      "type": "vscode-edge-devtools.debug",
+      "name": "Open Edge DevTools",
+      "request": "attach",
+      "url": "c:\\Users\\dostk\\.vscode\\extensions\\ms-edgedevtools.vscode-edge-devtools-1.4.7\\out\\startpage\\index.html", // Provide your project's url to finish configuring
+      "presentation": {
+        "hidden": true
+      }
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Launch Edge Headless and attach DevTools",
+      "configurations": [
+        "Launch Microsoft Edge in headless mode",
+        "Open Edge DevTools"
+      ]
+    },
+    {
+      "name": "Launch Edge and attach DevTools",
+      "configurations": ["Launch Microsoft Edge", "Open Edge DevTools"]
+    }
+  ]
 }
