@@ -144,10 +144,22 @@
                     <Action xsi:type="ExecuteFunction">
                       <FunctionName>decrypt</FunctionName>
                     </Action>
-                    <!--Action xsi:type="ShowTaskpane">
-                      <SourceLocation resid="Taskpane.Url" />
-                    </Action-->
                   </Control>
+                  <!--Control xsi:type="Button" id="Contoso.mobileButton1">
+                    <Label resid="TaskpaneButton2.Label"/>
+                    <Supertip>
+                      <Title resid="TaskpaneButton.Label"/>
+                      <Description resid="TaskpaneButton.Tooltip"/>
+                    </Supertip>
+                    <Icon>
+                      <bt:Image size="16" resid="Icon.16x16"/>
+                      <bt:Image size="32" resid="Icon.32x32"/>
+                      <bt:Image size="80" resid="Icon.80x80"/>
+                    </Icon>
+                    <Action xsi:type="ShowTaskpane">
+                      <SourceLocation resid="Taskpane.Url" />
+                    </Action>
+                  </Control-->
                 </Group>
               </OfficeTab>
             </ExtensionPoint>
@@ -168,21 +180,6 @@
                     </Icon>
                     <Action xsi:type="ExecuteFunction">
                       <FunctionName>encrypt</FunctionName>
-                    </Action>
-                  </Control>
-                  <Control xsi:type="Button" id="EncryptExtButton">
-                    <Label resid="EncryptExtButton.Label"/>
-                    <Supertip>
-                      <Title resid="EncryptExtButton.Label"/>
-                      <Description resid="EncryptExtButton.Tooltip"/>
-                    </Supertip>
-                    <Icon>
-                      <bt:Image size="16" resid="Icon.16x16"/>
-                      <bt:Image size="32" resid="Icon.32x32"/>
-                      <bt:Image size="80" resid="Icon.80x80"/>
-                    </Icon>
-                    <Action xsi:type="ExecuteFunction">
-                      <FunctionName>encryptExt</FunctionName>
                     </Action>
                   </Control>
                 </Group>
@@ -231,6 +228,7 @@
         <bt:ShortStrings>
           <bt:String id="GroupLabel" DefaultValue="PostGuard Add-in"/>
           <bt:String id="TaskpaneButton.Label" DefaultValue="Decrypt Email"/>
+          <bt:String id="TaskpaneButton2.Label" DefaultValue="Decrypt Email Taskpane"/>
           <bt:String id="EncryptButton.Label" DefaultValue="Send encrypted Email (default)"/>
           <bt:String id="EncryptExtButton.Label" DefaultValue="Send encrypted Email (extended)"/>
         </bt:ShortStrings>

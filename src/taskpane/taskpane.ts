@@ -140,7 +140,9 @@ function showLoginPopup(url) {
     '//' +
     location.hostname +
     (location.port ? ':' + location.port : '') +
-    url
+    url +
+    '?currentAccountMail=' +
+    Office.context.mailbox.userProfile.emailAddress
 
   // height and width are percentages of the size of the parent Office application, e.g., PowerPoint, Excel, Word, etc.
   Office.context.ui.displayDialogAsync(

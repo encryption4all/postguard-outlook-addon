@@ -63,10 +63,18 @@ const msalInstance = new msal.PublicClientApplication(msalConfig)
 
 Office.initialize = function () {
   if (Office.context.ui.messageParent) {
+    // first get correct AccountInfo object
+    const urlParams = new URLSearchParams(window.location.search)
+    const currentAccountMail = urlParams.get('currentAccountMail')
+
+    const currentAccount: msal.AccountInfo = msalInstance
+      .getAllAccounts()
+      .filter((item) => item['username'] === currentAccountMail)[0]
+
     msalInstance.handleRedirectPromise().then((response) => {
       const silentFlowRequest: SilentRequest = {
         scopes: requestObj.scopes,
-        account: msalInstance.getAllAccounts()[0],
+        account: currentAccount,
         forceRefresh: false
       }
 
@@ -82,7 +90,7 @@ Office.initialize = function () {
           if (response) {
             accountObj = response.account
           } else {
-            accountObj = msalInstance.getAllAccounts()[0]
+            accountObj = currentAccount
           }
 
           if (accountObj && response) {
