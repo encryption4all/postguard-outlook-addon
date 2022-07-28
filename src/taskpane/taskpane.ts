@@ -51,10 +51,8 @@ function write(message) {
   document.getElementById('decryptinfo').style.display = 'none'
   document.getElementById('irmaapp').style.display = 'none'
   document.getElementById('header_text').style.display = 'none'
-  document.getElementById('header_text').style.display = 'none'
-  document.getElementById('bg_decrypted_subject').style.display = 'none'
-  document.getElementById('bg_decrypted_txt').style.display = 'none'
-  document.getElementById('attachments').style.display = 'none'
+  document.getElementById('decrypted').style.display = 'none'
+  document.getElementById('loading').style.display = 'none'
   document.getElementById('status-container').hidden = false
   document.getElementById('status').innerHTML = message
 }

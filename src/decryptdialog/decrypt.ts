@@ -126,8 +126,6 @@ function getMailObject() {
  */
 export async function successMailReceived(mime) {
   decryptLog.info('Success MIME mail received: ', mime)
-  const conjunction = [{ t: email_attribute, v: g.recipient }]
-  const hashConjunction = await hashString(JSON.stringify(conjunction))
 
   const readMail = new ReadMail()
   readMail.parseMail(mime)
@@ -137,33 +135,45 @@ export async function successMailReceived(mime) {
   const unsealer = await mod.Unsealer.new(readable)
   const hidden = unsealer.get_hidden_policies()
 
-  if (!hidden[g.recipient]) {
+  const myPolicy = hidden[g.recipient]
+
+  if (!myPolicy) {
     passMsgToParent('Decrypton failed. Identifier not found in header.')
     return
   }
 
-  let localJwt = window.localStorage.getItem(`jwt_${hashConjunction}`)
+  myPolicy.con = myPolicy.con.map(({ t, v }) => {
+    if (t === email_attribute) return { t, v: g.recipient }
+    else if (v === '') return { t }
+    else return { t, v }
+  })
+
+  console.log('myPolicy: ', myPolicy)
+
+  const hashPolicy = await hashString(JSON.stringify(myPolicy))
+
+  let localJwt = window.localStorage.getItem(`jwt_${hashPolicy}`)
 
   // if JWT in local storage is null, we need to execute IRMA disclosure session
   if (localJwt === null) {
     decryptLog.info(
       'JWT not stored within localStorage, starting IRMA session ...'
     )
-    localJwt = await executeIrmaDisclosureSession(conjunction, hashConjunction)
+    localJwt = await executeIrmaDisclosureSession(myPolicy.con)
   }
 
   const decoded = jwtDecode<JwtPayload>(localJwt)
   // if JWT is expired, create new IRMA session
   if (Date.now() / 1000 > decoded.exp) {
     decryptLog.info('JWT expired.')
-    localJwt = await executeIrmaDisclosureSession(conjunction, hashConjunction)
+    localJwt = await executeIrmaDisclosureSession(myPolicy.con)
   }
 
   // retrieve USK
   const keyResp = await $.ajax({
     url: `${hostname}/v2/request/key/${hidden[g.recipient].ts.toString()}`,
     headers: {
-      'X-Postguard-Client-Version': `Outlook, ${Office.context.diagnostics.version}, pg4ol, 0.0.1`,
+      'X-Postguard-Client-Version': `Outlook,${Office.context.diagnostics.version},pg4ol,0.0.1`,
       Authorization: 'Bearer ' + localJwt
     }
   })
@@ -181,57 +191,68 @@ export async function successMailReceived(mime) {
       }
     })
 
-    await unsealer.unseal(g.recipient, keyResp.key, writable)
-    const mail: string = new TextDecoder().decode(plain)
+    try {
+      await unsealer.unseal(g.recipient, keyResp.key, writable)
+      const mail: string = new TextDecoder().decode(plain)
+      // store JWT locally after unsealing successfully
+      window.localStorage.setItem(`jwt_${hashPolicy}`, localJwt)
 
-    // Parse inner mail via simpleParser
-    let parsed = await simpleParser(mail)
-    const body = parsed.html ? parsed.html : parsed.textAsHtml
+      // Parse inner mail via simpleParser
+      let parsed = await simpleParser(mail)
+      // body can be either HTML encoded, or text as HTML encoded
+      const body = parsed.html ? parsed.html : parsed.textAsHtml
 
-    let to = ''
-    if (parsed.to !== undefined) {
-      to = parsed.to.value
-        .map(function (to) {
-          return to.address
-        })
-        .join(',')
-    }
-
-    console.log('To: ', to)
-
-    let cc = ''
-    if (parsed.cc !== undefined) {
-      cc = parsed.cc.value
-        .map(function (cc) {
-          return cc.address
-        })
-        .join(',')
-    }
-
-    showMailContent(
-      parsed.subject,
-      body,
-      parsed.from.value[0].address,
-      to,
-      cc,
-      parsed.date.toLocaleString()
-    )
-    showAttachments(parsed.attachments)
-
-    const attachments: IAttachmentContent[] = parsed.attachments.map(
-      (attachment) => {
-        const attachmentContent = Buffer.from(attachment.content).toString(
-          'base64'
-        )
-        return {
-          filename: attachment.filename,
-          content: attachmentContent,
-          isInline: false
-        }
+      // TO and CC for display purposes
+      let to = ''
+      if (parsed.to !== undefined) {
+        to = parsed.to.value
+          .map(function (to) {
+            return to.address
+          })
+          .join(',')
       }
-    )
 
-    replaceMailBody(body, parsed.subject, attachments)
+      let cc = ''
+      if (parsed.cc !== undefined) {
+        cc = parsed.cc.value
+          .map(function (cc) {
+            return cc.address
+          })
+          .join(',')
+      }
+
+      showMailContent(
+        parsed.subject,
+        body,
+        parsed.from.value[0].address,
+        to,
+        cc,
+        parsed.date.toLocaleString()
+      )
+      showAttachments(parsed.attachments)
+
+      // prepare attachments to be added to mail via Graph API
+      const attachments: IAttachmentContent[] = parsed.attachments.map(
+        (attachment) => {
+          const attachmentContent = Buffer.from(attachment.content).toString(
+            'base64'
+          )
+          return {
+            filename: attachment.filename,
+            content: attachmentContent,
+            isInline: false
+          }
+        }
+      )
+
+      replaceMailBody(body, parsed.subject, attachments)
+    } catch (error) {
+      if (error.name === 'OperationError') {
+        g.msgFunc('Disclosed identity does not match requested policy')
+      } else {
+        throw error
+      }
+    }
   }
 }
 
@@ -273,13 +294,9 @@ function replaceMailBody(
 /**
  * Executes an IRMA disclosure session based on the policy
  * @param policy The policy
- * @param hashPolicy The hash of the policy
  * @returns The JWT of the IRMA session
  */
-async function executeIrmaDisclosureSession(
-  policy: object,
-  hashPolicy: string
-) {
+async function executeIrmaDisclosureSession(policy: object) {
   // show HTML elements needed
   document.getElementById('info_message').style.display = 'block'
   document.getElementById('header_text').style.display = 'block'
@@ -321,7 +338,7 @@ async function executeIrmaDisclosureSession(
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Postguard-Client-Version': `Outlook, ${Office.context.diagnostics.version}, pg4ol, 0.0.1`
+          'X-Postguard-Client-Version': `Outlook,${Office.context.diagnostics.version},pg4ol,0.0.1`
         },
         body: JSON.stringify(requestBody)
       },
@@ -350,7 +367,6 @@ async function executeIrmaDisclosureSession(
   const jwtUrl = await irma.start()
   // retrieve JWT, add to local storage, and return
   const localJwt = await $.ajax({ url: jwtUrl })
-  window.localStorage.setItem(`jwt_${hashPolicy}`, localJwt)
   return localJwt
 }
 
