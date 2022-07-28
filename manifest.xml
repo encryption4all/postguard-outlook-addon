@@ -170,6 +170,21 @@
                       <FunctionName>encrypt</FunctionName>
                     </Action>
                   </Control>
+                  <Control xsi:type="Button" id="EncryptExtButton">
+                    <Label resid="EncryptExtButton.Label"/>
+                    <Supertip>
+                      <Title resid="EncryptExtButton.Label"/>
+                      <Description resid="EncryptExtButton.Tooltip"/>
+                    </Supertip>
+                    <Icon>
+                      <bt:Image size="16" resid="Icon.16x16"/>
+                      <bt:Image size="32" resid="Icon.32x32"/>
+                      <bt:Image size="80" resid="Icon.80x80"/>
+                    </Icon>
+                    <Action xsi:type="ExecuteFunction">
+                      <FunctionName>encryptExt</FunctionName>
+                    </Action>
+                  </Control>
                 </Group>
               </OfficeTab>
             </ExtensionPoint>
@@ -216,11 +231,13 @@
         <bt:ShortStrings>
           <bt:String id="GroupLabel" DefaultValue="PostGuard Add-in"/>
           <bt:String id="TaskpaneButton.Label" DefaultValue="Decrypt Email"/>
-          <bt:String id="EncryptButton.Label" DefaultValue="Send encrypted Email"/>
+          <bt:String id="EncryptButton.Label" DefaultValue="Send encrypted Email (default)"/>
+          <bt:String id="EncryptExtButton.Label" DefaultValue="Send encrypted Email (extended)"/>
         </bt:ShortStrings>
         <bt:LongStrings>
           <bt:String id="TaskpaneButton.Tooltip" DefaultValue="Decrypts the selected email with PostGuard."/>
-          <bt:String id="EncryptButton.Tooltip" DefaultValue="Encrypts and sends the current email with PostGuard."/>
+          <bt:String id="EncryptButton.Tooltip" DefaultValue="Encrypts and sends the current email with email address as identity."/>
+          <bt:String id="EncryptExtButton.Tooltip" DefaultValue="Encrypts and sends the current email where identity can be extended."/>
         </bt:LongStrings>
       </Resources>
 

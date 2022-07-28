@@ -18,6 +18,7 @@ import {
   newReadableStreamFromArray,
   getGlobal
 } from '../helpers/utils'
+import type { Policy } from 'attribute-form/AttributeForm/AttributeForm.svelte'
 
 // eslint-disable-next-line no-undef
 var Buffer = require('buffer/').Buffer
@@ -25,6 +26,7 @@ var Buffer = require('buffer/').Buffer
 var mailboxItem: Office.MessageCompose
 var globalEvent
 var isEncryptMode: boolean = false
+var isExtendedEncryption: boolean = false
 
 const hostname = 'https://main.irmaseal-pkg.ihub.ru.nl'
 const email_attribute = 'pbdf.sidn-pbdf.email.email'
@@ -68,6 +70,31 @@ function encrypt(event: Office.AddinCommands.Event) {
   )
 
   isEncryptMode = true
+  showLoginPopup('/fallbackauthdialog.html')
+}
+
+/**
+ * Entry point function for encryption
+ * @param event The AddinCommands Event
+ */
+// eslint-disable-next-line no-unused-vars
+function encryptExtended(event: Office.AddinCommands.Event) {
+  const message: Office.NotificationMessageDetails = {
+    type: Office.MailboxEnums.ItemNotificationMessageType.InformationalMessage,
+    message: 'Encrypting email with PostGuard',
+    icon: 'Icon.80x80',
+    persistent: true
+  }
+
+  globalEvent = event
+
+  Office.context.mailbox.item.notificationMessages.replaceAsync(
+    'action',
+    message
+  )
+
+  isEncryptMode = true
+  isExtendedEncryption = true
   showLoginPopup('/fallbackauthdialog.html')
 }
 
@@ -239,7 +266,7 @@ async function getPublicKey(): Promise<any> {
  * Encrypts and sends the email
  * @param token The authentication token for the Graph API
  */
-async function encryptAndSendEmail(token) {
+async function encryptAndSendEmail(token, policy: Policy = null) {
   const pk = await getPublicKey()
 
   const [mod] = await Promise.all([mod_promise])
@@ -264,23 +291,34 @@ async function encryptAndSendEmail(token) {
     throw 'Please add recipients to the email!'
   }
 
-  const policies = recipientEmails.reduce((total, recipient) => {
-    total[recipient] = {
-      ts: timestamp,
-      con: [{ t: email_attribute, v: recipient }]
-    }
-    return total
-  }, {})
+  let allPolicies = {}
 
-  const ccPolicies = ccRecipientEmails.reduce((total, recipient) => {
-    total[recipient] = {
-      ts: timestamp,
-      con: [{ t: email_attribute, v: recipient }]
-    }
-    return total
-  }, {})
+  if (policy === null) {
+    const policies = recipientEmails.reduce((total, recipient) => {
+      total[recipient] = {
+        ts: timestamp,
+        con: [{ t: email_attribute, v: recipient }]
+      }
+      return total
+    }, {})
 
-  const allPolicies = { ...policies, ...ccPolicies }
+    const ccPolicies = ccRecipientEmails.reduce((total, recipient) => {
+      total[recipient] = {
+        ts: timestamp,
+        con: [{ t: email_attribute, v: recipient }]
+      }
+      return total
+    }, {})
+
+    allPolicies = { ...policies, ...ccPolicies }
+  } else {
+    for (var id in policy) {
+      allPolicies[id] = {
+        ts: timestamp,
+        con: policy[id]
+      }
+    }
+  }
 
   encryptLog.info('Encrypting using the following policies: ', allPolicies)
 
@@ -356,7 +394,7 @@ async function encryptAndSendEmail(token) {
     }
   })
 
-  await mod.seal(pk.publicKey, policies, readable, writable)
+  await mod.seal(pk.publicKey, allPolicies, readable, writable)
 
   // get outer mail to send email via Graph API
   composeMail.setPayload(ct)
@@ -539,13 +577,93 @@ function showInfoMessage(msg: string) {
   globalEvent.completed()
 }
 
-var loginDialog
+var attributeDialog
+
+/**
+ * Shows dialog to add attributes for each recipient
+ * @param accessToken Token to access graph API
+ */
+async function addAttributes(accessToken: string) {
+  const recipientEmails: string[] = await getRecipientEmails()
+  const ccRecipientEmails: string[] = await getCcRecipientEmails()
+  const bccRecipientEmails: string[] = await getBccRecipientEmails()
+
+  // if BCC recipients available , abort operations
+  if (bccRecipientEmails.length > 0) {
+    bccMsgAndDialog()
+    return
+  }
+
+  const allRecipientsCount = recipientEmails.length + ccRecipientEmails.length
+
+  if (allRecipientsCount == 0) {
+    throw 'Please add recipients to the email!'
+  }
+
+  const recipientsStringified = JSON.stringify(
+    recipientEmails.concat(ccRecipientEmails)
+  )
+
+  const b64Recipients = Buffer.from(recipientsStringified).toString('base64')
+  const b64Token = Buffer.from(accessToken).toString('base64')
+
+  var fullUrl =
+    location.protocol +
+    '//' +
+    location.hostname +
+    (location.port ? ':' + location.port : '') +
+    '/attributes.html' +
+    '?recipients=' +
+    b64Recipients +
+    '&token=' +
+    b64Token
+
+  Office.context.ui.displayDialogAsync(
+    fullUrl,
+    { height: 60, width: 30 },
+    function (result) {
+      encryptLog.info('Attributedialog has initialized.')
+      attributeDialog = result.value
+      attributeDialog.addEventHandler(
+        Office.EventType.DialogMessageReceived,
+        processAttributesMessage
+      )
+    }
+  )
+}
 
 /**
  *  This handler responds to the success or failure message that the pop-up dialog receives from the identity provider and access token provider.
  * @param arg The arg object passed from the dialog
  */
 
+async function processAttributesMessage(arg) {
+  let messageFromDialog = JSON.parse(arg.message)
+  console.log(`Msg from attr. dialog: ${messageFromDialog}`)
+  attributeDialog.close()
+
+  if (messageFromDialog.status === 'success') {
+    encryptAndSendEmail(
+      messageFromDialog.result.accessToken,
+      messageFromDialog.result.policy
+    ).catch((err) => {
+      encryptLog.error(err)
+      showInfoMessage(err)
+    })
+  } else {
+    encryptLog.error(
+      'Error: ',
+      JSON.stringify(messageFromDialog.error.toString())
+    )
+  }
+}
+
+var loginDialog
+
+/**
+ *  This handler responds to the success or failure message that the pop-up dialog receives from the identity provider and access token provider.
+ * @param arg The arg object passed from the dialog
+ */
 async function processMessage(arg) {
   let messageFromDialog = JSON.parse(arg.message)
 
@@ -553,10 +671,19 @@ async function processMessage(arg) {
     loginDialog.close()
     if (isEncryptMode) {
       g.msgFunc = showInfoMessage
-      encryptAndSendEmail(messageFromDialog.result.accessToken).catch((err) => {
-        encryptLog.error(err)
-        showInfoMessage(err)
-      })
+      if (isExtendedEncryption) {
+        addAttributes(messageFromDialog.result.accessToken).catch((err) => {
+          encryptLog.error(err)
+          showInfoMessage(err)
+        })
+      } else {
+        encryptAndSendEmail(messageFromDialog.result.accessToken).catch(
+          (err) => {
+            encryptLog.error(err)
+            showInfoMessage(err)
+          }
+        )
+      }
     } else {
       showDecryptPopup(messageFromDialog.result.accessToken)
     }
@@ -601,6 +728,7 @@ const g = getGlobal() as any
 
 // the add-in command functions need to be available in global scope
 g.encrypt = encrypt
+g.encryptExt = encryptExtended
 g.decrypt = decrypt
 
 // eslint-disable-next-line no-unused-vars

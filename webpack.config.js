@@ -4,13 +4,14 @@ const devCerts = require('office-addin-dev-certs')
 const { CleanWebpackPlugin } = require('clean-webpack-plugin')
 const CopyWebpackPlugin = require('copy-webpack-plugin')
 const HtmlWebpackPlugin = require('html-webpack-plugin')
-const ReplaceInFileWebpackPlugin = require('replace-in-file-webpack-plugin')
+const path = require('path')
+//const ReplaceInFileWebpackPlugin = require('replace-in-file-webpack-plugin')
 
 const webpack = require('webpack')
 
 const urlDev = 'localhost:3000/'
 const urlProd = 'irmaseal.z6.web.core.windows.net/' // CHANGE THIS TO YOUR PRODUCTION DEPLOYMENT LOCATION
-const appIdProd = '6ee2a054-1d61-405d-8e5d-c2daf25c5833' // CHANGE TO APP ID used in App registration of RU account
+//const appIdProd = '6ee2a054-1d61-405d-8e5d-c2daf25c5833' // CHANGE TO APP ID used in App registration of RU account
 
 module.exports = async (env, options) => {
   const dev = options.mode === 'development'
@@ -24,18 +25,21 @@ module.exports = async (env, options) => {
       taskpane: './src/taskpane/taskpane.ts',
       commands: './src/commands/commands.ts',
       decrypt: './src/decryptdialog/decrypt.ts',
-      fallbackauthdialog: './src/helpers/fallbackauthdialog.ts'
+      fallbackauthdialog: './src/helpers/fallbackauthdialog.ts',
+      attributes: './src/dialogs/attributes.ts'
     },
     experiments: { syncWebAssembly: true, topLevelAwait: true },
     resolve: {
-      extensions: ['.ts', '.tsx', '.html', '.js'],
+      extensions: ['.ts', '.tsx', '.html', '.js', '.mjs', '.svelte'],
       alias: {
         process: 'process/browser',
         stream: 'stream-browserify',
         zlib: 'browserify-zlib',
-        crypto: 'crypto-browserify'
+        crypto: 'crypto-browserify',
+        svelte: path.resolve('node_modules', 'svelte')
       },
-      fallback: { https: false, http: false }
+      fallback: { https: false, http: false },
+      mainFields: ['svelte', 'browser', 'module', 'main']
     },
     module: {
       rules: [
@@ -65,6 +69,16 @@ module.exports = async (env, options) => {
           loader: 'file-loader',
           options: {
             name: '[path][name].[ext]'
+          }
+        },
+        {
+          test: /\.(svelte)$/,
+          use: 'svelte-loader'
+        },
+        {
+          test: /node_modules\/svelte\/.*\.mjs$/,
+          resolve: {
+            fullySpecified: false
           }
         }
       ]
@@ -130,6 +144,11 @@ module.exports = async (env, options) => {
         filename: 'fallbackauthdialog.html',
         template: './src/helpers/fallbackauthdialog.html',
         chunks: ['polyfill', 'fallbackauthdialog']
+      }),
+      new HtmlWebpackPlugin({
+        filename: 'attributes.html',
+        template: './src/dialogs/attributes.html',
+        chunks: ['polyfill', 'attributes']
       })
       /*new ReplaceInFileWebpackPlugin([
         {
