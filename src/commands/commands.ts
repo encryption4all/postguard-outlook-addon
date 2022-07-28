@@ -236,11 +236,13 @@ async function getMailAttachmentContent(attachmentId: string): Promise<string> {
  */
 async function getPublicKey(): Promise<any> {
   let response
+  let headers = {
+    'X-Postguard-Client-Version': `Outlook,${Office.context.diagnostics.version},pg4ol,0.0.1`
+  }
+  console.log(`Headers: ${headers}`)
   try {
     response = await fetch(`${hostname}/v2/parameters`, {
-      headers: {
-        'X-Postguard-Client-Version': `Outlook, ${Office.context.diagnostics.version}, pg4ol, 0.0.1`
-      }
+      headers: headers
     })
   } catch (e) {
     encryptLog.error(e)
@@ -724,13 +726,6 @@ function showLoginPopup(url: string) {
   )
 }
 
-const g = getGlobal() as any
-
-// the add-in command functions need to be available in global scope
-g.encrypt = encrypt
-g.encryptExt = encryptExtended
-g.decrypt = decrypt
-
 // eslint-disable-next-line no-unused-vars
 var decryptDialog: Office.Dialog
 
@@ -817,3 +812,9 @@ function showDecryptPopup(token: string) {
 function processDecryptMessage(arg) {
   showInfoMessage(arg.message)
 }
+
+// the add-in command functions need to be available in global scope
+const g = getGlobal() as any
+g.encrypt = encrypt
+g.encryptExt = encryptExtended
+g.decrypt = decrypt

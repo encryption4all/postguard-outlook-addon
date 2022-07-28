@@ -144,10 +144,22 @@
                     <Action xsi:type="ExecuteFunction">
                       <FunctionName>decrypt</FunctionName>
                     </Action>
-                    <!--Action xsi:type="ShowTaskpane">
-                      <SourceLocation resid="Taskpane.Url" />
-                    </Action-->
                   </Control>
+                  <!--Control xsi:type="Button" id="Contoso.mobileButton1">
+                    <Label resid="TaskpaneButton2.Label"/>
+                    <Supertip>
+                      <Title resid="TaskpaneButton.Label"/>
+                      <Description resid="TaskpaneButton.Tooltip"/>
+                    </Supertip>
+                    <Icon>
+                      <bt:Image size="16" resid="Icon.16x16"/>
+                      <bt:Image size="32" resid="Icon.32x32"/>
+                      <bt:Image size="80" resid="Icon.80x80"/>
+                    </Icon>
+                    <Action xsi:type="ShowTaskpane">
+                      <SourceLocation resid="Taskpane.Url" />
+                    </Action>
+                  </Control-->
                 </Group>
               </OfficeTab>
             </ExtensionPoint>

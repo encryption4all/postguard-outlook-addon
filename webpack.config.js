@@ -141,6 +141,11 @@ module.exports = async (env, options) => {
         chunks: ['polyfill', 'commands']
       }),
       new HtmlWebpackPlugin({
+        filename: 'attributes.html',
+        template: './src/dialogs/attributes.html',
+        chunks: ['polyfill', 'attributes']
+      }),
+      new HtmlWebpackPlugin({
         filename: 'fallbackauthdialog.html',
         template: './src/helpers/fallbackauthdialog.html',
         chunks: ['polyfill', 'fallbackauthdialog']
@@ -150,18 +155,6 @@ module.exports = async (env, options) => {
         template: './src/dialogs/attributes.html',
         chunks: ['polyfill', 'attributes']
       })
-      /*new ReplaceInFileWebpackPlugin([
-        {
-          dir: 'dist',
-          files: ['fallbackauthdialog.js'],
-          rules: [
-            {
-              search: 'clientId:"6ee2a054-1d61-405d-8e5d-c2daf25c5833"',
-              replace: `clientId:"${appIdProd}"`
-            }
-          ]
-        }
-      ])*/
     ],
     devServer: {
       headers: {
