@@ -54,7 +54,7 @@ Office.initialize = function () {
     decryptLog.info('Decrypt dialog openend!')
     const urlParams = new URLSearchParams(window.location.search)
     g.token = Buffer.from(urlParams.get('token'), 'base64').toString('utf-8')
-    g.recipient = urlParams.get('recipient')
+    g.recipient = urlParams.get('recipient').toLowerCase()
     g.mailId = urlParams.get('mailid')
     g.attachmentId = urlParams.get('attachmentid')
     g.msgFunc = passMsgToParent
@@ -68,6 +68,7 @@ Office.initialize = function () {
 
 /**
  * Passes a message to the parent
+ * TODO: Make msg object to be able to pass status (if error then close dialog in parent)
  * @param msg The message
  */
 function passMsgToParent(msg: string) {
@@ -118,6 +119,13 @@ function getMailObject() {
           ')'
       )
     })
+}
+
+function _getMobileUrl(sessionPtr) {
+  const json = JSON.stringify(sessionPtr)
+  // Universal links are not stable in Android webviews and custom tabs, so always use intent links.
+  const intent = `Intent;package=org.irmacard.cardemu;scheme=irma;l.timestamp=${Date.now()}`
+  return `intent://qr/json/${encodeURIComponent(json)}#${intent};end`
 }
 
 /**
@@ -346,6 +354,7 @@ async function executeIrmaDisclosureSession(policy: object) {
         sessionPtr: (r) => {
           const ptr = r.sessionPtr
           ptr.u = `https://ihub.ru.nl/irma/1/${ptr.u}`
+          console.log(`IntentURL: ${_getMobileUrl(r.sessionPtr)}`)
           return ptr
         }
       },
@@ -469,6 +478,8 @@ function showAttachments(attachments) {
  * @param sender The sender of the mail
  */
 function enableSenderinfo(sender: string) {
-  document.getElementById('item-sender').hidden = false
-  document.getElementById('item-sender').innerHTML += sender
+  if (sender !== undefined) {
+    document.getElementById('item-sender').hidden = false
+    document.getElementById('item-sender').innerHTML = sender
+  }
 }

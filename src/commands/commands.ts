@@ -668,6 +668,7 @@ var loginDialog
  */
 async function processMessage(arg) {
   let messageFromDialog = JSON.parse(arg.message)
+  encryptLog.info(`After auth: ${JSON.stringify(messageFromDialog)}`)
 
   if (messageFromDialog.status === 'success') {
     loginDialog.close()
@@ -690,12 +691,8 @@ async function processMessage(arg) {
       showDecryptPopup(messageFromDialog.result.accessToken)
     }
   } else {
-    // Something went wrong with authentication or the authorization of the web application.
-    loginDialog.close()
-    encryptLog.error(
-      'Error: ',
-      JSON.stringify(messageFromDialog.error.toString())
-    )
+    // Something went wrong with authentication or the authorization of the web application... try again
+    encryptLog.error('Error: ', JSON.stringify(messageFromDialog))
   }
 }
 
@@ -710,7 +707,9 @@ function showLoginPopup(url: string) {
     '//' +
     location.hostname +
     (location.port ? ':' + location.port : '') +
-    url
+    url +
+    '?currentAccountMail=' +
+    Office.context.mailbox.userProfile.emailAddress
 
   Office.context.ui.displayDialogAsync(
     fullUrl,

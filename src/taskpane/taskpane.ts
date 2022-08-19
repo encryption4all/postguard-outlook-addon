@@ -3,7 +3,7 @@
  * Copyright (c) Microsoft Corporation. All rights reserved. Licensed under the MIT license.
  * See LICENSE in the project root for license information.
  */
-/* global $, Office */
+/* global $, Office, OfficeRuntime */
 
 // images references in the manifest
 import '../../assets/16.png'
@@ -14,6 +14,9 @@ import 'web-streams-polyfill'
 
 import { getGlobal, getItemRestId, isPostGuardEmail } from '../helpers/utils'
 import { successMailReceived } from '../decryptdialog/decrypt'
+
+import * as sso from 'office-addin-sso'
+let retryGetAccessToken = 0
 
 const getLogger = require('webpack-log')
 const decryptLog = getLogger({ name: 'PostGuard decrypt log' })
@@ -63,7 +66,7 @@ function write(message) {
  */
 function enableSenderinfo(sender: string) {
   document.getElementById('item-sender').hidden = false
-  document.getElementById('item-sender').innerHTML += sender
+  document.getElementById('item-sender').innerHTML = sender
 }
 
 /**
@@ -100,7 +103,7 @@ async function graphAPITokenCallback(token) {
  * Initializes dialog for authentication to Graph API
  */
 async function getGraphAPIToken() {
-  showLoginPopup('/fallbackauthdialog.html')
+  showLoginPopup()
 }
 
 var loginDialog
@@ -116,29 +119,87 @@ async function processMessage(arg) {
     // We now have a valid access token.
     loginDialog.close()
     console.log('Valid token: ', JSON.stringify(messageFromDialog.result))
-    console.log('Logginger: ', JSON.stringify(messageFromDialog.logging))
+    console.log('Status2: ', JSON.stringify(messageFromDialog.status2))
     graphAPITokenCallback(messageFromDialog.result.accessToken)
   } else {
     // Something went wrong with authentication or the authorization of the web application.
-    loginDialog.close()
     console.log(
       'Message from dialog error: ',
-      JSON.stringify(messageFromDialog.error.toString())
+      JSON.stringify(messageFromDialog)
     )
   }
 }
 
 /**
  * Use the Office dialog API to open a pop-up and display the sign-in page for the identity provider.
- * @param url The URL pointing to the dialog / pop-up
  */
-function showLoginPopup(url) {
+async function showLoginPopup() {
+  try {
+    let bootstrapToken: string = await OfficeRuntime.auth.getAccessToken({
+      allowSignInPrompt: true
+    })
+    let exchangeResponse: any = await sso.getGraphToken(bootstrapToken)
+    if (exchangeResponse.claims) {
+      // Microsoft Graph requires an additional form of authentication. Have the Office host
+      // get a new token using the Claims string, which tells AAD to prompt the user for all
+      // required forms of authentication.
+      let mfaBootstrapToken: string = await OfficeRuntime.auth.getAccessToken({
+        authChallenge: exchangeResponse.claims
+      })
+      exchangeResponse = sso.getGraphToken(mfaBootstrapToken)
+    }
+
+    if (exchangeResponse.error) {
+      // AAD errors are returned to the client with HTTP code 200, so they do not trigger
+      // the catch block below.
+      handleAADErrors(exchangeResponse)
+    } else {
+      // makeGraphApiCall makes an AJAX call to the MS Graph endpoint. Errors are caught
+      // in the .fail callback of that call
+      const response: any = await sso.makeGraphApiCall(
+        exchangeResponse.access_token
+      )
+      console.log(response)
+      sso.showMessage('Your data has been added to the document.')
+    }
+  } catch (exception) {
+    // if handleClientSideErrors returns true then we will try to authenticate via the fallback
+    // dialog rather than simply throw and error
+    if (exception.code) {
+      if (sso.handleClientSideErrors(exception)) {
+        dialogFallback()
+      }
+    } else {
+      sso.showMessage('EXCEPTION: ' + JSON.stringify(exception))
+    }
+  }
+}
+
+function handleAADErrors(exchangeResponse: any): void {
+  // On rare occasions the bootstrap token is unexpired when Office validates it,
+  // but expires by the time it is sent to AAD for exchange. AAD will respond
+  // with "The provided value for the 'assertion' is not valid. The assertion has expired."
+  // Retry the call of getAccessToken (no more than once). This time Office will return a
+  // new unexpired bootstrap token.
+
+  if (
+    exchangeResponse.error_description.indexOf('AADSTS500133') !== -1 &&
+    retryGetAccessToken <= 0
+  ) {
+    retryGetAccessToken++
+    processMessage(null)
+  } else {
+    dialogFallback()
+  }
+}
+
+function dialogFallback() {
   var fullUrl =
     location.protocol +
     '//' +
     location.hostname +
     (location.port ? ':' + location.port : '') +
-    url +
+    '/fallbackauthdialog.html' +
     '?currentAccountMail=' +
     Office.context.mailbox.userProfile.emailAddress
 
