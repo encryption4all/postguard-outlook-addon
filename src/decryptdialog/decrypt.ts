@@ -437,7 +437,6 @@ function showMailContent(
   document.getElementById('decrypted_from').innerHTML += from
 
   const sanitizeBody = sanitizeHtml(body)
-  console.log(`Sanitize body: ${sanitizeBody}`)
   document.getElementById('decrypted_text').innerHTML = sanitizeBody
 
   if (to.length > 0) document.getElementById('decrypted_to').innerHTML += to
