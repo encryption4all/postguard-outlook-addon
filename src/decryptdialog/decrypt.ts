@@ -29,6 +29,8 @@ import {
 import jwtDecode, { JwtPayload } from 'jwt-decode'
 import sanitizeHtml from 'sanitize-html'
 
+import I18n from 'browser-i18n'
+
 // eslint-disable-next-line no-undef
 const getLogger = require('webpack-log')
 const decryptLog = getLogger({ name: 'PostGuard decrypt log' })
@@ -46,6 +48,8 @@ var Buffer = require('buffer/').Buffer
 
 const g = getGlobal() as any
 
+let i18n: I18n
+
 /**
  * Initialization function which also extracts the URL params
  */
@@ -59,6 +63,13 @@ Office.initialize = function () {
     g.attachmentId = urlParams.get('attachmentid')
     g.msgFunc = passMsgToParent
     g.sender = urlParams.get('sender')
+
+    const lang = Office.context.displayLanguage.substring(0, 2)
+    i18n = new I18n({
+      language: lang,
+      path: '/locales',
+      extension: '.json'
+    })
 
     $(function () {
       getMailObject()
@@ -299,12 +310,17 @@ function replaceMailBody(
   }).fail(handleAjaxError)
 }
 
+class Policy {
+  t: string
+  v: string
+}
+
 /**
  * Executes an IRMA disclosure session based on the policy
  * @param policy The policy
  * @returns The JWT of the IRMA session
  */
-async function executeIrmaDisclosureSession(policy: object) {
+async function executeIrmaDisclosureSession(policy: Policy[]) {
   // show HTML elements needed
   document.getElementById('info_message').style.display = 'block'
   document.getElementById('header_text').style.display = 'block'
@@ -313,6 +329,15 @@ async function executeIrmaDisclosureSession(policy: object) {
   document.getElementById('qrcodecontainer').style.display = 'block'
   document.getElementById('loading').style.display = 'none'
   enableSenderinfo(g.sender)
+
+  $.each(policy, function (_index, element) {
+    const colon = element.v.length > 0 ? ':' : ''
+    $('#attributes').append(
+      `<tr><td class="attrtype">${i18n
+        .__(element.t)
+        .toLowerCase()}${colon}</td><td class="attrvalue">${element.v}</td><tr>`
+    )
+  })
 
   // calculate diff in seconds between now and tomorrow 4 am
   let tomorrow = new Date()

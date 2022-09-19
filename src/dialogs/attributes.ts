@@ -50,7 +50,7 @@ Office.initialize = function () {
 
       new AttributeForm({
         target: el,
-        props: { initialPolicy: init, onSubmit: finish }
+        props: { initialPolicy: init, onSubmit: finish, submitButton: true }
       })
     })
   }

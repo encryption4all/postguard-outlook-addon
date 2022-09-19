@@ -622,7 +622,7 @@ async function addAttributes(accessToken: string) {
 
   Office.context.ui.displayDialogAsync(
     fullUrl,
-    { height: 60, width: 30 },
+    { height: 40, width: 20 },
     function (result) {
       encryptLog.info('Attributedialog has initialized.')
       attributeDialog = result.value
@@ -641,16 +641,24 @@ async function addAttributes(accessToken: string) {
 
 async function processAttributesMessage(arg) {
   let messageFromDialog = JSON.parse(arg.message)
-  console.log(`Msg from attr. dialog: ${messageFromDialog}`)
   attributeDialog.close()
 
   if (messageFromDialog.status === 'success') {
-    encryptAndSendEmail(
-      messageFromDialog.result.accessToken,
-      messageFromDialog.result.policy
-    ).catch((err) => {
-      encryptLog.error(err)
-      showInfoMessage(err)
+    const policies = messageFromDialog.result.policy
+    const recipients = Object.keys(policies)
+
+    Office.context.mailbox.item.to.setAsync(recipients, function (asyncResult) {
+      if (asyncResult.status === Office.AsyncResultStatus.Succeeded) {
+        encryptAndSendEmail(
+          messageFromDialog.result.accessToken,
+          messageFromDialog.result.policy
+        ).catch((err) => {
+          encryptLog.error(err)
+          showInfoMessage(err)
+        })
+      } else {
+        throw 'Could not set recipients in compose window'
+      }
     })
   } else {
     encryptLog.error(

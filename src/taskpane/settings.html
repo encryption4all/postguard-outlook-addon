@@ -1,0 +1,101 @@
+<!-- Copyright (c) Microsoft Corporation. All rights reserved. Licensed under the MIT License. -->
+<!-- This file shows how to design a first-run page that provides a welcome screen to the user about the features of the add-in. -->
+
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <title>PostGuard Outlook Add-In - Settings</title>
+
+    <!-- Office JavaScript API -->
+    <script
+      type="text/javascript"
+      src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"
+    ></script>
+
+    <!-- JQuery JS API -->
+    <script src="https://code.jquery.com/jquery.min.js"></script>
+
+    <!-- For more information on Office UI Fabric, visit https://developer.microsoft.com/fabric. -->
+    <link
+      rel="stylesheet"
+      href="https://static2.sharepointonline.com/files/fabric/office-ui-fabric-core/9.6.1/css/fabric.min.css"
+    />
+  </head>
+
+  <body class="ms-font-m ms-welcome ms-Fabric">
+    <main id="app-body">
+      <div
+        style="
+          background-color: #022e3d;
+          height: 40px;
+          padding: 0px;
+          margin: 0px;
+        "
+      >
+        <object
+          style="margin-top: 3px; margin-left: 14px; padding: 0"
+          height="34px"
+          data="assets/postguard_logo.svg"
+          type="image/svg+xml"
+        ></object>
+      </div>
+
+      <section>
+        <div class="ms-font-xxl">PostGuard Settings</div>
+        <div class="ms-TextField">
+          <label class="ms-Label"
+            >Do you want to store unencrypted mails in your mailbox?</label
+          >
+          <label>
+            <input
+              type="radio"
+              id="store-unencrypted-yes"
+              name="store-unencrypted"
+            />
+            Yes
+          </label>
+          <label>
+            <input
+              type="radio"
+              id="store-unencrypted-no"
+              name="store-unencrypted"
+            />
+            No
+          </label>
+        </div>
+        <div class="ms-TextField">
+          <label class="ms-Label">Do you want to encrypt the subject?</label>
+          <label>
+            <input
+              type="radio"
+              id="subject-encrypted-yes"
+              name="subject-encrypted"
+            />
+            Yes
+          </label>
+          <label>
+            <input
+              type="radio"
+              id="subject-encrypted-no"
+              name="subject-encrypted"
+            />
+            No
+          </label>
+        </div>
+        <div class="ms-Dialog-actions">
+          <div class="ms-Dialog-actionsRight">
+            <button
+              class="ms-Dialog-action ms-Button ms-Button--primary"
+              id="settings-done"
+            >
+              <span class="ms-Button-label">Save</span>
+            </button>
+          </div>
+        </div>
+        <span id="status"> </span>
+      </section>
+    </main>
+  </body>
+</html>

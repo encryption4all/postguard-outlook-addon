@@ -6,6 +6,7 @@ const CopyWebpackPlugin = require('copy-webpack-plugin')
 const HtmlWebpackPlugin = require('html-webpack-plugin')
 const path = require('path')
 //const ReplaceInFileWebpackPlugin = require('replace-in-file-webpack-plugin')
+const preprocess = require('svelte-preprocess')
 
 const webpack = require('webpack')
 
@@ -26,7 +27,8 @@ module.exports = async (env, options) => {
       commands: './src/commands/commands.ts',
       decrypt: './src/decryptdialog/decrypt.ts',
       fallbackauthdialog: './src/helpers/fallbackauthdialog.ts',
-      attributes: './src/dialogs/attributes.ts'
+      attributes: './src/dialogs/attributes.ts',
+      settings: './src/taskpane/settings.ts'
     },
     experiments: { syncWebAssembly: true, topLevelAwait: true },
     resolve: {
@@ -73,18 +75,36 @@ module.exports = async (env, options) => {
         },
         {
           test: /\.(svelte)$/,
-          use: 'svelte-loader'
+          use: {
+            loader: 'svelte-loader',
+            options: { preprocess: preprocess({ postcss: true }) }
+          }
         },
         {
           test: /node_modules\/svelte\/.*\.mjs$/,
           resolve: {
             fullySpecified: false
           }
-        }
+        },
+        {
+          test: /\.(woff(2)?|ttf|eot)(\?v=\d+\.\d+\.\d+)?$/,
+          use: [
+            {
+              loader: 'file-loader',
+              options: {
+                name: '[name].[ext]',
+                outputPath: 'fonts/'
+              }
+            }
+          ]
+        },
+        { test: /\.(css)$/, use: ['style-loader', 'css-loader'] }
       ]
     },
     plugins: [
       new CopyWebpackPlugin({ patterns: [{ from: 'assets', to: 'assets' }] }),
+      new CopyWebpackPlugin({ patterns: [{ from: 'fonts', to: 'fonts' }] }),
+      new CopyWebpackPlugin({ patterns: [{ from: 'locales', to: 'locales' }] }),
       new webpack.ProvidePlugin({
         process: 'process/browser',
         Buffer: ['buffer', 'Buffer']
@@ -154,6 +174,11 @@ module.exports = async (env, options) => {
         filename: 'attributes.html',
         template: './src/dialogs/attributes.html',
         chunks: ['polyfill', 'attributes']
+      }),
+      new HtmlWebpackPlugin({
+        filename: 'settings.html',
+        template: './src/taskpane/settings.html',
+        chunks: ['polyfill', 'settings']
       })
     ],
     devServer: {
