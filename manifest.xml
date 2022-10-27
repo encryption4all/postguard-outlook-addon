@@ -145,7 +145,7 @@
                       <FunctionName>decrypt</FunctionName>
                     </Action>
                   </Control>
-                  <Control xsi:type="Button" id="Contoso.settingButton">
+                  <!--Control xsi:type="Button" id="Contoso.settingButton">
                     <Label resid="TaskpaneButton2.Label"/>
                     <Supertip>
                       <Title resid="TaskpaneButton2.Label"/>
@@ -159,7 +159,7 @@
                     <Action xsi:type="ShowTaskpane">
                       <SourceLocation resid="Taskpane.Url" />
                     </Action>
-                  </Control>
+                  </Control-->
                   <!--Control xsi:type="Button" id="Contoso.mobileButton1">
                     <Label resid="SettingButton.Label"/>
                     <Supertip>
@@ -258,7 +258,7 @@
         </bt:Urls>
         <bt:ShortStrings>
           <bt:String id="GroupLabel" DefaultValue="PostGuard Add-in"/>
-          <bt:String id="TaskpaneButton.Label" DefaultValue="Decrypt Email via Dialog"/>
+          <bt:String id="TaskpaneButton.Label" DefaultValue="Decrypt Email"/>
           <bt:String id="SettingButton.Label" DefaultValue="Settings"/>
           <bt:String id="TaskpaneButton2.Label" DefaultValue="Decrypt Email via Taskpane"/>
           <bt:String id="EncryptButton.Label" DefaultValue="Send encrypted Email"/>

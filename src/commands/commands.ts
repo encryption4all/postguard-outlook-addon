@@ -790,7 +790,7 @@ function showDecryptPopup(token: string) {
   // height and width are percentages of the size of the parent Office application, e.g., PowerPoint, Excel, Word, etc.
   Office.context.ui.displayDialogAsync(
     fullUrl,
-    { height: 70, width: 30 },
+    { height: 80, width: 30 },
     function (result) {
       if (result.status === Office.AsyncResultStatus.Failed) {
         if (result.error.code === 12007) {
