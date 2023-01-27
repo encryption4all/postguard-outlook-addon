@@ -20,6 +20,7 @@ import * as IrmaClient from '@privacybydesign/irma-client'
 import * as IrmaWeb from '@privacybydesign/irma-web'
 import {
   getGlobal,
+  getPostGuardHeaders,
   hashString,
   htmlBodyType,
   IAttachmentContent,
@@ -40,8 +41,9 @@ const mod = await mod_promise
 // eslint-disable-next-line no-undef
 const simpleParser = require('mailparser').simpleParser
 
-const hostname = 'https://main.irmaseal-pkg.ihub.ru.nl'
-const email_attribute = 'pbdf.sidn-pbdf.email.email'
+const hostname = 'https://stable.irmaseal-pkg.ihub.ru.nl'
+
+const EMAIL_ATTRIBUTE_TYPE = 'pbdf.sidn-pbdf.email.email'
 
 // eslint-disable-next-line no-undef
 var Buffer = require('buffer/').Buffer
@@ -49,6 +51,13 @@ var Buffer = require('buffer/').Buffer
 const g = getGlobal() as any
 
 let i18n: I18n
+
+type AttributeCon = AttributeRequest[]
+
+type AttributeRequest = {
+  t: string
+  v: string
+}
 
 /**
  * Initialization function which also extracts the URL params
@@ -153,46 +162,44 @@ export async function successMailReceived(mime) {
 
   const unsealer = await mod.Unsealer.new(readable)
   const hidden = unsealer.get_hidden_policies()
+  const hiddenPolicy = unsealer.get_hidden_policies()
+  const recipientId = g.recipient
 
-  const myPolicy = hidden[g.recipient]
-
-  if (!myPolicy) {
+  if (!hiddenPolicy[recipientId]) {
     passMsgToParent('Decrypton failed. Identifier not found in header.')
     return
   }
 
-  myPolicy.con = myPolicy.con.map(({ t, v }) => {
-    if (t === email_attribute) return { t, v: g.recipient }
-    else if (v === '') return { t }
+  const keyRequest = Object.assign({}, hiddenPolicy[recipientId])
+  let hints = hiddenPolicy[recipientId].con
+
+  // Convert hints.
+  hints = hints.map(({ t, v }) => {
+    if (t === EMAIL_ATTRIBUTE_TYPE) return { t, v: recipientId }
     else return { t, v }
   })
 
-  console.log('myPolicy: ', myPolicy)
+  // Convert hidden policy to attribute request.
+  keyRequest.con = keyRequest.con.map(({ t, v }) => {
+    if (t === EMAIL_ATTRIBUTE_TYPE) return { t, v: recipientId }
+    else if (v === '' || v.includes('*')) return { t }
+    else return { t, v }
+  })
 
-  const hashPolicy = await hashString(JSON.stringify(myPolicy))
+  decryptLog.info('Hints: ', hints)
+  decryptLog.info('Trying decryption with policy: ', keyRequest)
 
-  let localJwt = window.localStorage.getItem(`jwt_${hashPolicy}`)
+  const hashPolicy = await hashCon(hints)
 
-  // if JWT in local storage is null, we need to execute IRMA disclosure session
-  if (localJwt === null) {
-    decryptLog.info(
-      'JWT not stored within localStorage, starting IRMA session ...'
-    )
-    localJwt = await executeIrmaDisclosureSession(myPolicy.con)
-  }
-
-  const decoded = jwtDecode<JwtPayload>(localJwt)
-  // if JWT is expired, create new IRMA session
-  if (Date.now() / 1000 > decoded.exp) {
-    decryptLog.info('JWT expired.')
-    localJwt = await executeIrmaDisclosureSession(myPolicy.con)
-  }
+  const localJwt = await checkLocalStorage(hints).catch(() =>
+    executeIrmaDisclosureSession(hints, keyRequest.con)
+  )
 
   // retrieve USK
   const keyResp = await $.ajax({
     url: `${hostname}/v2/request/key/${hidden[g.recipient].ts.toString()}`,
     headers: {
-      'X-Postguard-Client-Version': `Outlook,${Office.context.diagnostics.version},pg4ol,0.0.1`,
+      'X-Postguard-Client-Version': getPostGuardHeaders(),
       Authorization: 'Bearer ' + localJwt
     }
   })
@@ -320,7 +327,10 @@ class Policy {
  * @param policy The policy
  * @returns The JWT of the IRMA session
  */
-async function executeIrmaDisclosureSession(policy: Policy[]) {
+async function executeIrmaDisclosureSession(
+  hints: Policy[],
+  policy: Policy[]
+): Promise<string> {
   // show HTML elements needed
   document.getElementById('info_message').style.display = 'block'
   document.getElementById('header_text').style.display = 'block'
@@ -330,7 +340,7 @@ async function executeIrmaDisclosureSession(policy: Policy[]) {
   document.getElementById('loading').style.display = 'none'
   enableSenderinfo(g.sender)
 
-  $.each(policy, function (_index, element) {
+  $.each(hints, function (_index, element) {
     const colon = element.v.length > 0 ? ':' : ''
     $('#attributes').append(
       `<tr><td class="attrtype">${i18n
@@ -371,7 +381,7 @@ async function executeIrmaDisclosureSession(policy: Policy[]) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Postguard-Client-Version': `Outlook,${Office.context.diagnostics.version},pg4ol,0.0.1`
+          'X-Postguard-Client-Version': getPostGuardHeaders()
         },
         body: JSON.stringify(requestBody)
       },
@@ -400,7 +410,7 @@ async function executeIrmaDisclosureSession(policy: Policy[]) {
   // disclose and retrieve JWT URL
   const jwtUrl = await irma.start()
   // retrieve JWT, add to local storage, and return
-  const localJwt = await $.ajax({ url: jwtUrl })
+  const localJwt: string = await $.ajax({ url: jwtUrl })
   return localJwt
 }
 
@@ -506,4 +516,21 @@ function enableSenderinfo(sender: string) {
     document.getElementById('item-sender').hidden = false
     document.getElementById('item-sender').innerHTML = sender
   }
+}
+
+export async function hashCon(con: AttributeCon): Promise<string> {
+  const sorted = con.sort(
+    (att1: AttributeRequest, att2: AttributeRequest) =>
+      att1.t.localeCompare(att2.t) || att1.v.localeCompare(att2.v)
+  )
+  return await hashString(JSON.stringify(sorted))
+}
+
+async function checkLocalStorage(con: AttributeCon) {
+  const hash = await hashCon(con)
+  const cached = window.localStorage.getItem(`jwt_${hash}`)
+  if (cached === null) throw new Error('not found in localStorage')
+  const decoded = jwtDecode<JwtPayload>(cached)
+  if (Date.now() / 1000 > decoded.exp) throw new Error('jwt has expired')
+  return cached
 }

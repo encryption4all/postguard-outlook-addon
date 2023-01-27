@@ -16,7 +16,8 @@ import {
   getItemRestId,
   isPostGuardEmail,
   newReadableStreamFromArray,
-  getGlobal
+  getGlobal,
+  getPostGuardHeaders
 } from '../helpers/utils'
 import type { Policy } from 'attribute-form/AttributeForm/AttributeForm.svelte'
 
@@ -28,7 +29,7 @@ var globalEvent
 var isEncryptMode: boolean = false
 var isExtendedEncryption: boolean = false
 
-const hostname = 'https://main.irmaseal-pkg.ihub.ru.nl'
+const hostname = 'https://stable.irmaseal-pkg.ihub.ru.nl'
 const email_attribute = 'pbdf.sidn-pbdf.email.email'
 
 const mod_promise = import('@e4a/irmaseal-wasm-bindings')
@@ -236,13 +237,9 @@ async function getMailAttachmentContent(attachmentId: string): Promise<string> {
  */
 async function getPublicKey(): Promise<any> {
   let response
-  let headers = {
-    'X-Postguard-Client-Version': `Outlook,${Office.context.diagnostics.version},pg4ol,0.0.1`
-  }
-  console.log(`Headers: ${headers}`)
   try {
     response = await fetch(`${hostname}/v2/parameters`, {
-      headers: headers
+      headers: { 'X-Postguard-Client-Version': getPostGuardHeaders() }
     })
   } catch (e) {
     encryptLog.error(e)

@@ -357,3 +357,17 @@ export function getGlobal() {
       global
     : undefined
 }
+
+export function getPostGuardHeaders() {
+  // See https://learn.microsoft.com/en-us/javascript/api/office/office.platformtype
+  const host =
+    Office.context.platform.toString() === 'OfficeOnline'
+      ? 'OutlookWeb'
+      : ['iOS', 'Android'].includes(Office.context.platform.toString())
+      ? 'OoutlookMobile'
+      : 'OutlookDesktop'
+
+  let headers = `${host},${Office.context.diagnostics.version},pg4ol,0.0.1`
+  console.log(`Headers: ${headers}`)
+  return headers
+}
