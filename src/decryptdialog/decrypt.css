@@ -12,11 +12,11 @@ body {
   font-family: 'SF Pro Display', Arial, Helvetica, sans-serif;
   font-style: normal;
   line-height: 20px;
-  color: #022e3d;
+  color: #001730;
 }
 
 a {
-  color: #54d6a7;
+  color: #0071eb;
 }
 
 ul {
@@ -49,18 +49,19 @@ p {
 #info_message {
   margin-top: 16px;
   text-align: center;
-  font-size: 16px;
+  font-size: 14px;
+  font-stretch: expanded;
   display: none;
 }
 
 #header_text {
-  margin-top: 10px;
+  margin-top: 20px;
   text-align: center;
   display: none;
   font-style: normal;
-  font-weight: 300;
-  font-size: 14px;
-  line-height: 24px;
+  font-size: 15px;
+  margin-bottom: 12px;
+  font-stretch: condensed;
 }
 
 .smaller {
@@ -178,8 +179,8 @@ p {
 
 .irma {
   text-align: left;
-  margin-left: 20%;
-  margin-right: 20%;
+  margin-left: 14%;
+  margin-right: 14%;
   margin-top: 10px;
 }
 
@@ -215,13 +216,15 @@ p {
 #item-sender {
   display: block;
   margin-top: 20px;
-  color: #338265;
+  color: #0071eb;
+  font-size: 20px;
 }
 
 #decryptinfo_irma {
   display: flex;
   align-items: center;
   justify-content: center;
+  margin-left: -24%;
 }
 
 #irma_scan {
@@ -243,4 +246,15 @@ p {
 
 #from_received {
   margin-top: 10px;
+}
+
+.attrtype {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.attrvalue {
+  font-size: 12px;
+  font-weight: 500;
+  color: #0071eb;
 }

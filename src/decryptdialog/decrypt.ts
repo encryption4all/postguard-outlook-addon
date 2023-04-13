@@ -15,11 +15,12 @@ import 'web-streams-polyfill'
 
 import { ReadMail } from '@e4a/irmaseal-mail-utils/dist/index'
 
-import * as IrmaCore from '@privacybydesign/irma-core'
-import * as IrmaClient from '@privacybydesign/irma-client'
-import * as IrmaWeb from '@privacybydesign/irma-web'
+import * as IrmaCore from '@privacybydesign/yivi-core'
+import * as IrmaClient from '@privacybydesign/yivi-client'
+import * as IrmaWeb from '@privacybydesign/yivi-web'
 import {
   getGlobal,
+  getPostGuardHeaders,
   hashString,
   htmlBodyType,
   IAttachmentContent,
@@ -28,6 +29,8 @@ import {
 } from '../helpers/utils'
 import jwtDecode, { JwtPayload } from 'jwt-decode'
 import sanitizeHtml from 'sanitize-html'
+
+import I18n from 'browser-i18n'
 
 // eslint-disable-next-line no-undef
 const getLogger = require('webpack-log')
@@ -38,13 +41,23 @@ const mod = await mod_promise
 // eslint-disable-next-line no-undef
 const simpleParser = require('mailparser').simpleParser
 
-const hostname = 'https://main.irmaseal-pkg.ihub.ru.nl'
-const email_attribute = 'pbdf.sidn-pbdf.email.email'
+const hostname = 'https://stable.irmaseal-pkg.ihub.ru.nl'
+
+const EMAIL_ATTRIBUTE_TYPE = 'pbdf.sidn-pbdf.email.email'
 
 // eslint-disable-next-line no-undef
 var Buffer = require('buffer/').Buffer
 
 const g = getGlobal() as any
+
+let i18n: I18n
+
+type AttributeCon = AttributeRequest[]
+
+type AttributeRequest = {
+  t: string
+  v: string
+}
 
 /**
  * Initialization function which also extracts the URL params
@@ -54,11 +67,18 @@ Office.initialize = function () {
     decryptLog.info('Decrypt dialog openend!')
     const urlParams = new URLSearchParams(window.location.search)
     g.token = Buffer.from(urlParams.get('token'), 'base64').toString('utf-8')
-    g.recipient = urlParams.get('recipient')
+    g.recipient = urlParams.get('recipient').toLowerCase()
     g.mailId = urlParams.get('mailid')
     g.attachmentId = urlParams.get('attachmentid')
     g.msgFunc = passMsgToParent
     g.sender = urlParams.get('sender')
+
+    const lang = Office.context.displayLanguage.substring(0, 2)
+    i18n = new I18n({
+      language: lang,
+      path: '/locales',
+      extension: '.json'
+    })
 
     $(function () {
       getMailObject()
@@ -68,6 +88,7 @@ Office.initialize = function () {
 
 /**
  * Passes a message to the parent
+ * TODO: Make msg object to be able to pass status (if error then close dialog in parent)
  * @param msg The message
  */
 function passMsgToParent(msg: string) {
@@ -120,14 +141,19 @@ function getMailObject() {
     })
 }
 
+function _getMobileUrl(sessionPtr) {
+  const json = JSON.stringify(sessionPtr)
+  // Universal links are not stable in Android webviews and custom tabs, so always use intent links.
+  const intent = `Intent;package=org.irmacard.cardemu;scheme=irma;l.timestamp=${Date.now()}`
+  return `intent://qr/json/${encodeURIComponent(json)}#${intent};end`
+}
+
 /**
  * Handling decryption of the mail after it has been received
  * @param mime The mime message
  */
 export async function successMailReceived(mime) {
   decryptLog.info('Success MIME mail received: ', mime)
-  const conjunction = [{ t: email_attribute, v: g.recipient }]
-  const hashConjunction = await hashString(JSON.stringify(conjunction))
 
   const readMail = new ReadMail()
   readMail.parseMail(mime)
@@ -136,34 +162,44 @@ export async function successMailReceived(mime) {
 
   const unsealer = await mod.Unsealer.new(readable)
   const hidden = unsealer.get_hidden_policies()
+  const hiddenPolicy = unsealer.get_hidden_policies()
+  const recipientId = g.recipient
 
-  if (!hidden[g.recipient]) {
+  if (!hiddenPolicy[recipientId]) {
     passMsgToParent('Decrypton failed. Identifier not found in header.')
     return
   }
 
-  let localJwt = window.localStorage.getItem(`jwt_${hashConjunction}`)
+  const keyRequest = Object.assign({}, hiddenPolicy[recipientId])
+  let hints = hiddenPolicy[recipientId].con
 
-  // if JWT in local storage is null, we need to execute IRMA disclosure session
-  if (localJwt === null) {
-    decryptLog.info(
-      'JWT not stored within localStorage, starting IRMA session ...'
-    )
-    localJwt = await executeIrmaDisclosureSession(conjunction, hashConjunction)
-  }
+  // Convert hints.
+  hints = hints.map(({ t, v }) => {
+    if (t === EMAIL_ATTRIBUTE_TYPE) return { t, v: recipientId }
+    else return { t, v }
+  })
 
-  const decoded = jwtDecode<JwtPayload>(localJwt)
-  // if JWT is expired, create new IRMA session
-  if (Date.now() / 1000 > decoded.exp) {
-    decryptLog.info('JWT expired.')
-    localJwt = await executeIrmaDisclosureSession(conjunction, hashConjunction)
-  }
+  // Convert hidden policy to attribute request.
+  keyRequest.con = keyRequest.con.map(({ t, v }) => {
+    if (t === EMAIL_ATTRIBUTE_TYPE) return { t, v: recipientId }
+    else if (v === '' || v.includes('*')) return { t }
+    else return { t, v }
+  })
+
+  decryptLog.info('Hints: ', hints)
+  decryptLog.info('Trying decryption with policy: ', keyRequest)
+
+  const hashPolicy = await hashCon(hints)
+
+  const localJwt = await checkLocalStorage(hints).catch(() =>
+    executeIrmaDisclosureSession(hints, keyRequest.con)
+  )
 
   // retrieve USK
   const keyResp = await $.ajax({
     url: `${hostname}/v2/request/key/${hidden[g.recipient].ts.toString()}`,
     headers: {
-      'X-Postguard-Client-Version': `Outlook, ${Office.context.diagnostics.version}, pg4ol, 0.0.1`,
+      'X-Postguard-Client-Version': getPostGuardHeaders(),
       Authorization: 'Bearer ' + localJwt
     }
   })
@@ -181,57 +217,68 @@ export async function successMailReceived(mime) {
       }
     })
 
-    await unsealer.unseal(g.recipient, keyResp.key, writable)
-    const mail: string = new TextDecoder().decode(plain)
+    try {
+      await unsealer.unseal(g.recipient, keyResp.key, writable)
+      const mail: string = new TextDecoder().decode(plain)
+      // store JWT locally after unsealing successfully
+      window.localStorage.setItem(`jwt_${hashPolicy}`, localJwt)
 
-    // Parse inner mail via simpleParser
-    let parsed = await simpleParser(mail)
-    const body = parsed.html ? parsed.html : parsed.textAsHtml
+      // Parse inner mail via simpleParser
+      let parsed = await simpleParser(mail)
+      // body can be either HTML encoded, or text as HTML encoded
+      const body = parsed.html ? parsed.html : parsed.textAsHtml
 
-    let to = ''
-    if (parsed.to !== undefined) {
-      to = parsed.to.value
-        .map(function (to) {
-          return to.address
-        })
-        .join(',')
-    }
-
-    console.log('To: ', to)
-
-    let cc = ''
-    if (parsed.cc !== undefined) {
-      cc = parsed.cc.value
-        .map(function (cc) {
-          return cc.address
-        })
-        .join(',')
-    }
-
-    showMailContent(
-      parsed.subject,
-      body,
-      parsed.from.value[0].address,
-      to,
-      cc,
-      parsed.date.toLocaleString()
-    )
-    showAttachments(parsed.attachments)
-
-    const attachments: IAttachmentContent[] = parsed.attachments.map(
-      (attachment) => {
-        const attachmentContent = Buffer.from(attachment.content).toString(
-          'base64'
-        )
-        return {
-          filename: attachment.filename,
-          content: attachmentContent,
-          isInline: false
-        }
+      // TO and CC for display purposes
+      let to = ''
+      if (parsed.to !== undefined) {
+        to = parsed.to.value
+          .map(function (to) {
+            return to.address
+          })
+          .join(',')
       }
-    )
 
-    replaceMailBody(body, parsed.subject, attachments)
+      let cc = ''
+      if (parsed.cc !== undefined) {
+        cc = parsed.cc.value
+          .map(function (cc) {
+            return cc.address
+          })
+          .join(',')
+      }
+
+      showMailContent(
+        parsed.subject,
+        body,
+        parsed.from.value[0].address,
+        to,
+        cc,
+        parsed.date.toLocaleString()
+      )
+      showAttachments(parsed.attachments)
+
+      // prepare attachments to be added to mail via Graph API
+      const attachments: IAttachmentContent[] = parsed.attachments.map(
+        (attachment) => {
+          const attachmentContent = Buffer.from(attachment.content).toString(
+            'base64'
+          )
+          return {
+            filename: attachment.filename,
+            content: attachmentContent,
+            isInline: false
+          }
+        }
+      )
+
+      replaceMailBody(body, parsed.subject, attachments)
+    } catch (error) {
+      if (error.name === 'OperationError') {
+        g.msgFunc('Disclosed identity does not match requested policy')
+      } else {
+        throw error
+      }
+    }
   }
 }
 
@@ -270,16 +317,20 @@ function replaceMailBody(
   }).fail(handleAjaxError)
 }
 
+class Policy {
+  t: string
+  v: string
+}
+
 /**
  * Executes an IRMA disclosure session based on the policy
  * @param policy The policy
- * @param hashPolicy The hash of the policy
  * @returns The JWT of the IRMA session
  */
 async function executeIrmaDisclosureSession(
-  policy: object,
-  hashPolicy: string
-) {
+  hints: Policy[],
+  policy: Policy[]
+): Promise<string> {
   // show HTML elements needed
   document.getElementById('info_message').style.display = 'block'
   document.getElementById('header_text').style.display = 'block'
@@ -288,6 +339,15 @@ async function executeIrmaDisclosureSession(
   document.getElementById('qrcodecontainer').style.display = 'block'
   document.getElementById('loading').style.display = 'none'
   enableSenderinfo(g.sender)
+
+  $.each(hints, function (_index, element) {
+    const colon = element.v.length > 0 ? ':' : ''
+    $('#attributes').append(
+      `<tr><td class="attrtype">${i18n
+        .__(element.t)
+        .toLowerCase()}${colon}</td><td class="attrvalue">${element.v}</td><tr>`
+    )
+  })
 
   // calculate diff in seconds between now and tomorrow 4 am
   let tomorrow = new Date()
@@ -321,7 +381,7 @@ async function executeIrmaDisclosureSession(
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Postguard-Client-Version': `Outlook, ${Office.context.diagnostics.version}, pg4ol, 0.0.1`
+          'X-Postguard-Client-Version': getPostGuardHeaders()
         },
         body: JSON.stringify(requestBody)
       },
@@ -329,6 +389,7 @@ async function executeIrmaDisclosureSession(
         sessionPtr: (r) => {
           const ptr = r.sessionPtr
           ptr.u = `https://ihub.ru.nl/irma/1/${ptr.u}`
+          console.log(`IntentURL: ${_getMobileUrl(r.sessionPtr)}`)
           return ptr
         }
       },
@@ -349,8 +410,7 @@ async function executeIrmaDisclosureSession(
   // disclose and retrieve JWT URL
   const jwtUrl = await irma.start()
   // retrieve JWT, add to local storage, and return
-  const localJwt = await $.ajax({ url: jwtUrl })
-  window.localStorage.setItem(`jwt_${hashPolicy}`, localJwt)
+  const localJwt: string = await $.ajax({ url: jwtUrl })
   return localJwt
 }
 
@@ -412,7 +472,6 @@ function showMailContent(
   document.getElementById('decrypted_from').innerHTML += from
 
   const sanitizeBody = sanitizeHtml(body)
-  console.log(`Sanitize body: ${sanitizeBody}`)
   document.getElementById('decrypted_text').innerHTML = sanitizeBody
 
   if (to.length > 0) document.getElementById('decrypted_to').innerHTML += to
@@ -453,6 +512,25 @@ function showAttachments(attachments) {
  * @param sender The sender of the mail
  */
 function enableSenderinfo(sender: string) {
-  document.getElementById('item-sender').hidden = false
-  document.getElementById('item-sender').innerHTML += sender
+  if (sender !== undefined) {
+    document.getElementById('item-sender').hidden = false
+    document.getElementById('item-sender').innerHTML = sender
+  }
+}
+
+export async function hashCon(con: AttributeCon): Promise<string> {
+  const sorted = con.sort(
+    (att1: AttributeRequest, att2: AttributeRequest) =>
+      att1.t.localeCompare(att2.t) || att1.v.localeCompare(att2.v)
+  )
+  return await hashString(JSON.stringify(sorted))
+}
+
+async function checkLocalStorage(con: AttributeCon) {
+  const hash = await hashCon(con)
+  const cached = window.localStorage.getItem(`jwt_${hash}`)
+  if (cached === null) throw new Error('not found in localStorage')
+  const decoded = jwtDecode<JwtPayload>(cached)
+  if (Date.now() / 1000 > decoded.exp) throw new Error('jwt has expired')
+  return cached
 }

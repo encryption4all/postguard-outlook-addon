@@ -16,8 +16,10 @@ import {
   getItemRestId,
   isPostGuardEmail,
   newReadableStreamFromArray,
-  getGlobal
+  getGlobal,
+  getPostGuardHeaders
 } from '../helpers/utils'
+import type { Policy } from 'attribute-form/AttributeForm/AttributeForm.svelte'
 
 // eslint-disable-next-line no-undef
 var Buffer = require('buffer/').Buffer
@@ -27,7 +29,7 @@ var globalEvent
 var isEncryptMode: boolean = false
 var isExtendedEncryption: boolean = false
 
-const hostname = 'https://main.irmaseal-pkg.ihub.ru.nl'
+const hostname = 'https://stable.irmaseal-pkg.ihub.ru.nl'
 const email_attribute = 'pbdf.sidn-pbdf.email.email'
 
 const mod_promise = import('@e4a/irmaseal-wasm-bindings')
@@ -76,7 +78,8 @@ function encrypt(event: Office.AddinCommands.Event) {
  * Entry point function for encryption
  * @param event The AddinCommands Event
  */
-function encryptExt(event: Office.AddinCommands.Event) {
+// eslint-disable-next-line no-unused-vars
+function encryptExtended(event: Office.AddinCommands.Event) {
   const message: Office.NotificationMessageDetails = {
     type: Office.MailboxEnums.ItemNotificationMessageType.InformationalMessage,
     message: 'Encrypting email with PostGuard',
@@ -240,7 +243,7 @@ async function getPublicKey(): Promise<any> {
   console.log(`Headers: ${headers}`)
   try {
     response = await fetch(`${hostname}/v2/parameters`, {
-      headers: headers
+      headers: { 'X-Postguard-Client-Version': getPostGuardHeaders() }
     })
   } catch (e) {
     encryptLog.error(e)
@@ -266,7 +269,7 @@ async function getPublicKey(): Promise<any> {
  * Encrypts and sends the email
  * @param token The authentication token for the Graph API
  */
-async function encryptAndSendEmail(token) {
+async function encryptAndSendEmail(token, policy: Policy = null) {
   const pk = await getPublicKey()
 
   const [mod] = await Promise.all([mod_promise])
@@ -291,23 +294,34 @@ async function encryptAndSendEmail(token) {
     throw 'Please add recipients to the email!'
   }
 
-  const policies = recipientEmails.reduce((total, recipient) => {
-    total[recipient] = {
-      ts: timestamp,
-      con: [{ t: email_attribute, v: recipient }]
-    }
-    return total
-  }, {})
+  let allPolicies = {}
 
-  const ccPolicies = ccRecipientEmails.reduce((total, recipient) => {
-    total[recipient] = {
-      ts: timestamp,
-      con: [{ t: email_attribute, v: recipient }]
-    }
-    return total
-  }, {})
+  if (policy === null) {
+    const policies = recipientEmails.reduce((total, recipient) => {
+      total[recipient] = {
+        ts: timestamp,
+        con: [{ t: email_attribute, v: recipient }]
+      }
+      return total
+    }, {})
 
-  const allPolicies = { ...policies, ...ccPolicies }
+    const ccPolicies = ccRecipientEmails.reduce((total, recipient) => {
+      total[recipient] = {
+        ts: timestamp,
+        con: [{ t: email_attribute, v: recipient }]
+      }
+      return total
+    }, {})
+
+    allPolicies = { ...policies, ...ccPolicies }
+  } else {
+    for (var id in policy) {
+      allPolicies[id] = {
+        ts: timestamp,
+        con: policy[id]
+      }
+    }
+  }
 
   encryptLog.info('Encrypting using the following policies: ', allPolicies)
 
@@ -383,7 +397,7 @@ async function encryptAndSendEmail(token) {
     }
   })
 
-  await mod.seal(pk.publicKey, policies, readable, writable)
+  await mod.seal(pk.publicKey, allPolicies, readable, writable)
 
   // get outer mail to send email via Graph API
   composeMail.setPayload(ct)
@@ -609,7 +623,7 @@ async function addAttributes(accessToken: string) {
 
   Office.context.ui.displayDialogAsync(
     fullUrl,
-    { height: 60, width: 30 },
+    { height: 40, width: 20 },
     function (result) {
       encryptLog.info('Attributedialog has initialized.')
       attributeDialog = result.value
@@ -628,15 +642,26 @@ async function addAttributes(accessToken: string) {
 
 async function processAttributesMessage(arg) {
   let messageFromDialog = JSON.parse(arg.message)
+  attributeDialog.close()
 
   if (messageFromDialog.status === 'success') {
-    encryptAndSendEmail(messageFromDialog.result.accessToken).catch((err) => {
-      encryptLog.error(err)
-      showInfoMessage(err)
+    const policies = messageFromDialog.result.policy
+    const recipients = Object.keys(policies)
+
+    Office.context.mailbox.item.to.setAsync(recipients, function (asyncResult) {
+      if (asyncResult.status === Office.AsyncResultStatus.Succeeded) {
+        encryptAndSendEmail(
+          messageFromDialog.result.accessToken,
+          messageFromDialog.result.policy
+        ).catch((err) => {
+          encryptLog.error(err)
+          showInfoMessage(err)
+        })
+      } else {
+        throw 'Could not set recipients in compose window'
+      }
     })
   } else {
-    // Something went wrong with authentication or the authorization of the web application.
-    attributeDialog.close()
     encryptLog.error(
       'Error: ',
       JSON.stringify(messageFromDialog.error.toString())
@@ -650,9 +675,9 @@ var loginDialog
  *  This handler responds to the success or failure message that the pop-up dialog receives from the identity provider and access token provider.
  * @param arg The arg object passed from the dialog
  */
-
 async function processMessage(arg) {
   let messageFromDialog = JSON.parse(arg.message)
+  encryptLog.info(`After auth: ${JSON.stringify(messageFromDialog)}`)
 
   if (messageFromDialog.status === 'success') {
     loginDialog.close()
@@ -675,12 +700,8 @@ async function processMessage(arg) {
       showDecryptPopup(messageFromDialog.result.accessToken)
     }
   } else {
-    // Something went wrong with authentication or the authorization of the web application.
-    loginDialog.close()
-    encryptLog.error(
-      'Error: ',
-      JSON.stringify(messageFromDialog.error.toString())
-    )
+    // Something went wrong with authentication or the authorization of the web application... try again
+    encryptLog.error('Error: ', JSON.stringify(messageFromDialog))
   }
 }
 
@@ -695,7 +716,9 @@ function showLoginPopup(url: string) {
     '//' +
     location.hostname +
     (location.port ? ':' + location.port : '') +
-    url
+    url +
+    '?currentAccountMail=' +
+    Office.context.mailbox.userProfile.emailAddress
 
   Office.context.ui.displayDialogAsync(
     fullUrl,
@@ -710,13 +733,6 @@ function showLoginPopup(url: string) {
     }
   )
 }
-
-const g = getGlobal() as any
-
-// the add-in command functions need to be available in global scope
-g.encrypt = encrypt
-g.encryptExt = encryptExt
-g.decrypt = decrypt
 
 // eslint-disable-next-line no-unused-vars
 var decryptDialog: Office.Dialog
@@ -775,7 +791,7 @@ function showDecryptPopup(token: string) {
   // height and width are percentages of the size of the parent Office application, e.g., PowerPoint, Excel, Word, etc.
   Office.context.ui.displayDialogAsync(
     fullUrl,
-    { height: 70, width: 30 },
+    { height: 80, width: 30 },
     function (result) {
       if (result.status === Office.AsyncResultStatus.Failed) {
         if (result.error.code === 12007) {
@@ -804,3 +820,9 @@ function showDecryptPopup(token: string) {
 function processDecryptMessage(arg) {
   showInfoMessage(arg.message)
 }
+
+// the add-in command functions need to be available in global scope
+const g = getGlobal() as any
+g.encrypt = encrypt
+g.encryptExt = encryptExtended
+g.decrypt = decrypt

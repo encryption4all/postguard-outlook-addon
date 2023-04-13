@@ -6,356 +6,164 @@
   <head>
     <meta charset="UTF-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>PostGuard Outlook Add-In - Decrypt Panels</title>
+    <title>PostGuard Outlook Add-In - Decryption</title>
 
     <!-- Office JavaScript API -->
-    <script
-      type="text/javascript"
-      src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"
-    ></script>
+    <script type="text/javascript" src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
 
     <!-- JQuery JS API -->
     <script src="https://code.jquery.com/jquery.min.js"></script>
 
     <!-- For more information on Office UI Fabric, visit https://developer.microsoft.com/fabric. -->
-    <link
-      rel="stylesheet"
-      href="https://static2.sharepointonline.com/files/fabric/office-ui-fabric-core/9.6.1/css/fabric.min.css"
-    />
+    <link rel="stylesheet" href="https://static2.sharepointonline.com/files/fabric/office-ui-fabric-core/9.6.1/css/fabric.min.css" />
 
-    <!-- Fonts>
+    <link href="https://overpass-30e2.kxcdn.com/overpass.css" rel="stylesheet" type="text/css" />
+    <link href="https://fonts.cdnfonts.com/css/sf-pro-display" rel="stylesheet">
+
+      <!-- Fonts>
     <link rel="preconnect" href="https://fonts.gstatic.com" />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Karla:wght@300;700&family=Roboto:wght@100&display=swap"
-      rel="stylesheet"
+    <link href="https://fonts.googleapis.com/css2?family=Karla:wght@300;700&family=Roboto:wght@100&display=swap" rel="stylesheet"
     /-->
 
-    <!-- CSS -->
-    <link href="taskpane.css" rel="stylesheet" type="text/css" />
-  </head>
+      <!-- CSS -->
+      <link href="decrypt.css" rel="stylesheet" type="text/css" />
+    </head>
 
-  <body class="ms-font-m ms-welcome ms-Fabric">
-    <section id="sideload-msg" class="ms-welcome__main">
-      <h2 class="ms-font-xl">Please sideload your add-in to see app body.</h2>
-    </section>
-    <main id="app-body" hidden="true" class="bg">
-      <div class="center">
-        <div id="idlock_svg">
-          <svg
-            width="71"
-            height="52"
-            viewBox="0 0 71 52"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <mask
-              id="mask0"
-              mask-type="alpha"
-              maskUnits="userSpaceOnUse"
-              x="0"
-              y="0"
-              width="71"
-              height="52"
-            >
-              <path
-                d="M66.7877 51.8H4.3877C2.1877 51.8 0.387695 50 0.387695 47.8V4C0.387695 1.8 2.1877 0 4.3877 0H66.7877C68.9877 0 70.7877 1.8 70.7877 4V47.8C70.8877 50 68.9877 51.8 66.7877 51.8Z"
-                fill="#E9E9EA"
-              />
-            </mask>
-            <g mask="url(#mask0)">
-              <path
-                d="M66.7877 51.8H4.3877C2.1877 51.8 0.387695 50 0.387695 47.8V4C0.387695 1.8 2.1877 0 4.3877 0H66.7877C68.9877 0 70.7877 1.8 70.7877 4V47.8C70.8877 50 68.9877 51.8 66.7877 51.8Z"
-                fill="#E9E9EA"
-              />
-              <path
-                d="M30.2874 36L1.48739 6.9C-0.612609 4.9 0.287391 0 4.98739 0C4.98739 0 4.98739 0 5.08739 0H67.3874C67.3874 0 67.3874 0 67.4874 0C70.3874 0 71.9874 4.7 70.0874 6.9L30.2874 36Z"
-                fill="#CFCFCE"
-              />
-              <path
-                d="M9.08789 51.8L30.2879 36L46.3879 51.8H9.08789Z"
-                fill="#F1F1F1"
-              />
-              <g filter="url(#filter0_d)">
-                <path
-                  d="M35.7874 31.9L1.48739 6.9C-0.612609 4.9 0.287391 0 4.98739 0C4.98739 0 4.98739 0 5.08739 0H67.3874C67.3874 0 67.3874 0 67.4874 0C70.3874 0 71.9874 4.7 70.0874 6.9L35.7874 31.9Z"
-                  fill="#F1F1F1"
-                />
-              </g>
-              <path
-                d="M30.1279 36.0205L9.14941 51.8931"
-                stroke="white"
-                stroke-width="0.5"
-              />
-              <g filter="url(#filter1_d)">
-                <path
-                  d="M29.1035 24.7062V20.009C29.1035 17.4755 31.7634 13.9292 35.6478 14.0981C39.5322 14.267 41.981 17.2117 41.981 19.745V24.7062"
-                  stroke="#0074DF"
-                  stroke-width="3"
-                />
-                <rect
-                  x="24.1406"
-                  y="24.7051"
-                  width="22.8984"
-                  height="18.7156"
-                  rx="2"
-                  fill="#0074DF"
-                />
-              </g>
-              <path
-                d="M33.6857 35.9692C32.8091 36.2353 31.4416 37.1181 31.0479 37.8433L30.9727 38.4449L30.9727 38.9383H40.5944C40.5895 38.7105 40.636 38.1809 40.5152 37.8793C40.3167 37.0733 37.2588 35.7342 37.1918 35.7342V35.1742C37.3849 35.0597 37.5632 34.5104 37.6524 34.1106C37.6737 34.0153 38.1603 34.3395 38.0982 32.6635C38.6521 30.4346 37.6524 30.9264 37.6524 30.7214C37.5343 30.0545 37.579 29.6372 35.6316 29.5327C32.9689 29.5565 32.9736 31.6046 33.5163 32.6946C33.4676 32.7227 33.3651 33.0828 33.4912 33.56C33.7308 34.1157 33.7201 33.9704 33.896 34.163C34.0669 34.8039 34.3693 34.9224 34.3693 35.2429V35.7342C34.0635 35.8604 34.0381 35.8622 33.6857 35.9692Z"
-                fill="#F1F1F1"
-              />
-            </g>
-            <defs>
-              <filter
-                id="filter0_d"
-                x="-5.58301"
-                y="-6"
-                width="90.4948"
-                height="51.9"
-                filterUnits="userSpaceOnUse"
-                color-interpolation-filters="sRGB"
-              >
-                <feFlood flood-opacity="0" result="BackgroundImageFix" />
-                <feColorMatrix
-                  in="SourceAlpha"
-                  type="matrix"
-                  values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0"
-                />
-                <feOffset dx="4" dy="4" />
-                <feGaussianBlur stdDeviation="5" />
-                <feColorMatrix
-                  type="matrix"
-                  values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.15 0"
-                />
-                <feBlend
-                  mode="normal"
-                  in2="BackgroundImageFix"
-                  result="effect1_dropShadow"
-                />
-                <feBlend
-                  mode="normal"
-                  in="SourceGraphic"
-                  in2="effect1_dropShadow"
-                  result="shape"
-                />
-              </filter>
-              <filter
-                id="filter1_d"
-                x="22.1406"
-                y="10.5923"
-                width="34.8984"
-                height="42.8284"
-                filterUnits="userSpaceOnUse"
-                color-interpolation-filters="sRGB"
-              >
-                <feFlood flood-opacity="0" result="BackgroundImageFix" />
-                <feColorMatrix
-                  in="SourceAlpha"
-                  type="matrix"
-                  values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0"
-                />
-                <feOffset dx="4" dy="4" />
-                <feGaussianBlur stdDeviation="3" />
-                <feColorMatrix
-                  type="matrix"
-                  values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.25 0"
-                />
-                <feBlend
-                  mode="normal"
-                  in2="BackgroundImageFix"
-                  result="effect1_dropShadow"
-                />
-                <feBlend
-                  mode="normal"
-                  in="SourceGraphic"
-                  in2="effect1_dropShadow"
-                  result="shape"
-                />
-              </filter>
-            </defs>
-          </svg>
+    <body class="ms-font-m ms-welcome ms-Fabric">
+      <section id="sideload-msg" class="ms-welcome__main">
+        <h2 class="ms-font-xl">Please sideload your add-in to see app body.</h2>
+      </section>
+      <main id="app-body" hidden="true">
+
+        <div style="background-color: #001730; height: 40px; padding: 0px; margin: 0px">
+          <object style="margin-top: 3px; margin-left: 14px; padding: 0" height="34px" data="assets/postguard_full_logo.svg" type="image/svg+xml"></object>
         </div>
 
-        <div id="idlock_svg_decrypt">
-          <svg
-            width="71"
-            height="78"
-            viewBox="0 0 71 78"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <path
-              d="M66.5074 76.7197H4.10736C1.90736 76.7197 0.107361 74.9197 0.107361 72.7197V28.9197C0.107361 26.7197 1.90736 24.9197 4.10736 24.9197H66.5074C68.7074 24.9197 70.5074 26.7197 70.5074 28.9197V72.7197C70.6074 74.9197 68.7074 76.7197 66.5074 76.7197Z"
-              fill="#E9E9EA"
-            />
-            <path
-              d="M8.80756 76.7197L35.2925 56.5426L60.2633 76.7197H8.80756Z"
-              fill="#F1F1F1"
-            />
-            <path
-              d="M35.4778 0.825953L1.17776 25.826C-0.92224 27.826 -0.0222406 32.726 4.67776 32.726C4.67776 32.726 4.67776 32.726 4.77776 32.726H67.0778C67.0778 32.726 67.0778 32.726 67.1778 32.726C70.0778 32.726 71.6778 28.026 69.7778 25.826L35.4778 0.825953Z"
-              fill="#E9E9EA"
-            />
-            <path
-              d="M35.1958 56.5426L8.86908 76.8127"
-              stroke="white"
-              stroke-width="0.5"
-            />
-            <path
-              d="M0.157776 28.9354L6.47614 30.0841L35.1958 45.88L63.054 30.0841L70.2339 28.9354"
-              stroke="white"
-              stroke-width="0.5"
-            />
-            <g filter="url(#filter0_i)">
-              <path
-                d="M1.22817 25.7938L35.5282 0.793823L69.8282 25.7938C70.5405 26.6187 70.7609 27.7949 70.6052 28.9431L62.9114 30.1959L35.0545 45.88L6.5734 30.0398L0.179755 28.9233C0.0609913 27.7468 0.425363 26.5584 1.22817 25.7938Z"
-                fill="#C2C2C2"
-              />
-            </g>
-            <path
-              d="M0.208191 28.9032L6.52655 30.052L35.2462 45.8478L63.1044 30.052L70.2843 28.9032"
-              stroke="white"
-              stroke-width="0.5"
-            />
-            <path
-              d="M40.9268 49.7999V42.761C40.9268 40.2275 43.5868 36.6813 47.4711 36.8502C51.3555 37.0191 53.8043 39.9638 53.8043 42.4971V47.4583"
-              stroke="#0074DF"
-              stroke-width="3"
-            />
-            <rect
-              x="23.0865"
-              y="49.759"
-              width="22.8984"
-              height="18.7156"
-              rx="2"
-              fill="#0074DF"
-            />
-            <path
-              d="M32.6318 61.0234C31.7553 61.2895 30.3877 62.1723 29.994 62.8975L29.9188 63.4991L29.9188 63.9925H39.5406C39.5357 63.7647 39.5822 63.2351 39.4614 62.9335C39.2629 62.1275 36.205 60.7884 36.1379 60.7884V60.2284C36.3311 60.1139 36.5094 59.5646 36.5986 59.1648C36.6198 59.0695 37.1065 59.3937 37.0443 57.7177C37.5983 55.4888 36.5986 55.9806 36.5986 55.7756C36.4805 55.1087 36.5252 54.6914 34.5778 54.5869C31.9151 54.6107 31.9197 56.6588 32.4625 57.7488C32.4138 57.7769 32.3112 58.137 32.4374 58.6142C32.6769 59.1699 32.6663 59.0246 32.8422 59.2172C33.0131 59.8581 33.3154 59.9766 33.3154 60.2971V60.7884C33.0097 60.9146 32.9842 60.9164 32.6318 61.0234Z"
-              fill="#F1F1F1"
-            />
-            <defs>
-              <filter
-                id="filter0_i"
-                x="-0.842224"
-                y="-5.20618"
-                width="71.4948"
-                height="51.0862"
-                filterUnits="userSpaceOnUse"
-                color-interpolation-filters="sRGB"
-              >
-                <feFlood flood-opacity="0" result="BackgroundImageFix" />
-                <feBlend
-                  mode="normal"
-                  in="SourceGraphic"
-                  in2="BackgroundImageFix"
-                  result="shape"
-                />
-                <feColorMatrix
-                  in="SourceAlpha"
-                  type="matrix"
-                  values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0"
-                  result="hardAlpha"
-                />
-                <feOffset dx="-1" dy="-6" />
-                <feGaussianBlur stdDeviation="5" />
-                <feComposite
-                  in2="hardAlpha"
-                  operator="arithmetic"
-                  k2="-1"
-                  k3="1"
-                />
-                <feColorMatrix
-                  type="matrix"
-                  values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.15 0"
-                />
-                <feBlend
-                  mode="normal"
-                  in2="shape"
-                  result="effect1_innerShadow"
-                />
-              </filter>
-            </defs>
-          </svg>
-        </div>
-      </div>
+        <div id="center" class="center">
 
-      <div class="center">
-        <p id="idlock_txt">PostGuard mail</p>
-      </div>
+          <p id="status-container" hidden="true">
+            <b>Status:</b>
+            <label id="status"></label>
+          </p>
 
-      <p id="status-container" hidden="true">
-        <b>Status:</b> <label id="status"></label>
-      </p>
+          <div id="loading">Loading ...</div>
 
-      <div id="loading">Loading ...</div>
-
-      <div id="info_message">
-        <p id="info_message_text">Encrypted message from</p>
-        <p class="blue" id="item-sender"></p>
-      </div>
-
-      <div id="header_text">
-        <h3>Get your PostGuard Key</h3>
-        <p>
-          To decrypt and read PostGuard encrypted emails you need your PostGuard
-          key.
-        </p>
-      </div>
-
-      <div class="instructions_container" id="decryptinfo">
-        <div class="left">
-          <img src="/assets/irma_logo.svg" id="logo" />
-        </div>
-
-        <div class="right">
-          <div>
-            <p>
-              Scan the QR code with the <b>IRMA app</b> to disclose your email
-              address.
-            </p>
+          <div id="info_message">
+            <p id="info_message_text">You received a PostGuard encrypted email from</p>
+            <p id="item-sender"></p>
           </div>
 
-          <div id="qrcodecontainer">
-            <div id="qrcode"></div>
+          <div id="header_text">
+            <h3>You need to prove who you are to decrypt and read this email.</h3>
+          </div>
+
+          <div id="decryptinfo">
+            <div id="decryptinfo_irma">
+              <div style="flex-basis: 7%">
+                <img alt="IRMA" src="/assets/irma_logo.svg" id="logo" />
+              </div>
+              <div id="irma_scan">
+            Scan the QR code with the IRMA app to disclose your identity matching the policy.
+              </div>
+            </div>
+            <div id="qrcodecontainer">
+              <div id="qrcode"></div>
+            </div>
+          </div>
+
+          <div id="irmaapp">
+            <div class="irma">
+              <div id="whatisirma">
+                <p>
+                  <b>What is the IRMA app?</b>
+                </p>
+                <p>The IRMA app is a separate privacy-friendly authentication app (which is used also for other authentication purposes).<br/>
+                <a href="https://irma.app">More information about IRMA</a>
+              </p>
+            </div>
+            <div id="download_irma">
+              <p>
+                <b>Download the free IRMA app:</b>
+              </p>
+              <a href="https://play.google.com/store/apps/details?id=org.irmacard.cardemu">
+                <img alt="Get it on Google Play" src="/assets/google-play-badge.png" />
+              </a>
+            &nbsp;&nbsp;&nbsp;
+              <a href="https://apps.apple.com/us/app/irma-authentication/id1294092994">
+                <img src="/assets/download-on-the-app-store-badge.png" alt="Download on the App Store" />
+              </a>
+            </div>
           </div>
         </div>
-      </div>
+        <div id="decrypted">
+          <div style="display: flex; margin-top: 31px; align-items: center">
+            <div style="flex-basis: 12%">
+              <svg style="max-width: 100%" width="71" height="76" viewBox="0 0 71 76" fill="none"
+                xmlns="http://www.w3.org/2000/svg">
+                <path d="M65.9446 75.4079H4.38096C2.21045 75.4079 0.43457 73.6321 0.43457 71.4616V28.2486C0.43457 26.0781 2.21045 24.3022 4.38096 24.3022H65.9446C68.1151 24.3022 69.891 26.0781 69.891 28.2486V71.4616C69.9897 73.6321 68.1151 75.4079 65.9446 75.4079Z" fill="#E9E9EA"/>
+                <path d="M9.01953 75.4082L35.1495 55.5015L59.7856 75.4082H9.01953Z" fill="#F1F1F1"/>
+                <path d="M35.3309 0.531181L1.49062 25.1961C-0.581231 27.1693 0.306706 32.0036 4.94371 32.0036C4.94371 32.0036 4.94371 32.0036 5.04237 32.0036H66.5074C66.5074 32.0036 66.5074 32.0036 66.606 32.0036C69.4672 32.0036 71.0457 27.3666 69.1712 25.1961L35.3309 0.531181Z" fill="#E9E9EA"/>
+                <path d="M35.052 55.5015L9.07812 75.5" stroke="white" stroke-width="0.5"/>
+                <path d="M0.482422 28.2643L6.7161 29.3977L35.0509 44.9818L62.5356 29.3977L69.6193 28.2643" stroke="white" stroke-width="0.5"/>
+                <g filter="url(#filter0_i_309_27500)">
+                  <path d="M1.54043 25.1649L35.3807 0.5L69.221 25.1649C69.9238 25.9787 70.1412 27.1392 69.9876 28.272L62.3969 29.508L34.9134 44.9819L6.81401 29.354L0.50606 28.2524C0.388888 27.0917 0.748376 25.9193 1.54043 25.1649Z" fill="#C2C2C2"/>
+                </g>
+                <path d="M0.535156 28.2327L6.76883 29.3661L35.1036 44.9502L62.5883 29.3661L69.672 28.2327" stroke="white" stroke-width="0.5"/>
+                <path d="M45.7792 51.1818C45.8169 51.09 45.8394 50.9981 45.8771 50.8992C47.1035 46.922 47.4948 43.4816 47.4948 43.4816C45.0945 42.422 38.6987 39.3419 36.4188 38.3246C33.4692 39.7587 28.3375 42.0405 25.3428 43.4816C25.3428 43.4816 27.3067 60.9095 36.4188 62.6826C40.8959 61.8066 43.6348 57.1653 45.2826 52.6583" fill="#54D6A7"/>
+                <path d="M36.4195 63.0077C36.4195 63.0077 36.3517 63.0077 36.3216 62.9935C27.1042 61.1639 25.0876 44.2376 25.0048 43.517C24.9898 43.3828 25.065 43.2627 25.1854 43.1991C26.6527 42.4927 28.6617 41.5673 30.6106 40.6772C32.6497 39.7376 34.7566 38.7698 36.2614 38.0421C36.3517 37.9998 36.4646 37.9927 36.5624 38.0421C37.6836 38.5437 39.7528 39.5186 41.9424 40.55C44.1396 41.5885 46.4195 42.6623 47.6309 43.1991C47.7889 43.2415 47.8416 43.3687 47.8266 43.5241C47.8266 43.5594 47.4202 47.0351 46.2013 50.9912L46.1561 51.1183C46.1411 51.1748 46.1185 51.2313 46.0959 51.2879C46.0282 51.4503 45.8401 51.5351 45.6595 51.4786C45.4864 51.4221 45.3886 51.2384 45.4564 51.0689C45.4714 51.0265 45.4864 50.977 45.5015 50.9276L45.5466 50.7934C46.5775 47.466 47.0139 44.4849 47.1193 43.6654C45.8025 43.0791 43.6881 42.0759 41.6339 41.1081C39.5421 40.1191 37.5632 39.1866 36.4195 38.6709C34.9146 39.3985 32.8754 40.3381 30.8965 41.2423C29.053 42.09 27.1418 42.966 25.7046 43.6583C25.9755 45.7141 28.2328 60.6835 36.4119 62.3577C39.971 61.6301 42.8454 58.331 44.9522 52.5594C45.0124 52.3899 45.208 52.3051 45.3811 52.3616C45.5617 52.4182 45.652 52.6018 45.5918 52.7643C43.3871 58.8044 40.3171 62.2447 36.4797 62.9935C36.4571 62.9935 36.4345 62.9935 36.4119 62.9935L36.4195 63.0077Z" fill="#181817"/>
+                <path d="M29.2354 55.8376L41.568 56.9608C41.568 56.9608 41.0713 59.8784 40.6725 60.2458C40.2737 60.6131 37.5198 62.6547 36.3911 62.5558C35.2625 62.4569 29.9126 59.4334 29.2354 55.8376Z" fill="white"/>
+                <path d="M36.4195 63.0077C36.4195 63.0077 36.3517 63.0077 36.3216 62.9935C27.1042 61.1639 25.0876 44.2376 25.0048 43.517C24.9898 43.3828 25.065 43.2627 25.1854 43.1991C26.6527 42.4927 28.6617 41.5673 30.6106 40.6772C32.6497 39.7376 34.7566 38.7698 36.2614 38.0421C36.3517 37.9998 36.4646 37.9927 36.5624 38.0421C37.6836 38.5437 39.7528 39.5186 41.9424 40.55C44.1396 41.5885 46.4195 42.6623 47.6309 43.1991C47.7889 43.2415 47.8416 43.3687 47.8266 43.5241C47.8266 43.5594 47.4202 47.0351 46.2013 50.9912L46.1561 51.1183C46.1411 51.1748 46.1185 51.2313 46.0959 51.2879C46.0282 51.4503 45.8401 51.5351 45.6595 51.4786C45.4864 51.4221 45.3886 51.2384 45.4564 51.0689C45.4714 51.0265 45.4864 50.977 45.5015 50.9276L45.5466 50.7934C46.5775 47.466 47.0139 44.4849 47.1193 43.6654C45.8025 43.0791 43.6881 42.0759 41.6339 41.1081C39.5421 40.1191 37.5632 39.1866 36.4195 38.6709C34.9146 39.3985 32.8754 40.3381 30.8965 41.2423C29.053 42.09 27.1418 42.966 25.7046 43.6583C25.9755 45.7141 28.2328 60.6835 36.4119 62.3577C39.971 61.6301 42.8454 58.331 44.9522 52.5594C45.0124 52.3899 45.208 52.3051 45.3811 52.3616C45.5617 52.4182 45.652 52.6018 45.5918 52.7643C43.3871 58.8044 40.3171 62.2447 36.4797 62.9935C36.4571 62.9935 36.4345 62.9935 36.4119 62.9935L36.4195 63.0077Z" fill="#181817"/>
+                <path d="M42.5536 49.5994L46.2105 51.0335L46.7297 52.1143L41.8613 53.4354L42.5536 49.5994Z" fill="white"/>
+                <path d="M36.4197 62.167C36.4197 62.167 36.352 62.167 36.3219 62.1529C27.6462 60.4292 25.75 44.5131 25.6748 43.835C25.6597 43.7007 25.735 43.5806 25.8553 43.5171C27.2323 42.853 29.1285 41.9841 30.9569 41.1434C32.8682 40.2675 34.8471 39.3561 36.2617 38.6709C36.352 38.6285 36.4649 38.6215 36.5627 38.6709C37.6161 39.1372 39.5649 40.0555 41.6191 41.0304C43.6883 42.0053 45.8253 43.0155 46.9615 43.5171C47.112 43.5665 47.1722 43.6937 47.1571 43.842C47.1571 43.8773 46.7734 47.1411 45.6297 50.864L45.592 50.9841C45.577 51.0406 45.5544 51.0901 45.5394 51.1466C45.4792 51.3091 45.2835 51.4009 45.1029 51.3373C44.9299 51.2808 44.8321 51.0971 44.8998 50.9276C44.9148 50.8852 44.9299 50.8428 44.9449 50.7934L44.9901 50.6662C45.9457 47.5579 46.3595 44.7745 46.4649 43.9833C45.2384 43.4323 43.2519 42.4927 41.3181 41.5885C39.3618 40.6631 37.5032 39.7871 36.4272 39.3067C35.0202 39.9849 33.1014 40.8679 31.2429 41.7227C29.5122 42.5139 27.7214 43.3405 26.3745 43.9833C26.6379 45.9613 28.7673 59.9559 36.4197 61.5242C39.753 60.8389 42.4468 57.7447 44.4257 52.3263C44.4859 52.1568 44.6816 52.072 44.8546 52.1285C45.0352 52.1851 45.1255 52.3687 45.0653 52.5312C42.9886 58.211 40.1067 61.4535 36.4874 62.16C36.4649 62.16 36.4423 62.16 36.4197 62.16V62.167Z" fill="white"/>
+                <path d="M36.4195 63.0077C36.4195 63.0077 36.3517 63.0077 36.3216 62.9935C27.1042 61.1639 25.0876 44.2376 25.0048 43.517C24.9898 43.3828 25.065 43.2627 25.1854 43.1991C26.6527 42.4927 28.6617 41.5673 30.6106 40.6772C32.6497 39.7376 34.7566 38.7698 36.2614 38.0421C36.3517 37.9998 36.4646 37.9927 36.5624 38.0421C37.6836 38.5437 39.7528 39.5186 41.9424 40.55C44.1396 41.5885 46.4195 42.6623 47.6309 43.1991C47.7889 43.2415 47.8416 43.3687 47.8266 43.5241C47.8266 43.5594 47.4202 47.0351 46.2013 50.9912L46.1561 51.1183C46.1411 51.1748 46.1185 51.2313 46.0959 51.2879C46.0282 51.4503 45.8401 51.5351 45.6595 51.4786C45.4864 51.4221 45.3886 51.2384 45.4564 51.0689C45.4714 51.0265 45.4864 50.977 45.5015 50.9276L45.5466 50.7934C46.5775 47.466 47.0139 44.4849 47.1193 43.6654C45.8025 43.0791 43.6881 42.0759 41.6339 41.1081C39.5421 40.1191 37.5632 39.1866 36.4195 38.6709C34.9146 39.3985 32.8754 40.3381 30.8965 41.2423C29.053 42.09 27.1418 42.966 25.7046 43.6583C25.9755 45.7141 28.2328 60.6835 36.4119 62.3577C39.971 61.6301 42.8454 58.331 44.9522 52.5594C45.0124 52.3899 45.208 52.3051 45.3811 52.3616C45.5617 52.4182 45.652 52.6018 45.5918 52.7643C43.3871 58.8044 40.3171 62.2447 36.4797 62.9935C36.4571 62.9935 36.4345 62.9935 36.4119 62.9935L36.4195 63.0077Z" fill="#022E3D"/>
+                <path d="M42.4166 53.9862C42.2812 53.9862 42.1458 53.9085 42.1006 53.7814C42.0329 53.6189 42.1232 53.4352 42.3038 53.3716L46.4422 51.9234C46.4422 51.9234 46.4874 51.8881 46.4949 51.8599C46.5024 51.8316 46.4798 51.8033 46.4498 51.7963L42.6348 50.2562C42.4618 50.1856 42.3865 50.0019 42.4543 49.8394C42.5295 49.677 42.7251 49.5993 42.8982 49.6699L46.7131 51.2099C46.999 51.323 47.1796 51.5843 47.1721 51.881C47.1646 52.1707 46.9689 52.425 46.683 52.5239L42.5446 53.9721C42.5069 53.9862 42.4618 53.9933 42.4242 53.9933L42.4166 53.9862Z" fill="#022E3D"/>
+                <path d="M41.7106 57.1085L41.831 56.2113L42.1696 53.6681L42.6963 49.7262C42.734 49.486 42.7415 49.2458 42.7415 49.0127C42.7415 46.2011 40.5067 43.7497 37.4518 43.3895C34.141 42.9939 31.1237 45.1979 30.7023 48.3063L30.0703 52.9688L30.0853 52.884C30.0853 52.884 29.8596 54.6289 29.2275 56.2678" fill="white"/>
+                <path d="M42.0489 57.1508L41.3717 57.0731L42.3649 49.6909C42.395 49.4719 42.41 49.2529 42.41 49.0197C42.41 46.3282 40.2656 44.0464 37.4213 43.7144C34.3062 43.34 31.4469 45.424 31.0481 48.3557L30.4311 52.9334C30.4236 53.004 30.1903 54.7348 29.5507 56.3879L28.9111 56.1689C29.4454 54.7843 29.6862 53.3007 29.7388 52.9405L30.3709 48.2709C30.8148 44.993 34.0052 42.6618 37.5041 43.0786C40.6869 43.453 43.0872 46.0032 43.0872 49.0197C43.0872 49.2811 43.0722 49.5284 43.0346 49.7756L42.0413 57.1579L42.0489 57.1508Z" fill="#022E3D"/>
+                <path d="M38.4964 49.1689C38.7899 48.4201 39.9562 48.4624 40.2196 49.2183C40.2948 49.4373 40.3324 49.6705 40.3174 49.9106C40.2948 50.1862 40.197 50.4334 40.0691 50.6595C39.6251 51.4083 38.4137 51.1964 38.3384 50.3416C38.3234 50.2073 38.3234 50.0661 38.3384 49.9106C38.361 49.6351 38.4212 49.3879 38.504 49.1689H38.4964Z" fill="#022E3D"/>
+                <path d="M39.8968 61.3829C39.8141 61.3829 39.7313 61.3547 39.6711 61.2982C39.5357 61.1781 39.5206 60.9803 39.6485 60.8461C41.1083 59.3555 41.4168 56.7628 41.4168 56.7346C41.4393 56.558 41.6049 56.4308 41.793 56.452C41.9811 56.4732 42.1166 56.6286 42.094 56.8052C42.0789 56.9183 41.7554 59.631 40.1451 61.284C40.0774 61.3547 39.9871 61.39 39.8968 61.39V61.3829Z" fill="#022E3D"/>
+                <path d="M37.5638 48.3136C37.4961 48.3136 37.4208 48.2924 37.3606 48.25C37.2101 48.144 37.18 47.9462 37.2929 47.8049C37.323 47.7696 37.9626 46.9713 38.9709 46.8301C39.5728 46.7453 40.1597 46.9078 40.7241 47.3104C40.8745 47.4164 40.9046 47.6142 40.7918 47.7555C40.6789 47.8968 40.4682 47.925 40.3177 47.8191C39.7384 47.4093 39.1514 47.3387 38.5871 47.6071C38.1281 47.8191 37.8422 48.1794 37.8347 48.1794C37.7669 48.2641 37.6691 48.3065 37.5638 48.3065V48.3136Z" fill="#022E3D"/>
+                <defs>
+                  <filter id="filter0_i_309_27500" x="-0.515625" y="-5.5" width="70.5498" height="50.4819" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+                    <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+                    <feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
+                    <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+                    <feOffset dx="-1" dy="-6"/>
+                    <feGaussianBlur stdDeviation="5"/>
+                    <feComposite in2="hardAlpha" operator="arithmetic" k2="-1" k3="1"/>
+                    <feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.15 0"/>
+                    <feBlend mode="normal" in2="shape" result="effect1_innerShadow_309_27500"/>
+                  </filter>
+                </defs>
+              </svg>
+            </div>
 
-      <div class="instructions_container" id="irmaapp">
-        <div class="left"></div>
+            <div style="font-size: 14px; line-height: 20px;">
+              <b>Successfully decrypted the email.</b>
+              <br>
+        You can decrypt emails until 04:00 without disclosing again.</div>
+            </div>
 
-        <div class="right">
-          <div id="download_irma">
-            <p><b>Not yet downloaded the IRMA app?</b></p>
-            <a
-              href="https://play.google.com/store/apps/details?id=org.irmacard.cardemu&hl=en&gl=US&pcampaignid=pcampaignidMKT-Other-global-all-co-prtnr-py-PartBadge-Mar2515-1"
-              ><img
-                alt="Get it on Google Play"
-                src="/assets/google-play-badge.png"
-            /></a>
-            <a
-              href="https://apps.apple.com/us/app/irma-authentication/id1294092994?itsct=apps_box_badge&amp;itscg=30200"
-              ><img
-                src="/assets/download-on-the-app-store-badge.png"
-                alt="Download on the App Store"
-            /></a>
+            <div id="bg_decrypted_txt">
+              <div id="decrypted_subject"></div>
+              <div id="from_received">
+                <div id="decrypted_from">
+                </div>
+                <div id="decrypted_received"></div>
+              </div>
+              <div id="decrypted_to">
+                <b>To: </b>
+              </div>
+              <div id="decrypted_cc">
+                <b>Cc: </b>
+              </div>
+              <div id="decrypted_text">
+              </div>
+            </div>
+            <div id="attachments">
+              <p>Attachments (click to download):</p>
+              <div id="attachmentList"></div>
+            </div>
           </div>
-        </div>
-      </div>
-      <div id="bg_decrypted_subject">
-        Subject:
-        <div id="decrypted-subject"></div>
-      </div>
-      <div id="bg_decrypted_txt">
-        <div id="decrypted-text"></div>
-      </div>
-      <div id="attachments">
-        <p>Attachments (click to download):</p>
-        <div id="attachmentList"></div>
-      </div>
-    </main>
-  </body>
-</html>
+        </main>
+      </body>
+    </html>

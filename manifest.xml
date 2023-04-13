@@ -144,10 +144,37 @@
                     <Action xsi:type="ExecuteFunction">
                       <FunctionName>decrypt</FunctionName>
                     </Action>
-                    <!--Action xsi:type="ShowTaskpane">
-                      <SourceLocation resid="Taskpane.Url" />
-                    </Action-->
                   </Control>
+                  <!--Control xsi:type="Button" id="Contoso.settingButton">
+                    <Label resid="TaskpaneButton2.Label"/>
+                    <Supertip>
+                      <Title resid="TaskpaneButton2.Label"/>
+                      <Description resid="TaskpaneButton.Tooltip"/>
+                    </Supertip>
+                    <Icon>
+                      <bt:Image size="16" resid="Icon.16x16"/>
+                      <bt:Image size="32" resid="Icon.32x32"/>
+                      <bt:Image size="80" resid="Icon.80x80"/>
+                    </Icon>
+                    <Action xsi:type="ShowTaskpane">
+                      <SourceLocation resid="Taskpane.Url" />
+                    </Action>
+                  </Control-->
+                  <!--Control xsi:type="Button" id="Contoso.mobileButton1">
+                    <Label resid="SettingButton.Label"/>
+                    <Supertip>
+                      <Title resid="SettingButton.Label"/>
+                      <Description resid="SettingButton.Tooltip"/>
+                    </Supertip>
+                    <Icon>
+                      <bt:Image size="16" resid="Icon.16x16"/>
+                      <bt:Image size="32" resid="Icon.32x32"/>
+                      <bt:Image size="80" resid="Icon.80x80"/>
+                    </Icon>
+                    <Action xsi:type="ShowTaskpane">
+                      <SourceLocation resid="Settings.Url" />
+                    </Action>
+                  </Control-->
                 </Group>
               </OfficeTab>
             </ExtensionPoint>
@@ -167,10 +194,10 @@
                       <bt:Image size="80" resid="Icon.80x80"/>
                     </Icon>
                     <Action xsi:type="ExecuteFunction">
-                      <FunctionName>encrypt</FunctionName>
+                      <FunctionName>encryptExt</FunctionName>
                     </Action>
                   </Control>
-                  <Control xsi:type="Button" id="EncryptExtButton">
+                  <!--Control xsi:type="Button" id="EncryptExtButton">
                     <Label resid="EncryptExtButton.Label"/>
                     <Supertip>
                       <Title resid="EncryptExtButton.Label"/>
@@ -184,7 +211,7 @@
                     <Action xsi:type="ExecuteFunction">
                       <FunctionName>encryptExt</FunctionName>
                     </Action>
-                  </Control>
+                  </Control-->
                 </Group>
               </OfficeTab>
             </ExtensionPoint>
@@ -227,16 +254,20 @@
         <bt:Urls>
           <bt:Url id="Encrypt.Url" DefaultValue="https://localhost:3000/commands.html"/>
           <bt:Url id="Taskpane.Url" DefaultValue="https://localhost:3000/taskpane.html"/>
+          <bt:Url id="Settings.Url" DefaultValue="https://localhost:3000/settings.html"/>
         </bt:Urls>
         <bt:ShortStrings>
           <bt:String id="GroupLabel" DefaultValue="PostGuard Add-in"/>
           <bt:String id="TaskpaneButton.Label" DefaultValue="Decrypt Email"/>
-          <bt:String id="EncryptButton.Label" DefaultValue="Send encrypted Email (default)"/>
+          <bt:String id="SettingButton.Label" DefaultValue="Settings"/>
+          <bt:String id="TaskpaneButton2.Label" DefaultValue="Decrypt Email via Taskpane"/>
+          <bt:String id="EncryptButton.Label" DefaultValue="Send encrypted Email"/>
           <bt:String id="EncryptExtButton.Label" DefaultValue="Send encrypted Email (extended)"/>
         </bt:ShortStrings>
         <bt:LongStrings>
           <bt:String id="TaskpaneButton.Tooltip" DefaultValue="Decrypts the selected email with PostGuard."/>
-          <bt:String id="EncryptButton.Tooltip" DefaultValue="Encrypts and sends the current email with email address as identity."/>
+          <bt:String id="SettingButton.Tooltip" DefaultValue="Adjust settings"/>
+          <bt:String id="EncryptButton.Tooltip" DefaultValue="Encrypts and sends the current email."/>
           <bt:String id="EncryptExtButton.Tooltip" DefaultValue="Encrypts and sends the current email where identity can be extended."/>
         </bt:LongStrings>
       </Resources>

@@ -12,6 +12,9 @@ import '../../assets/16.png'
 import '../../assets/32.png'
 import '../../assets/80.png'
 
+import AttributeForm from 'attribute-form/AttributeForm/AttributeForm.svelte'
+import type { Policy } from 'attribute-form/AttributeForm/AttributeForm.svelte'
+
 // eslint-disable-next-line no-undef
 const getLogger = require('webpack-log')
 const attributeLog = getLogger({ name: 'PostGuard attribute log' })
@@ -29,14 +32,40 @@ Office.initialize = function () {
     attributeLog.info('Add attributes dialog openend!')
     const urlParams = new URLSearchParams(window.location.search)
     g.token = Buffer.from(urlParams.get('token'), 'base64').toString('utf-8')
-    g.recipients = JSON.parse(
+    const recipients = JSON.parse(
       Buffer.from(urlParams.get('recipients'), 'base64').toString('utf-8')
     )
 
     attributeLog.info(`Token: ${g.token}, recipients: ${g.recipients}`)
 
-    $(function () {})
+    $(function () {
+      const el = document.querySelector('#root')
+      if (!el) return
+
+      const init = recipients.reduce((policies, next) => {
+        const email = next
+        policies[email] = []
+        return policies
+      }, [])
+
+      new AttributeForm({
+        target: el,
+        props: {
+          initialPolicy: init,
+          onSubmit: finish,
+          submitButton: { customText: 'Send' }
+        }
+      })
+    })
   }
+}
+
+const finish = async (policy: Policy) => {
+  const msg = {
+    result: { policy: policy, accessToken: g.token },
+    status: 'success'
+  }
+  passMsgToParent(JSON.stringify(msg))
 }
 
 /**
@@ -47,16 +76,4 @@ function passMsgToParent(msg: string) {
   if (Office.context.mailbox === undefined) {
     Office.context.ui.messageParent(msg)
   }
-}
-
-/**
- * Handles an jQuery ajax error
- * @param $xhr The error
- */
-function handleAjaxError($xhr) {
-  var data = $xhr.responseJSON
-  attributeLog.error('Ajax error: ', data)
-  const msg =
-    'Error during decryption, please try again or contact your administrator.'
-  g.msgFunc(msg)
 }
