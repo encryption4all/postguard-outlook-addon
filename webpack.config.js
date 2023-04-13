@@ -126,6 +126,10 @@ module.exports = async (env, options) => {
             from: './src/decryptdialog/decrypt.css'
           },
           {
+            to: 'attributes.css',
+            from: './src/dialogs/attributes.css'
+          },
+          {
             to: '[name].' + buildType + '.[ext]',
             from: 'manifest*.xml',
             transform(content) {

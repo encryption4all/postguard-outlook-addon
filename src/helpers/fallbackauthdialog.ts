@@ -18,8 +18,7 @@ const msalConfig: Configuration = {
     clientId: '6ee2a054-1d61-405d-8e5d-c2daf25c5833'
   },
   cache: {
-    cacheLocation: 'localStorage', // Needed to avoid "User login is required" error.
-    storeAuthStateInCookie: true // Recommended to avoid certain IE/Edge issues.
+    cacheLocation: 'sessionStorage' // Needed to avoid "User login is required" error.
   }
 }
 
@@ -46,6 +45,9 @@ Office.onReady(async () => {
 
       let accountObj: AccountInfo
       if (tokenResponse) {
+        //accountObj = JSON.parse(localStorage.getItem('activeAcc'))
+        //console.log('AccObj: ', accountObj)
+        //accountObj = publicClientApp.getActiveAccount()
         accountObj = tokenResponse.account
       } else {
         const urlParams = new URLSearchParams(window.location.search)
@@ -57,11 +59,15 @@ Office.onReady(async () => {
         accountObj = allAccountsurrentAccount.find((acc) =>
           findMyAcc(acc, currentAccountMail)
         )
-        publicClientApp.setActiveAccount(accountObj)
+        localStorage.setItem('activeAcc', JSON.stringify(accountObj))
       }
+      publicClientApp.setActiveAccount(accountObj)
 
       if (accountObj && tokenResponse) {
-        setAuthLog('[AuthService.init] Got valid accountObj and tokenResponse')
+        setAuthLog(
+          '[AuthService.init] Got valid accountObj and tokenResponse for ' +
+            JSON.stringify(accountObj)
+        )
         handleResponse(tokenResponse, 'Got valid accountObj and tokenResponse')
       } else if (accountObj) {
         setAuthLog('[AuthService.init] User has logged in, but no tokens.')
@@ -72,13 +78,19 @@ Office.onReady(async () => {
           })
           handleResponse(tokenResponse, 'User has logged in, but no tokens.')
         } catch (err) {
-          await publicClientApp.acquireTokenRedirect(requestObj)
+          await publicClientApp.acquireTokenRedirect({
+            account: accountObj,
+            scopes: requestObj.scopes
+          })
         }
       } else {
         setAuthLog(
           '[AuthService.init] No accountObject or tokenResponse present. User must now login.'
         )
-        await publicClientApp.loginRedirect(requestObj)
+        await publicClientApp.loginRedirect({
+          scopes: requestObj.scopes,
+          prompt: 'select_account'
+        })
       }
     } catch (error) {
       setAuthLog(

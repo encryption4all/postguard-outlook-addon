@@ -15,9 +15,9 @@ import 'web-streams-polyfill'
 
 import { ReadMail } from '@e4a/irmaseal-mail-utils/dist/index'
 
-import * as IrmaCore from '@privacybydesign/irma-core'
-import * as IrmaClient from '@privacybydesign/irma-client'
-import * as IrmaWeb from '@privacybydesign/irma-web'
+import * as IrmaCore from '@privacybydesign/yivi-core'
+import * as IrmaClient from '@privacybydesign/yivi-client'
+import * as IrmaWeb from '@privacybydesign/yivi-web'
 import {
   getGlobal,
   getPostGuardHeaders,
