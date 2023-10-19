@@ -223,7 +223,7 @@ async function getMailAttachmentContent(attachmentId: string): Promise<string> {
  * Gets public key from PKG, or local storage if PKG is not available
  * @returns The public key
  */
-async function getPublicKey(): Promise<any> {
+async function getPublicKey(): Promise<string> {
   let response
 
   try {
@@ -247,7 +247,7 @@ async function getPublicKey(): Promise<any> {
     pk = await response.json()
     window.localStorage.setItem('pk', JSON.stringify(pk))
   }
-  return pk
+  return pk.publicKey
 }
 
 async function getSigningKeys(jwt: string, keyRequest?: any): Promise<any> {
@@ -636,8 +636,8 @@ async function processRecipientAccessPolicyMessage(arg) {
   recipientAttributeDialog.close()
 
   if (messageFromDialog.status === 'success') {
-    g.policies = messageFromDialog.result.policy
-    const recipients = Object.keys(g.policies)
+    g.accessPolicy = messageFromDialog.result.policy
+    const recipients = Object.keys(g.accessPolicy)
 
     Office.context.mailbox.item.to.setAsync(recipients, function (asyncResult) {
       if (asyncResult.status === Office.AsyncResultStatus.Succeeded) {
@@ -648,7 +648,7 @@ async function processRecipientAccessPolicyMessage(arg) {
           // if JWT is available, directly send and decrpt
           encryptAndSendEmail(
             messageFromDialog.result.accessToken,
-            g.policy,
+            g.accessPolicy,
             g.signingJwt
           ).catch((err) => {
             encryptLog.error(err)
@@ -795,13 +795,15 @@ async function processSignMsgMessage(arg) {
   if (messageFromDialog.status === 'success') {
     const accessToken = messageFromDialog.result.accessToken
     encryptLog.info(`Signing keys: ${JSON.stringify(messageFromDialog)}`)
-    const signingJwt = JSON.parse(messageFromDialog.result.jwt)
+    const signingJwt = messageFromDialog.result.jwt
 
-    encryptAndSendEmail(accessToken, g.policy, signingJwt).catch((err) => {
-      encryptLog.error(err)
-      showInfoMessage(err)
-      globalEvent.completed()
-    })
+    encryptAndSendEmail(accessToken, g.accessPolicy, signingJwt).catch(
+      (err) => {
+        encryptLog.error(err)
+        showInfoMessage(err)
+        globalEvent.completed()
+      }
+    )
   } else {
     const err = JSON.stringify(messageFromDialog.error.toString())
     encryptLog.error('Error: ', err)
