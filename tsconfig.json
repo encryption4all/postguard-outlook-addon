@@ -1,5 +1,6 @@
 {
   "compilerOptions": {
+    "target": "es2019",
     "module": "esnext",
     "moduleResolution": "node",
     "allowJs": true,
@@ -9,10 +10,11 @@
     "noEmitOnError": true,
     "outDir": "lib",
     "sourceMap": true,
-    "target": "es2018",
     "lib": ["es2015", "dom"],
     "forceConsistentCasingInFileNames": true,
-    "importHelpers": true
+    "importHelpers": true,
+    "resolveJsonModule": true,
+    "allowSyntheticDefaultImports": true
   },
   "exclude": ["node_modules", "dist", "lib", "lib-amd"]
 }

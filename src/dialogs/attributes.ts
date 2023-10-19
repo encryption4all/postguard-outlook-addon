@@ -7,13 +7,12 @@
 /* global $, Office */
 
 // images references in the manifest
-import { getGlobal } from '../helpers/utils'
+import { Policy, getGlobal } from '../helpers/utils'
+import { AttributeForm } from '@e4a/pg-components'
+
 import '../../assets/16.png'
 import '../../assets/32.png'
 import '../../assets/80.png'
-
-import AttributeForm from 'attribute-form/AttributeForm/AttributeForm.svelte'
-import type { Policy } from 'attribute-form/AttributeForm/AttributeForm.svelte'
 
 // eslint-disable-next-line no-undef
 const getLogger = require('webpack-log')
@@ -32,30 +31,48 @@ Office.initialize = function () {
     attributeLog.info('Add attributes dialog openend!')
     const urlParams = new URLSearchParams(window.location.search)
     g.token = Buffer.from(urlParams.get('token'), 'base64').toString('utf-8')
-    const recipients = JSON.parse(
-      Buffer.from(urlParams.get('recipients'), 'base64').toString('utf-8')
-    )
+    const senderObj = urlParams.get('sender')
 
-    attributeLog.info(`Token: ${g.token}, recipients: ${g.recipients}`)
+    let recipients
+    let sender
 
     $(function () {
       const el = document.querySelector('#root')
       if (!el) return
 
-      const init = recipients.reduce((policies, next) => {
+      if (senderObj !== null) {
+        sender = Buffer.from(senderObj, 'base64').toString('utf-8')
+        g.signDialog = true
+      } else {
+        recipients = JSON.parse(
+          Buffer.from(urlParams.get('recipients'), 'base64').toString('utf-8')
+        )
+      }
+
+      const start = senderObj !== null ? [sender] : recipients
+
+      const init = start.reduce((policies, next) => {
         const email = next
         policies[email] = []
         return policies
       }, [])
 
+      const customText = senderObj !== null ? 'Next' : 'Send'
+
       new AttributeForm({
         target: el,
         props: {
           initialPolicy: init,
+          signing: senderObj !== null,
           onSubmit: finish,
-          submitButton: { customText: 'Send' }
+          submitButton: { customText: customText },
+          lang: g.language
         }
       })
+
+      attributeLog.info(
+        `Token: ${g.token}, recipients: ${recipients}, sender: ${sender}`
+      )
     })
   }
 }
@@ -63,6 +80,7 @@ Office.initialize = function () {
 const finish = async (policy: Policy) => {
   const msg = {
     result: { policy: policy, accessToken: g.token },
+    operation: g.signDialog === true ? 'sign' : 'enc',
     status: 'success'
   }
   passMsgToParent(JSON.stringify(msg))

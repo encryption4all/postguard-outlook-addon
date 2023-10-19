@@ -20,5 +20,18 @@
   "pbdf.gemeente.personalData.bsn": "BSN",
   "pbdf.gemeente.personalData.digidlevel": "DigiD assurance level",
   "pbdf.pbdf.surfnet-2.id": "Educational number",
-  "pbdf.nuts.agb.agbcode": "AGB code"
+  "pbdf.nuts.agb.agbcode": "AGB code",
+  "displayMessageNoPostGuardMail": "This is not a PostGuard email, cannot decrpt.",
+  "displayMessageTitle": "You received a PostGuard encrypted email from",
+  "displayMessageTitleSign": "Sign the email",
+  "displayMessageHeading": "You need to prove who you are to decrypt and read this email.",
+  "displayMessageHeadingSign": "You need to prove who you are to sign this email.",
+  "displayMessageQrPrefix": "Scan the QR code with the Yivi app to disclose your e-mail address.",
+  "displayMessageYiviHelpHeader": "What is the Yivi app?",
+  "displayMessageYiviHelpBody": "The Yivi app is a separate privacy-friendly authentication app (which is used also for other authentication purposes).",
+  "displayMessageYiviHelpLinkText": "More information about Yivi",
+  "displayMessageYiviHelpDownloadHeader": "Download the free Yivi app",
+  "composeBccWarning": "PostGuard does not support BCC. Either remove BCC or disable PostGuard.",
+  "decryptionFailed": "You did not have the correct attributes to decrypt this message.",
+  "attributeSelectionButtonLabelSign": "Sign"
 }

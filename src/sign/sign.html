@@ -1,0 +1,108 @@
+<!-- Copyright (c) Microsoft Corporation. All rights reserved. Licensed under the MIT License. -->
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>Encrypt PostGuard email</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <!-- JQuery JS API -->
+    <script
+      crossorigin="anonymous"
+      src="https://code.jquery.com/jquery.min.js"
+      integrity="sha384-omOsxWjfyCQN/QkJa5gsN9F1sKX/IRXsLKvv7uHdTUYqkonYl4B/SrIIrNmrnJDj"
+    ></script>
+
+    <!-- Office JavaScript API -->
+    <script
+      type="text/javascript"
+      src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"
+    ></script>
+  </head>
+
+  <body>
+    <div
+      style="background-color: #001730; height: 40px; padding: 0px; margin: 0px"
+    >
+      <object
+        style="margin-top: 3px; margin-left: 14px; padding: 0"
+        height="34px"
+        data="assets/postguard_full_logo.svg"
+        type="image/svg+xml"
+      ></object>
+    </div>
+
+    <div id="center" class="center">
+      <div id="loading">Loading ...</div>
+
+      <div id="header_text">
+        To send a mail you need to sign the email first with your signature.
+      </div>
+
+      <div id="decryptinfo">
+        <div id="decryptinfo_irma">
+          <div style="flex-basis: 7%">
+            <img alt="Yivi" src="/assets/yivi-logo.svg" id="logo" />
+          </div>
+          <div id="irma_scan"></div>
+        </div>
+
+        <div
+          style="
+            margin-top: -5px;
+            align-items: center;
+            justify-content: center;
+            display: flex;
+          "
+        >
+          <table style="margin-left: -32%">
+            <tbody id="attributes"></tbody>
+          </table>
+        </div>
+
+        <div id="qrcodecontainer">
+          <div id="qrcode"></div>
+        </div>
+      </div>
+
+      <div id="irmaapp">
+        <div class="irma">
+          <div id="whatisirma">
+            <p>
+              <b>What is the Yivi app?</b>
+            </p>
+            <p>
+              The Yivi app is a privacy-friendly authentication app. You can
+              easily log in, disclose specific personal data, and digitally sign
+              documents with the Yivi app.<br />
+              <a href="https://yivi.app">More information about Yivi</a>
+            </p>
+          </div>
+          <div id="download_irma">
+            <p>
+              <b>Download the free Yivi app</b>
+            </p>
+            <a
+              href="https://play.google.com/store/apps/details?id=org.irmacard.cardemu"
+            >
+              <img
+                alt="Get it on Google Play"
+                src="/assets/google-play-badge.png"
+              />
+            </a>
+            &nbsp;&nbsp;&nbsp;
+            <a
+              href="https://apps.apple.com/us/app/irma-authentication/id1294092994"
+            >
+              <img
+                src="/assets/download-on-the-app-store-badge.png"
+                alt="Download on the App Store"
+              />
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

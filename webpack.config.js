@@ -5,19 +5,20 @@ const { CleanWebpackPlugin } = require('clean-webpack-plugin')
 const CopyWebpackPlugin = require('copy-webpack-plugin')
 const HtmlWebpackPlugin = require('html-webpack-plugin')
 const path = require('path')
-//const ReplaceInFileWebpackPlugin = require('replace-in-file-webpack-plugin')
 const preprocess = require('svelte-preprocess')
-
 const webpack = require('webpack')
 
 const urlDev = 'localhost:3000/'
 const urlProd = 'irmaseal.z6.web.core.windows.net/' // CHANGE THIS TO YOUR PRODUCTION DEPLOYMENT LOCATION
-//const appIdProd = '6ee2a054-1d61-405d-8e5d-c2daf25c5833' // CHANGE TO APP ID used in App registration of RU account
 
-module.exports = async (env, options) => {
+module.exports = async (_env, options) => {
   const dev = options.mode === 'development'
 
   const buildType = dev ? 'dev' : 'prod'
+  const pkgUrl = dev
+    ? 'https://main.postguard.ihub.ru.nl/pkg'
+    : 'https://postguard.ihub.ru.nl/pkg'
+
   const config = {
     devtool: 'source-map',
     entry: {
@@ -28,9 +29,10 @@ module.exports = async (env, options) => {
       decrypt: './src/decryptdialog/decrypt.ts',
       fallbackauthdialog: './src/helpers/fallbackauthdialog.ts',
       attributes: './src/dialogs/attributes.ts',
-      settings: './src/taskpane/settings.ts'
+      settings: './src/taskpane/settings.ts',
+      sign: './src/sign/sign.ts'
     },
-    experiments: { syncWebAssembly: true, topLevelAwait: true },
+    experiments: { asyncWebAssembly: true, topLevelAwait: true },
     resolve: {
       extensions: ['.ts', '.tsx', '.html', '.js', '.mjs', '.svelte'],
       alias: {
@@ -41,7 +43,8 @@ module.exports = async (env, options) => {
         svelte: path.resolve('node_modules', 'svelte')
       },
       fallback: { https: false, http: false },
-      mainFields: ['svelte', 'browser', 'module', 'main']
+      mainFields: ['svelte', 'browser', 'module', 'main'],
+      conditionNames: ['svelte', 'browser', 'import']
     },
     module: {
       rules: [
@@ -98,10 +101,22 @@ module.exports = async (env, options) => {
             }
           ]
         },
+        {
+          test: /\.svg$/,
+          use: {
+            loader: 'svg-url-loader'
+          }
+        },
         { test: /\.(css)$/, use: ['style-loader', 'css-loader'] }
       ]
     },
     plugins: [
+      new webpack.DefinePlugin({
+        'process.env': {
+          PKG_URL: JSON.stringify(pkgUrl),
+          YIVI_URL: JSON.stringify('https://ihub.ru.nl/irma/1/')
+        }
+      }),
       new CopyWebpackPlugin({ patterns: [{ from: 'assets', to: 'assets' }] }),
       new CopyWebpackPlugin({ patterns: [{ from: 'fonts', to: 'fonts' }] }),
       new CopyWebpackPlugin({ patterns: [{ from: 'locales', to: 'locales' }] }),
@@ -109,7 +124,6 @@ module.exports = async (env, options) => {
         process: 'process/browser',
         Buffer: ['buffer', 'Buffer']
       }),
-      new CleanWebpackPlugin(),
       new HtmlWebpackPlugin({
         filename: 'taskpane.html',
         template: './src/taskpane/taskpane.html',
@@ -128,6 +142,10 @@ module.exports = async (env, options) => {
           {
             to: 'attributes.css',
             from: './src/dialogs/attributes.css'
+          },
+          {
+            to: 'commands.css',
+            from: './src/sign/sign.css'
           },
           {
             to: '[name].' + buildType + '.[ext]',
@@ -175,14 +193,9 @@ module.exports = async (env, options) => {
         chunks: ['polyfill', 'fallbackauthdialog']
       }),
       new HtmlWebpackPlugin({
-        filename: 'attributes.html',
-        template: './src/dialogs/attributes.html',
-        chunks: ['polyfill', 'attributes']
-      }),
-      new HtmlWebpackPlugin({
-        filename: 'settings.html',
-        template: './src/taskpane/settings.html',
-        chunks: ['polyfill', 'settings']
+        filename: 'sign.html',
+        template: './src/sign/sign.html',
+        chunks: ['polyfill', 'sign']
       })
     ],
     devServer: {
@@ -197,8 +210,13 @@ module.exports = async (env, options) => {
       disableHostCheck: true
     },
     output: {
-      publicPath: ''
+      publicPath: '',
+      path: path.resolve(process.cwd(), 'dist')
     }
+  }
+
+  if (!dev) {
+    config.plugins.push(new CleanWebpackPlugin())
   }
 
   return config

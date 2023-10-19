@@ -1,11 +1,26 @@
 /* global $, Office */
 
+import { AttributeCon } from '@e4a/pg-wasm'
 import * as MicrosoftGraph from '@microsoft/microsoft-graph-types'
+import jwtDecode, { JwtPayload } from 'jwt-decode'
+import * as getLogger from 'webpack-log'
+
+const utilLog = getLogger({ name: 'PostGuard util log' })
 
 export const htmlBodyType: MicrosoftGraph.BodyType = 'html'
+export class Policy {
+  t: string
+  v: string
+}
 
-import * as getLogger from 'webpack-log'
-const utilLog = getLogger({ name: 'PostGuard util log' })
+type AttributeRequest = {
+  t: string
+  v: string
+}
+
+export type KeySort = 'Decryption' | 'Signing'
+
+export const PKG_URL = process.env.PKG_URL
 
 /**
  * Interface to store attachment metadata and content
@@ -299,6 +314,13 @@ export function getItemRestId() {
   }
 }
 
+export function _getMobileUrl(sessionPtr) {
+  const json = JSON.stringify(sessionPtr)
+  // Universal links are not stable in Android webviews and custom tabs, so always use intent links.
+  const intent = `Intent;package=org.irmacard.cardemu;scheme=irma;l.timestamp=${Date.now()}`
+  return `intent://qr/json/${encodeURIComponent(json)}#${intent};end`
+}
+
 /**
  * Calculates a hash for a message
  * @param message The message
@@ -370,4 +392,87 @@ export function getPostGuardHeaders() {
   let headers = `${host},${Office.context.diagnostics.version},pg4ol,0.0.1`
   console.log(`Headers: ${headers}`)
   return headers
+}
+
+export function type_to_image(t: string): string {
+  let type: string
+  switch (t) {
+    case 'pbdf.sidn-pbdf.email.email':
+      type = 'envelope'
+      break
+    case 'pbdf.sidn-pbdf.mobilenumber.mobilenumber':
+      type = 'phone'
+      break
+    case 'pbdf.pbdf.surfnet-2.id':
+      type = 'education'
+      break
+    case 'pbdf.nuts.agb.agbcode':
+      type = 'health'
+      break
+    case 'pbdf.gemeente.personalData.dateofbirth':
+      type = 'calendar'
+      break
+    default:
+      type = 'personal'
+      break
+  }
+  return type
+}
+
+export async function checkLocalStorage(con: AttributeCon) {
+  const hash = await hashCon(con)
+  const cached = window.localStorage.getItem(`jwt_${hash}`)
+  if (cached === null) throw new Error('not found in localStorage')
+  const decoded = jwtDecode<JwtPayload>(cached)
+  if (Date.now() / 1000 > decoded.exp) throw new Error('jwt has expired')
+  return cached
+}
+
+export async function hashCon(con: AttributeCon): Promise<string> {
+  const sorted = con.sort(
+    (att1: AttributeRequest, att2: AttributeRequest) =>
+      att1.t.localeCompare(att2.t) || att1.v.localeCompare(att2.v)
+  )
+  return await hashString(JSON.stringify(sorted))
+}
+
+// Retrieve a USK using a JWT and timestamp.
+export async function getUSK(
+  jwt: string,
+  sort: KeySort,
+  ts?: number
+): Promise<any> {
+  const url =
+    sort === 'Decryption'
+      ? `${PKG_URL}/v2/irma/key/${ts?.toString()}`
+      : `${PKG_URL}/v2/irma/sign/key`
+  return fetch(url, {
+    headers: {
+      Authorization: `Bearer ${jwt}`,
+      'X-Postguard-Client-Version': getPostGuardHeaders()
+    }
+  })
+    .then((r) => r.json())
+    .then((json) => {
+      if (json.status !== 'DONE' || json.proofStatus !== 'VALID')
+        throw new Error('session not DONE and VALID')
+      return json.key
+    })
+}
+
+/**
+ * Displays a message
+ * @param msg The message to be displayes
+ */
+export function showInfoMessage(msg: string) {
+  const msgDetails: Office.NotificationMessageDetails = {
+    type: Office.MailboxEnums.ItemNotificationMessageType.InformationalMessage,
+    message: msg,
+    icon: 'Icon.80x80',
+    persistent: true
+  }
+  Office.context.mailbox.item.notificationMessages.replaceAsync(
+    'action',
+    msgDetails
+  )
 }

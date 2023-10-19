@@ -1,0 +1,260 @@
+/* 
+ * Copyright (c) Microsoft Corporation. All rights reserved. Licensed under the MIT license.
+ * See LICENSE in the project root for license information.
+ */
+
+body {
+  margin: 0px;
+  padding: 0px;
+  background: #ffffff;
+  font-weight: 300;
+  font-size: 14px;
+  font-family: 'SF Pro Display', Arial, Helvetica, sans-serif;
+  font-style: normal;
+  line-height: 20px;
+  color: #001730;
+}
+
+a {
+  color: #0071eb;
+}
+
+ul {
+  margin: 0;
+  padding: 0;
+}
+
+b {
+  font-weight: bold;
+}
+
+div,
+p {
+  margin: 0px;
+}
+
+#app-body {
+  background: #ffffff;
+  min-height: 800px;
+}
+
+.center {
+  display: flex;
+  justify-content: center;
+  margin: 0 auto;
+  text-align: center;
+  flex-direction: column;
+}
+
+#info_message {
+  margin-top: 16px;
+  text-align: center;
+  font-size: 14px;
+  font-stretch: expanded;
+  display: none;
+}
+
+#header_text {
+  margin-top: 20px;
+  text-align: center;
+  display: none;
+  font-style: normal;
+  font-size: 15px;
+  margin-bottom: 12px;
+  font-stretch: condensed;
+}
+
+.smaller {
+  font-size: 12px;
+}
+
+.instructions_container {
+  display: -webkit-flex;
+  display: flex;
+  margin-left: 16px;
+  margin-top: 20px;
+}
+
+.left {
+  width: 50px;
+}
+.right {
+  width: 70%;
+}
+
+#logo {
+  width: 40px;
+}
+
+#attributes {
+  margin-top: 16px;
+}
+
+#qr_instruction {
+  margin-top: 16px;
+}
+
+#qr_img {
+  margin-top: 16px;
+  width: 118px;
+}
+
+#download_irma {
+  margin-top: 12px;
+}
+
+#download_irma a {
+  text-decoration: none;
+}
+
+#download_irma img {
+  height: 30px;
+  margin-top: 12px;
+}
+
+#bg_decrypted_txt {
+  padding: 15px;
+  background: #ffffff;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  margin-top: 15px;
+}
+
+#decrypted_subject {
+  font-style: normal;
+  font-weight: 700;
+  font-size: 15px;
+  line-height: 18px;
+  margin-bottom: 10px;
+}
+
+#attachments {
+  padding: 15px;
+  flex-direction: column;
+  display: none;
+}
+
+#attachmentList {
+  display: contents;
+}
+
+#attachmentList div {
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+#qrcodecontainer {
+  display: none;
+}
+
+#loading {
+  padding: 15px;
+  margin: 15px;
+}
+
+#decryptinfo {
+  display: none;
+}
+
+#irmaapp {
+  display: none;
+}
+
+#decrypted {
+  display: none;
+}
+
+#info_message {
+  display: none;
+}
+
+#info_message_text {
+  margin-top: 24px;
+  font-style: normal;
+  font-weight: 700;
+  font-size: 24px;
+  line-height: 30px;
+}
+
+.irma {
+  text-align: left;
+  margin-left: 14%;
+  margin-right: 14%;
+  margin-top: 10px;
+}
+
+.leftAndMargin {
+  margin: 10px 10px 10px 10px;
+  text-align: left;
+}
+
+#decrypted_received {
+  color: grey;
+  float: right;
+  font-weight: 500;
+  font-size: 12px;
+}
+
+#decrypted_from {
+  float: left;
+  font-weight: bold;
+}
+
+#decrypted_to {
+  margin-top: 7px;
+  font-size: 12px;
+  overflow: auto;
+}
+
+#decrypted_cc {
+  margin-top: 7px;
+  font-size: 12px;
+  overflow: auto;
+}
+
+#item-sender {
+  display: block;
+  margin-top: 20px;
+  color: #0071eb;
+  font-size: 20px;
+}
+
+#decryptinfo_irma {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: -24%;
+}
+
+#irma_scan {
+  font-style: normal;
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+#decrypted_text {
+  padding: 10px;
+  margin-top: 25px;
+}
+
+#decrypted {
+  margin-left: 20px;
+  margin-right: 20px;
+}
+
+#from_received {
+  margin-top: 10px;
+}
+
+.attrtype {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.attrvalue {
+  font-size: 12px;
+  font-weight: 500;
+  color: #0071eb;
+}

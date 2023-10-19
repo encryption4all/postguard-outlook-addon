@@ -7,7 +7,11 @@
 
 import 'web-streams-polyfill'
 
-import { ComposeMail } from '@e4a/irmaseal-mail-utils/dist/index'
+import i18next from 'i18next'
+import translationEN from '../../locales/en.json'
+import translationNL from '../../locales/nl.json'
+
+import { ComposeMail } from '@e4a/irmaseal-mail-utils/dist/composeMail'
 import { createMimeMessage } from 'mimetext'
 import {
   storeMailAsPlainLocally,
@@ -17,24 +21,27 @@ import {
   isPostGuardEmail,
   newReadableStreamFromArray,
   getGlobal,
-  getPostGuardHeaders
+  getPostGuardHeaders,
+  PKG_URL,
+  showInfoMessage,
+  Policy,
+  checkLocalStorage
 } from '../helpers/utils'
-import type { Policy } from 'attribute-form/AttributeForm/AttributeForm.svelte'
 
 // eslint-disable-next-line no-undef
 var Buffer = require('buffer/').Buffer
 
-var mailboxItem: Office.MessageCompose
 var globalEvent
+var mailboxItem: Office.MessageCompose
 var isEncryptMode: boolean = false
-var isExtendedEncryption: boolean = false
+var isSignEmail: boolean = false
 
-const hostname = 'https://stable.irmaseal-pkg.ihub.ru.nl'
-const email_attribute = 'pbdf.sidn-pbdf.email.email'
+const EMAIL_ATTRIBUTE_TYPE = 'pbdf.sidn-pbdf.email.email'
 
-const mod_promise = import('@e4a/irmaseal-wasm-bindings')
+const mod_promise = import('@e4a/pg-wasm') // require('@e4a/pg-wasm')
+import { ISealOptions } from '@e4a/pg-wasm'
 
-import * as getLogger from 'webpack-log'
+const getLogger = require('webpack-log')
 const encryptLog = getLogger({ name: 'PostGuard encrypt log' })
 const decryptLog = getLogger({ name: 'PostGuard decrypt log' })
 
@@ -47,55 +54,36 @@ Office.initialize = () => {
     delete window.alert // assures alert works
     delete window.confirm // assures confirm works
     delete window.prompt // assures prompt works
+
+    i18next.init({
+      lng: Office.context.displayLanguage.toLowerCase().startsWith('nl')
+        ? 'nl'
+        : 'en',
+      debug: true,
+      resources: {
+        en: {
+          translation: translationEN
+        },
+        nl: {
+          translation: translationNL
+        }
+      }
+    })
   })
 }
 
-/**
- * Entry point function for encryption
- * @param event The AddinCommands Event
- */
-// eslint-disable-next-line no-unused-vars
-function encrypt(event: Office.AddinCommands.Event) {
-  const message: Office.NotificationMessageDetails = {
-    type: Office.MailboxEnums.ItemNotificationMessageType.InformationalMessage,
-    message: 'Encrypting email with PostGuard',
-    icon: 'Icon.80x80',
-    persistent: true
-  }
-
+function encryptExtended(event: Office.AddinCommands.Event) {
   globalEvent = event
-
-  Office.context.mailbox.item.notificationMessages.replaceAsync(
-    'action',
-    message
-  )
-
+  showInfoMessage('Encrypting email with PostGuard extended')
   isEncryptMode = true
   showLoginPopup('/fallbackauthdialog.html')
 }
 
-/**
- * Entry point function for encryption
- * @param event The AddinCommands Event
- */
-// eslint-disable-next-line no-unused-vars
-function encryptExtended(event: Office.AddinCommands.Event) {
-  const message: Office.NotificationMessageDetails = {
-    type: Office.MailboxEnums.ItemNotificationMessageType.InformationalMessage,
-    message: 'Encrypting email with PostGuard',
-    icon: 'Icon.80x80',
-    persistent: true
-  }
-
+function encryptExtendedSign(event: Office.AddinCommands.Event) {
   globalEvent = event
-
-  Office.context.mailbox.item.notificationMessages.replaceAsync(
-    'action',
-    message
-  )
-
+  showInfoMessage('Encrypting email with PostGuard extended + signatures')
+  isSignEmail = true
   isEncryptMode = true
-  isExtendedEncryption = true
   showLoginPopup('/fallbackauthdialog.html')
 }
 
@@ -237,12 +225,9 @@ async function getMailAttachmentContent(attachmentId: string): Promise<string> {
  */
 async function getPublicKey(): Promise<any> {
   let response
-  let headers = {
-    'X-Postguard-Client-Version': `Outlook,${Office.context.diagnostics.version},pg4ol,0.0.1`
-  }
-  console.log(`Headers: ${headers}`)
+
   try {
-    response = await fetch(`${hostname}/v2/parameters`, {
+    response = await fetch(`${PKG_URL}/v2/parameters`, {
       headers: { 'X-Postguard-Client-Version': getPostGuardHeaders() }
     })
   } catch (e) {
@@ -265,11 +250,32 @@ async function getPublicKey(): Promise<any> {
   return pk
 }
 
+async function getSigningKeys(jwt: string, keyRequest?: any): Promise<any> {
+  const url = `${PKG_URL}/v2/irma/sign/key`
+  return fetch(url, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${jwt}`,
+      'X-Postguard-Client-Version': getPostGuardHeaders(),
+      'content-type': 'application/json'
+    },
+    body: JSON.stringify(keyRequest)
+  })
+    .then((r) => r.json())
+    .then((json) => {
+      if (json.status !== 'DONE' || json.proofStatus !== 'VALID')
+        throw new Error('session not DONE and VALID')
+      return { pubSignKey: json.pubSignKey, privSignKey: json.privSignKey }
+    })
+}
+
 /**
  * Encrypts and sends the email
  * @param token The authentication token for the Graph API
+ * @param policy The encryption access policy
+ * @param signingJwt Signing JWT
  */
-async function encryptAndSendEmail(token, policy: Policy = null) {
+async function encryptAndSendEmail(token, policy: Policy = null, jwt: any) {
   const pk = await getPublicKey()
 
   const [mod] = await Promise.all([mod_promise])
@@ -300,7 +306,7 @@ async function encryptAndSendEmail(token, policy: Policy = null) {
     const policies = recipientEmails.reduce((total, recipient) => {
       total[recipient] = {
         ts: timestamp,
-        con: [{ t: email_attribute, v: recipient }]
+        con: [{ t: EMAIL_ATTRIBUTE_TYPE, v: recipient }]
       }
       return total
     }, {})
@@ -308,7 +314,7 @@ async function encryptAndSendEmail(token, policy: Policy = null) {
     const ccPolicies = ccRecipientEmails.reduce((total, recipient) => {
       total[recipient] = {
         ts: timestamp,
-        con: [{ t: email_attribute, v: recipient }]
+        con: [{ t: EMAIL_ATTRIBUTE_TYPE, v: recipient }]
       }
       return total
     }, {})
@@ -396,8 +402,23 @@ async function encryptAndSendEmail(token, policy: Policy = null) {
       ct = new Uint8Array([...ct, ...chunk])
     }
   })
+  const pubSignId = g.pubSignId
+  const privSignId = g.privSignId
 
-  await mod.seal(pk.publicKey, allPolicies, readable, writable)
+  const { pubSignKey, privSignKey } = await getSigningKeys(jwt, {
+    pubSignId,
+    privSignId
+  })
+
+  const sealOptions: ISealOptions = {
+    policy: allPolicies,
+    pubSignKey,
+    ...(privSignKey && { privSignKey })
+  }
+
+  encryptLog.info('Sealing with options: ', sealOptions)
+
+  await mod.sealStream(pk, sealOptions, readable, writable)
 
   // get outer mail to send email via Graph API
   composeMail.setPayload(ct)
@@ -469,20 +490,6 @@ function bccMsgAndDialog() {
   showInfoMessage(
     'PostGuard does not support BCCs. Please remove BCCs, or send the mail unencrypted.'
   )
-  /*var fullUrl =
-    'https://' +
-    location.hostname +
-    (location.port ? ':' + location.port : '') +
-    '/bcc.html'
-
-  Office.context.ui.displayDialogAsync(
-    fullUrl,
-    { height: 20, width: 30 },
-    // eslint-disable-next-line no-unused-vars
-    function (result) {
-      encryptLog.info('Bccdialog has initialized.')
-    }
-  )*/
 }
 
 /**
@@ -562,31 +569,15 @@ function clearCurrentEmail(attachments) {
   }
 }
 
-/**
- * Displays a message
- * @param msg The message to be displayes
- */
-function showInfoMessage(msg: string) {
-  const msgDetails: Office.NotificationMessageDetails = {
-    type: Office.MailboxEnums.ItemNotificationMessageType.InformationalMessage,
-    message: msg,
-    icon: 'Icon.80x80',
-    persistent: true
-  }
-  Office.context.mailbox.item.notificationMessages.replaceAsync(
-    'action',
-    msgDetails
-  )
-  globalEvent.completed()
-}
-
-var attributeDialog
+var signingDialog
+var recipientAttributeDialog
+var signingAttributeDialog
 
 /**
  * Shows dialog to add attributes for each recipient
  * @param accessToken Token to access graph API
  */
-async function addAttributes(accessToken: string) {
+async function chooseRecipientAcessPolicies(accessToken: string) {
   const recipientEmails: string[] = await getRecipientEmails()
   const ccRecipientEmails: string[] = await getCcRecipientEmails()
   const bccRecipientEmails: string[] = await getBccRecipientEmails()
@@ -625,38 +616,46 @@ async function addAttributes(accessToken: string) {
     fullUrl,
     { height: 40, width: 20 },
     function (result) {
-      encryptLog.info('Attributedialog has initialized.')
-      attributeDialog = result.value
-      attributeDialog.addEventHandler(
+      encryptLog.info('Recipients attributedialog has initialized.')
+      recipientAttributeDialog = result.value
+      recipientAttributeDialog.addEventHandler(
         Office.EventType.DialogMessageReceived,
-        processAttributesMessage
+        processRecipientAccessPolicyMessage
       )
     }
   )
 }
 
 /**
- *  This handler responds to the success or failure message that the pop-up dialog receives from the identity provider and access token provider.
+ *  This handler responds to the success or failure message that the pop-up dialog receives from the attribute form handler.
  * @param arg The arg object passed from the dialog
  */
 
-async function processAttributesMessage(arg) {
+async function processRecipientAccessPolicyMessage(arg) {
   let messageFromDialog = JSON.parse(arg.message)
-  attributeDialog.close()
+  recipientAttributeDialog.close()
 
   if (messageFromDialog.status === 'success') {
-    const policies = messageFromDialog.result.policy
-    const recipients = Object.keys(policies)
+    g.policies = messageFromDialog.result.policy
+    const recipients = Object.keys(g.policies)
 
     Office.context.mailbox.item.to.setAsync(recipients, function (asyncResult) {
       if (asyncResult.status === Office.AsyncResultStatus.Succeeded) {
-        encryptAndSendEmail(
-          messageFromDialog.result.accessToken,
-          messageFromDialog.result.policy
-        ).catch((err) => {
-          encryptLog.error(err)
-          showInfoMessage(err)
-        })
+        // if global signingJwt is null, it means there is no JWT available for that sigining policy
+        if (g.signingJwt === null) {
+          signMessageDialog(messageFromDialog.result.accessToken)
+        } else {
+          // if JWT is available, directly send and decrpt
+          encryptAndSendEmail(
+            messageFromDialog.result.accessToken,
+            g.policy,
+            g.signingJwt
+          ).catch((err) => {
+            encryptLog.error(err)
+            showInfoMessage(err)
+            globalEvent.completed()
+          })
+        }
       } else {
         throw 'Could not set recipients in compose window'
       }
@@ -669,40 +668,189 @@ async function processAttributesMessage(arg) {
   }
 }
 
+async function signMessageDialog(accessToken: String) {
+  const b64Token = Buffer.from(accessToken).toString('base64')
+  const b64Policy = Buffer.from(JSON.stringify(g.signingpolicy)).toString(
+    'base64'
+  )
+  var fullUrl =
+    location.protocol +
+    '//' +
+    location.hostname +
+    (location.port ? ':' + location.port : '') +
+    '/sign.html' +
+    '?signingpolicy=' +
+    b64Policy +
+    '&token=' +
+    b64Token
+
+  encryptLog.info('signing message url: ', fullUrl)
+
+  Office.context.ui.displayDialogAsync(
+    fullUrl,
+    { height: 40, width: 20, promptBeforeOpen: false },
+    function (result) {
+      encryptLog.info('Signing attributedialog has initialized.')
+      signingDialog = result.value
+      signingDialog.addEventHandler(
+        Office.EventType.DialogMessageReceived,
+        processSignMsgMessage // receive used policy and store in object as it is later used again
+      )
+    }
+  )
+}
+
 var loginDialog
 
 /**
  *  This handler responds to the success or failure message that the pop-up dialog receives from the identity provider and access token provider.
  * @param arg The arg object passed from the dialog
  */
-async function processMessage(arg) {
+async function processAuthMessage(arg) {
   let messageFromDialog = JSON.parse(arg.message)
+  const accessToken = messageFromDialog.result.accessToken
+
   encryptLog.info(`After auth: ${JSON.stringify(messageFromDialog)}`)
 
   if (messageFromDialog.status === 'success') {
     loginDialog.close()
     if (isEncryptMode) {
       g.msgFunc = showInfoMessage
-      if (isExtendedEncryption) {
-        addAttributes(messageFromDialog.result.accessToken).catch((err) => {
+
+      // show attribute form to choose sign policy
+      if (isSignEmail) {
+        chooseSigningPolicy(accessToken).catch((err) => {
           encryptLog.error(err)
           showInfoMessage(err)
+          globalEvent.completed()
         })
       } else {
-        encryptAndSendEmail(messageFromDialog.result.accessToken).catch(
-          (err) => {
-            encryptLog.error(err)
-            showInfoMessage(err)
-          }
-        )
+        chooseRecipientAcessPolicies(accessToken).catch((err) => {
+          encryptLog.error(err)
+          showInfoMessage(err)
+          globalEvent.completed()
+        })
       }
     } else {
-      showDecryptPopup(messageFromDialog.result.accessToken)
+      showDecryptPopup(accessToken)
     }
   } else {
     // Something went wrong with authentication or the authorization of the web application... try again
     encryptLog.error('Error: ', JSON.stringify(messageFromDialog))
+    globalEvent.completed()
   }
+}
+
+async function processSigningPolicyMessage(arg) {
+  let messageFromDialog = JSON.parse(arg.message)
+
+  signingAttributeDialog.close()
+
+  if (messageFromDialog.status === 'success') {
+    const accessToken = messageFromDialog.result.accessToken
+
+    encryptLog.info(
+      `Signing policy: ${JSON.stringify(messageFromDialog.result.policy)}`
+    )
+
+    const pubSignId = [
+      {
+        t: EMAIL_ATTRIBUTE_TYPE,
+        v: Office.context.mailbox.userProfile.emailAddress
+      }
+    ]
+
+    const privSignId = messageFromDialog.result.policy[
+      Office.context.mailbox.userProfile.emailAddress
+    ].filter(({ t }) => t !== EMAIL_ATTRIBUTE_TYPE)
+
+    encryptLog.info(`Private signing policy: ${JSON.stringify(privSignId)}`)
+
+    g.pubSignId = pubSignId
+    g.privSignId = privSignId
+    g.signingpolicy = [...pubSignId, ...(privSignId ? privSignId : [])]
+    g.signingJwt = await checkLocalStorage(g.signingpolicy).catch((e) => null)
+
+    encryptLog.info(`Signing JWT in storage: ${g.signingJwt}`)
+
+    if (messageFromDialog.status === 'success') {
+      chooseRecipientAcessPolicies(accessToken).catch((err) => {
+        encryptLog.error(err)
+        showInfoMessage(err)
+        globalEvent.completed()
+      })
+    }
+  } else {
+    const err = JSON.stringify(messageFromDialog.error.toString())
+    encryptLog.error('Error: ', err)
+    showInfoMessage(err)
+    globalEvent.completed()
+  }
+}
+
+async function processSignMsgMessage(arg) {
+  let messageFromDialog = JSON.parse(arg.message)
+  signingDialog.close()
+
+  if (messageFromDialog.status === 'success') {
+    const accessToken = messageFromDialog.result.accessToken
+    encryptLog.info(`Signing keys: ${JSON.stringify(messageFromDialog)}`)
+    const signingJwt = JSON.parse(messageFromDialog.result.jwt)
+
+    encryptAndSendEmail(accessToken, g.policy, signingJwt).catch((err) => {
+      encryptLog.error(err)
+      showInfoMessage(err)
+      globalEvent.completed()
+    })
+  } else {
+    const err = JSON.stringify(messageFromDialog.error.toString())
+    encryptLog.error('Error: ', err)
+    showInfoMessage(err)
+    globalEvent.completed()
+  }
+}
+
+/**
+ * Opens dialog to choose a signing policy
+ * @param accessToken The access token
+ */
+async function chooseSigningPolicy(accessToken: String) {
+  const b64Sender = Buffer.from(
+    Office.context.mailbox.userProfile.emailAddress
+  ).toString('base64')
+  const b64Token = Buffer.from(accessToken).toString('base64')
+
+  var fullUrl =
+    location.protocol +
+    '//' +
+    location.hostname +
+    (location.port ? ':' + location.port : '') +
+    '/attributes.html' +
+    '?sender=' +
+    b64Sender +
+    '&token=' +
+    b64Token
+
+  encryptLog.info('signing policy url: ', fullUrl)
+
+  Office.context.ui.displayDialogAsync(
+    fullUrl,
+    { height: 40, width: 20 },
+    function (result) {
+      encryptLog.info('Signing attributedialog has initialized.')
+      if (result.status === Office.AsyncResultStatus.Failed) {
+        if (result.error.code === 12007) {
+          chooseSigningPolicy(accessToken)
+        }
+      } else {
+        signingAttributeDialog = result.value
+        signingAttributeDialog.addEventHandler(
+          Office.EventType.DialogMessageReceived,
+          processSigningPolicyMessage // receive used policy and store in object as it is later used again
+        )
+      }
+    }
+  )
 }
 
 /**
@@ -722,13 +870,13 @@ function showLoginPopup(url: string) {
 
   Office.context.ui.displayDialogAsync(
     fullUrl,
-    { height: 60, width: 30 },
+    { height: 60, width: 30, promptBeforeOpen: false },
     function (result) {
       encryptLog.info('Logindialog has initialized.')
       loginDialog = result.value
       loginDialog.addEventHandler(
         Office.EventType.DialogMessageReceived,
-        processMessage
+        processAuthMessage
       )
     }
   )
@@ -759,7 +907,7 @@ function decrypt(event: Office.AddinCommands.Event) {
   if (isPostGuardEmail()) {
     showLoginPopup('/fallbackauthdialog.html')
   } else {
-    showInfoMessage('This is not a PostGuard Email, cannot decrypt.')
+    showInfoMessage(i18next.t('displayMessageNoPostGuardMail'))
   }
 }
 
@@ -823,6 +971,7 @@ function processDecryptMessage(arg) {
 
 // the add-in command functions need to be available in global scope
 const g = getGlobal() as any
-g.encrypt = encrypt
+g.encrypt = encryptExtended
 g.encryptExt = encryptExtended
+g.encryptExtSign = encryptExtendedSign
 g.decrypt = decrypt

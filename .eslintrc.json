@@ -2,6 +2,7 @@
   "root": true,
   "parser": "@typescript-eslint/parser",
   "plugins": ["@typescript-eslint", "office-addins", "prettier"],
+  "node": true,
   "parserOptions": {
     "ecmaVersion": 6,
     "sourceType": "module",
