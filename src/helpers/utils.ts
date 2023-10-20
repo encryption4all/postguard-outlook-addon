@@ -423,7 +423,7 @@ export async function checkLocalStorage(con: AttributeCon) {
   const hash = await hashCon(con)
   const cached = window.localStorage.getItem(`jwt_${hash}`)
   if (cached === null) throw new Error('not found in localStorage')
-  const decoded = jwtDecode<JwtPayload>(cached)
+  const decoded = JSON.parse(cached[hash]) // jwtDecode<JwtPayload>(cached)
   if (Date.now() / 1000 > decoded.exp) throw new Error('jwt has expired')
   return cached
 }
@@ -437,15 +437,8 @@ export async function hashCon(con: AttributeCon): Promise<string> {
 }
 
 // Retrieve a USK using a JWT and timestamp.
-export async function getUSK(
-  jwt: string,
-  sort: KeySort,
-  ts?: number
-): Promise<any> {
-  const url =
-    sort === 'Decryption'
-      ? `${PKG_URL}/v2/irma/key/${ts?.toString()}`
-      : `${PKG_URL}/v2/irma/sign/key`
+export async function getDecryptionUSK(jwt: string, ts?: number): Promise<any> {
+  const url = `${PKG_URL}/v2/irma/key/${ts?.toString()}`
   return fetch(url, {
     headers: {
       Authorization: `Bearer ${jwt}`,
@@ -475,4 +468,37 @@ export function showInfoMessage(msg: string) {
     'action',
     msgDetails
   )
+}
+
+/**
+ * Gets encryption public key from PKG, or local storage if PKG is not available
+ * @param isSigning Indicates whether signing public key should be received or not (= encryption public key)
+ * @returns The public key
+ */
+export async function getPublicKey(
+  isSigning: boolean = false
+): Promise<string> {
+  let response
+
+  const resource = !isSigning ? 'parameters' : 'sign/parameters'
+  const key = !isSigning ? 'pk' : 'signpk'
+
+  response = await fetch(`${PKG_URL}/v2/${resource}`, {
+    headers: { 'X-Postguard-Client-Version': getPostGuardHeaders() }
+  })
+  let pk
+
+  // if response is not ok, try to get PK from localStorage
+  if (!response.ok || (response.status < 200 && response.status > 299)) {
+    const cachedPK = window.localStorage.getItem(key)
+    if (cachedPK) {
+      pk = JSON.parse(cachedPK)
+    } else {
+      throw 'Cannot retrieve public key'
+    }
+  } else {
+    pk = await response.json()
+    window.localStorage.setItem(key, JSON.stringify(pk))
+  }
+  return pk.publicKey
 }

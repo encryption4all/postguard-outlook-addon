@@ -144,7 +144,7 @@ module.exports = async (_env, options) => {
             from: './src/dialogs/attributes.css'
           },
           {
-            to: 'commands.css',
+            to: 'sign.css',
             from: './src/sign/sign.css'
           },
           {

@@ -23,17 +23,22 @@ import {
   checkLocalStorage,
   getGlobal,
   getPostGuardHeaders,
-  getUSK,
+  getDecryptionUSK,
   hashCon,
   htmlBodyType,
   IAttachmentContent,
   newReadableStreamFromArray,
   PKG_URL,
   removeAttachment,
-  type_to_image
+  type_to_image,
+  getPublicKey
 } from '../helpers/utils'
 import sanitizeHtml from 'sanitize-html'
-const i18next = require('i18next')
+import jwtDecode, { JwtPayload } from 'jwt-decode'
+
+import i18next from 'i18next'
+import translationEN from '../../locales/en.json'
+import translationNL from '../../locales/nl.json'
 
 // eslint-disable-next-line no-undef
 const getLogger = require('webpack-log')
@@ -41,9 +46,7 @@ const decryptLog = getLogger({ name: 'PostGuard decrypt log' })
 
 const mod_promise = require('@e4a/pg-wasm')
 
-const vk_promise: Promise<string> = fetch(`${PKG_URL}/v2/sign/parameters`)
-  .then((r) => r.json())
-  .then((j) => j.publicKey)
+const vk_promise: Promise<string> = getPublicKey(true)
 
 const [vk, mod] = await Promise.all([vk_promise, mod_promise])
 
@@ -70,6 +73,21 @@ Office.initialize = function () {
     g.attachmentId = urlParams.get('attachmentid')
     g.msgFunc = passMsgToParent
     g.sender = urlParams.get('sender')
+
+    i18next.init({
+      lng: Office.context.displayLanguage.toLowerCase().startsWith('nl')
+        ? 'nl'
+        : 'en',
+      debug: true,
+      resources: {
+        en: {
+          translation: translationEN
+        },
+        nl: {
+          translation: translationNL
+        }
+      }
+    })
 
     $(function () {
       getMailObject()
@@ -176,13 +194,12 @@ export async function successMailReceived(mime) {
   decryptLog.info('Trying decryption with policy: ', keyRequest)
 
   const hashPolicy = await hashCon(hints)
-
   const localJwt = await checkLocalStorage(hints).catch(() =>
     executeIrmaDisclosureSession(hints, keyRequest.con)
   )
 
   // retrieve USK
-  const usk = await getUSK(localJwt, 'Decryption', keyRequest.ts)
+  const usk = await getDecryptionUSK(localJwt, keyRequest.ts)
 
   let plain = new Uint8Array(0)
   const writable = new WritableStream({
@@ -201,10 +218,19 @@ export async function successMailReceived(mime) {
         return { type: type_to_image(t), value: v }
       }
     )
+    let signingString = 'Sender signed with => '
+    badges.forEach(
+      (element) => (signingString += element.type + ': ' + element.value)
+    )
 
     const mail: string = new TextDecoder().decode(plain)
+
+    const decoded = jwtDecode<JwtPayload>(localJwt)
     // store JWT locally after unsealing successfully
-    window.localStorage.setItem(`jwt_${hashPolicy}`, localJwt)
+    window.localStorage.setItem(
+      `jwt_${hashPolicy}`,
+      JSON.stringify({ jwt: localJwt, exp: decoded.exp })
+    )
 
     // Parse inner mail via simpleParser
     let parsed = await simpleParser(mail)
@@ -255,19 +281,7 @@ export async function successMailReceived(mime) {
     )
 
     replaceMailBody(body, parsed.subject, attachments)
-
-    const msgDetails: Office.NotificationMessageDetails = {
-      type: Office.MailboxEnums.ItemNotificationMessageType
-        .InformationalMessage,
-      message: 'Succesfully decrypted, signature: ' + JSON.stringify(badges),
-      icon: 'Icon.80x80',
-      persistent: true
-    }
-
-    Office.context.mailbox.item.notificationMessages.replaceAsync(
-      'action',
-      msgDetails
-    )
+    passMsgToParent('Succesfully decrypted. ' + signingString)
   } catch (error) {
     if (error.name === 'OperationError') {
       g.msgFunc('Disclosed identity does not match requested policy')
@@ -306,8 +320,7 @@ function replaceMailBody(
     },
     success: function (success) {
       decryptLog.info('PATCH message success: ', success)
-      passMsgToParent('Successfully decrypted this Email with PostGuard')
-      removeAttachment(g.token, g.mailId, g.attachmentId, attachments)
+      //removeAttachment(g.token, g.mailId, g.attachmentId, attachments)
     }
   }).fail(handleAjaxError)
 }

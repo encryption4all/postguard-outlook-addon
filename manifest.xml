@@ -7,7 +7,7 @@
   <Version>1.0.0.0</Version>
   <ProviderName>PostGuard</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
-  <DisplayName DefaultValue="PostGuard Outlook add-in 3"/>
+  <DisplayName DefaultValue="PostGuard Outlook add-in"/>
   <Description DefaultValue="PostGuard - easy and secure emailing"/>
   <IconUrl DefaultValue="https://localhost:3000/assets/64.png"/>
   <HighResolutionIconUrl DefaultValue="https://localhost:3000/assets/128.png"/>
@@ -62,9 +62,9 @@
                     <bt:Image size="32" resid="Icon.32x32"/>
                     <bt:Image size="80" resid="Icon.80x80"/>
                   </Icon>
-                  <Action xsi:type="ShowTaskpane">
-                    <SourceLocation resid="Taskpane.Url"/>
-                  </Action>
+                  <Action xsi:type="ExecuteFunction">
+                      <FunctionName>decrypt</FunctionName>
+                    </Action>
                 </Control>
               </Group>
             </OfficeTab>
@@ -73,21 +73,6 @@
             <OfficeTab id="TabDefault">
               <Group id="msgComposeGroup">
                 <Label resid="GroupLabel"/>
-                <Control xsi:type="Button" id="EncryptButton">
-                    <Label resid="EncryptButton.Label"/>
-                    <Supertip>
-                      <Title resid="EncryptButton.Label"/>
-                      <Description resid="EncryptButton.Tooltip"/>
-                    </Supertip>
-                    <Icon>
-                      <bt:Image size="16" resid="Icon.16x16"/>
-                      <bt:Image size="32" resid="Icon.32x32"/>
-                      <bt:Image size="80" resid="Icon.80x80"/>
-                    </Icon>
-                    <Action xsi:type="ExecuteFunction">
-                      <FunctionName>encryptExt</FunctionName>
-                    </Action>
-                  </Control>
                   <Control xsi:type="Button" id="EncryptSignButton">
                     <Label resid="EncryptSignButton.Label"/>
                     <Supertip>
@@ -129,13 +114,13 @@
           <bt:String id="TaskpaneButton2.Label" DefaultValue="Decrypt Email via Taskpane"/>
           <bt:String id="EncryptButton.Label" DefaultValue="Send encrypted Email"/>
           <bt:String id="EncryptExtButton.Label" DefaultValue="Send encrypted Email (extended)"/>
-          <bt:String id="EncryptSignButton.Label" DefaultValue="Sign and send encrypted Email"/>
+          <bt:String id="EncryptSignButton.Label" DefaultValue="Secure Email"/>
         </bt:ShortStrings>
         <bt:LongStrings>
           <bt:String id="TaskpaneButton.Tooltip" DefaultValue="Decrypts the selected email with PostGuard."/>
           <bt:String id="SettingButton.Tooltip" DefaultValue="Adjust settings"/>
           <bt:String id="EncryptButton.Tooltip" DefaultValue="Encrypts and sends the current email."/>
-          <bt:String id="EncryptSignButton.Tooltip" DefaultValue="Encrypts, signs and sends the current email."/>
+          <bt:String id="EncryptSignButton.Tooltip" DefaultValue="Signs, encrypts and sends the current Email."/>
           <bt:String id="EncryptExtButton.Tooltip" DefaultValue="Encrypts and sends the current email where identity can be extended."/>
         </bt:LongStrings>
       </Resources>

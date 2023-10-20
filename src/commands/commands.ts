@@ -25,7 +25,9 @@ import {
   PKG_URL,
   showInfoMessage,
   Policy,
-  checkLocalStorage
+  checkLocalStorage,
+  hashCon,
+  getPublicKey
 } from '../helpers/utils'
 
 // eslint-disable-next-line no-undef
@@ -40,6 +42,7 @@ const EMAIL_ATTRIBUTE_TYPE = 'pbdf.sidn-pbdf.email.email'
 
 const mod_promise = import('@e4a/pg-wasm') // require('@e4a/pg-wasm')
 import { ISealOptions } from '@e4a/pg-wasm'
+import jwtDecode, { JwtPayload } from 'jwt-decode'
 
 const getLogger = require('webpack-log')
 const encryptLog = getLogger({ name: 'PostGuard encrypt log' })
@@ -217,37 +220,6 @@ async function getMailAttachmentContent(attachmentId: string): Promise<string> {
       }
     })
   })
-}
-
-/**
- * Gets public key from PKG, or local storage if PKG is not available
- * @returns The public key
- */
-async function getPublicKey(): Promise<string> {
-  let response
-
-  try {
-    response = await fetch(`${PKG_URL}/v2/parameters`, {
-      headers: { 'X-Postguard-Client-Version': getPostGuardHeaders() }
-    })
-  } catch (e) {
-    encryptLog.error(e)
-  }
-  let pk
-
-  // if response is not ok, try to get PK from localStorage
-  if (!response.ok || (response.status < 200 && response.status > 299)) {
-    const cachedPK = window.localStorage.getItem('pk')
-    if (cachedPK) {
-      pk = JSON.parse(cachedPK)
-    } else {
-      throw 'Cannot retrieve public key'
-    }
-  } else {
-    pk = await response.json()
-    window.localStorage.setItem('pk', JSON.stringify(pk))
-  }
-  return pk.publicKey
 }
 
 async function getSigningKeys(jwt: string, keyRequest?: any): Promise<any> {
@@ -496,7 +468,7 @@ function bccMsgAndDialog() {
  * Adds info message to email and shows dialog that message is successfully encrypted and send
  */
 function successMsgAndDialog() {
-  showInfoMessage('Successfully encrypted and sent')
+  showInfoMessage('Successfully signed, encrypted and sent')
   var fullUrl =
     'https://' +
     location.hostname +
@@ -796,6 +768,14 @@ async function processSignMsgMessage(arg) {
     const accessToken = messageFromDialog.result.accessToken
     encryptLog.info(`Signing keys: ${JSON.stringify(messageFromDialog)}`)
     const signingJwt = messageFromDialog.result.jwt
+
+    // store in local storage
+    const hashPolicy = await hashCon(g.signingpolicy)
+    const decoded = jwtDecode<JwtPayload>(signingJwt)
+    window.localStorage.setItem(
+      `jwt_${hashPolicy}`,
+      JSON.stringify({ jwt: signingJwt, exp: decoded.exp })
+    )
 
     encryptAndSendEmail(accessToken, g.accessPolicy, signingJwt).catch(
       (err) => {

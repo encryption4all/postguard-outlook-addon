@@ -11,9 +11,7 @@ import {
   getPostGuardHeaders,
   PKG_URL,
   _getMobileUrl,
-  Policy,
-  getGlobal,
-  hashCon
+  getGlobal
 } from '../helpers/utils'
 
 import * as YiviCore from '@privacybydesign/yivi-core'
@@ -22,6 +20,7 @@ import * as YiviWeb from '@privacybydesign/yivi-web'
 
 import * as getLogger from 'webpack-log'
 import i18next from 'i18next'
+import { AttributeCon } from '@e4a/pg-wasm'
 const encryptLog = getLogger({ name: 'PostGuard encrypt log' })
 
 // eslint-disable-next-line no-undef
@@ -41,7 +40,7 @@ Office.initialize = function () {
       urlParams.get('signingpolicy'),
       'base64'
     ).toString('utf-8')
-    const policy: Policy[] = JSON.parse(policyArg)
+    const policy: AttributeCon = JSON.parse(policyArg)
 
     $(function () {
       executeIrmaDisclosureSession(policy)
@@ -61,12 +60,10 @@ function passMsgToParent(msg: string) {
 
 /**
  * Executes an IRMA disclosure session based on the policy for signing
- * @param hints The policy with hidden values
  * @param policy The policy
- * @param sort Either Signing or Decrypting
  * @returns The JWT of the IRMA session
  */
-async function executeIrmaDisclosureSession(policy: Policy[]) {
+async function executeIrmaDisclosureSession(policy: AttributeCon) {
   // show HTML elements needed
   document.getElementById('header_text').style.display = 'block'
   document.getElementById('decryptinfo').style.display = 'block'
@@ -128,9 +125,6 @@ async function executeIrmaDisclosureSession(policy: Policy[]) {
   const jwtUrl = await yivi.start()
   // retrieve JWT, add to local storage, and return
   const localJwt: string = await $.ajax({ url: jwtUrl })
-
-  const hashPolicy = await hashCon(policy)
-  window.localStorage.setItem(`jwt_${hashPolicy}`, localJwt)
 
   const msg = {
     result: { jwt: localJwt, accessToken: g.token },
