@@ -31,10 +31,10 @@ import {
   PKG_URL,
   removeAttachment,
   type_to_image,
-  getPublicKey
+  getPublicKey,
+  storeLocalStorage
 } from '../helpers/utils'
 import sanitizeHtml from 'sanitize-html'
-import jwtDecode, { JwtPayload } from 'jwt-decode'
 
 import i18next from 'i18next'
 import translationEN from '../../locales/en.json'
@@ -64,35 +64,37 @@ const g = getGlobal() as any
  * Initialization function which also extracts the URL params
  */
 Office.initialize = function () {
-  if (Office.context.mailbox === undefined) {
-    decryptLog.info('Decrypt dialog openend!')
-    const urlParams = new URLSearchParams(window.location.search)
-    g.token = Buffer.from(urlParams.get('token'), 'base64').toString('utf-8')
-    g.recipient = urlParams.get('recipient').toLowerCase()
-    g.mailId = urlParams.get('mailid')
-    g.attachmentId = urlParams.get('attachmentid')
-    g.msgFunc = passMsgToParent
-    g.sender = urlParams.get('sender')
+  Office.onReady(() => {
+    if (Office.context.mailbox === undefined) {
+      decryptLog.info('Decrypt dialog openend!')
+      const urlParams = new URLSearchParams(window.location.search)
+      g.token = Buffer.from(urlParams.get('token'), 'base64').toString('utf-8')
+      g.recipient = urlParams.get('recipient').toLowerCase()
+      g.mailId = urlParams.get('mailid')
+      g.attachmentId = urlParams.get('attachmentid')
+      g.msgFunc = passMsgToParent
+      g.sender = urlParams.get('sender')
 
-    i18next.init({
-      lng: Office.context.displayLanguage.toLowerCase().startsWith('nl')
-        ? 'nl'
-        : 'en',
-      debug: true,
-      resources: {
-        en: {
-          translation: translationEN
-        },
-        nl: {
-          translation: translationNL
+      i18next.init({
+        lng: Office.context.displayLanguage.toLowerCase().startsWith('nl')
+          ? 'nl'
+          : 'en',
+        debug: true,
+        resources: {
+          en: {
+            translation: translationEN
+          },
+          nl: {
+            translation: translationNL
+          }
         }
-      }
-    })
+      })
 
-    $(function () {
-      getMailObject()
-    })
-  }
+      $(function () {
+        getMailObject()
+      })
+    }
+  })
 }
 
 /**
@@ -193,10 +195,10 @@ export async function successMailReceived(mime) {
   decryptLog.info('Hints: ', hints)
   decryptLog.info('Trying decryption with policy: ', keyRequest)
 
-  const hashPolicy = await hashCon(hints)
-  const localJwt = await checkLocalStorage(hints).catch(() =>
+  const localJwt = await checkLocalStorage(hints).catch((e) =>
     executeIrmaDisclosureSession(hints, keyRequest.con)
   )
+  decryptLog.info('LocalJwt: ' + localJwt)
 
   // retrieve USK
   const usk = await getDecryptionUSK(localJwt, keyRequest.ts)
@@ -225,12 +227,8 @@ export async function successMailReceived(mime) {
 
     const mail: string = new TextDecoder().decode(plain)
 
-    const decoded = jwtDecode<JwtPayload>(localJwt)
     // store JWT locally after unsealing successfully
-    window.localStorage.setItem(
-      `jwt_${hashPolicy}`,
-      JSON.stringify({ jwt: localJwt, exp: decoded.exp })
-    )
+    storeLocalStorage(hints, localJwt).catch((e) => decryptLog.error(e))
 
     // Parse inner mail via simpleParser
     let parsed = await simpleParser(mail)
@@ -320,7 +318,7 @@ function replaceMailBody(
     },
     success: function (success) {
       decryptLog.info('PATCH message success: ', success)
-      //removeAttachment(g.token, g.mailId, g.attachmentId, attachments)
+      removeAttachment(g.token, g.mailId, g.attachmentId, attachments)
     }
   }).fail(handleAjaxError)
 }
@@ -412,7 +410,6 @@ async function executeIrmaDisclosureSession(
   irma.use(YiviWeb)
   // disclose and retrieve JWT URL
   const jwtUrl = await irma.start()
-  // retrieve JWT, add to local storage, and return
   const localJwt: string = await $.ajax({ url: jwtUrl })
   return localJwt
 }

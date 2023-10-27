@@ -15,10 +15,10 @@ import {
 
 const msalConfig: Configuration = {
   auth: {
-    clientId: '6ee2a054-1d61-405d-8e5d-c2daf25c5833'
+    clientId: '799afcb4-a093-4ad4-8c6a-a8a4d5b1fbdd'
   },
   cache: {
-    cacheLocation: 'sessionStorage' // Needed to avoid "User login is required" error.
+    cacheLocation: 'localStorage'
   }
 }
 
@@ -41,6 +41,7 @@ const publicClientApp: PublicClientApplication = new PublicClientApplication(
 Office.onReady(async () => {
   if (Office.context.ui.messageParent) {
     try {
+      await publicClientApp.initialize()
       let tokenResponse = await publicClientApp.handleRedirectPromise()
 
       let accountObj: AccountInfo

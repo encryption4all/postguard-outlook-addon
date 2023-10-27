@@ -278,8 +278,8 @@ function storeAttachment(
 }
 
 /**
- * Sets event error for encryption
- */
+ * Sets generic event error
+ *  */
 export function setEventError() {
   const msg = 'PostGuard error, please try again or contact your administrator.'
   // if mailbox is available, current context is the main window, and not a dialog
@@ -381,15 +381,19 @@ export function getGlobal() {
 }
 
 export function getPostGuardHeaders() {
+  let host = 'OutlookDesktop'
+  let version = '0.0.0.0'
   // See https://learn.microsoft.com/en-us/javascript/api/office/office.platformtype
-  const host =
-    Office.context.platform.toString() === 'OfficeOnline'
-      ? 'OutlookWeb'
-      : ['iOS', 'Android'].includes(Office.context.platform.toString())
-      ? 'OoutlookMobile'
-      : 'OutlookDesktop'
-
-  let headers = `${host},${Office.context.diagnostics.version},pg4ol,0.0.1`
+  try {
+    host =
+      Office.context.platform.toString() === 'OfficeOnline'
+        ? 'OutlookWeb'
+        : ['iOS', 'Android'].includes(Office.context.platform.toString())
+        ? 'OoutlookMobile'
+        : 'OutlookDesktop'
+    version = Office.context.diagnostics.version
+  } catch {}
+  let headers = `${host},${version},pg4ol,0.0.1`
   console.log(`Headers: ${headers}`)
   return headers
 }
@@ -419,13 +423,29 @@ export function type_to_image(t: string): string {
   return type
 }
 
+export async function storeLocalStorage(con: AttributeCon, jwt: string) {
+  const decoded = jwtDecode<JwtPayload>(jwt)
+  hashCon(con).then((hash) => {
+    const storageJwt = JSON.stringify({ jwt: jwt, exp: decoded.exp })
+    utilLog.info(`JWT to store with hash ${hash}: ${storageJwt}`)
+    window.localStorage.setItem(`jwt_${hash}`, storageJwt)
+  })
+}
+
 export async function checkLocalStorage(con: AttributeCon) {
   const hash = await hashCon(con)
   const cached = window.localStorage.getItem(`jwt_${hash}`)
-  if (cached === null) throw new Error('not found in localStorage')
-  const decoded = JSON.parse(cached[hash]) // jwtDecode<JwtPayload>(cached)
-  if (Date.now() / 1000 > decoded.exp) throw new Error('jwt has expired')
-  return cached
+  if (cached === null) {
+    utilLog.info('not found in localStorage with hash ' + hash)
+    throw new Error('not found in localStorage')
+  }
+  const decoded = JSON.parse(cached)
+  if (Date.now() / 1000 > decoded.exp) {
+    utilLog.info(`jwt has expired: ${cached}`)
+    window.localStorage.removeItem(`jwt_${hash}`)
+    throw new Error('jwt has expired')
+  }
+  return decoded.jwt
 }
 
 export async function hashCon(con: AttributeCon): Promise<string> {
@@ -458,16 +478,22 @@ export async function getDecryptionUSK(jwt: string, ts?: number): Promise<any> {
  * @param msg The message to be displayes
  */
 export function showInfoMessage(msg: string) {
-  const msgDetails: Office.NotificationMessageDetails = {
-    type: Office.MailboxEnums.ItemNotificationMessageType.InformationalMessage,
-    message: msg,
-    icon: 'Icon.80x80',
-    persistent: true
+  // if mailbox is available, current context is the main window, and not a dialog
+  if (Office.context.mailbox !== undefined) {
+    const msgDetails: Office.NotificationMessageDetails = {
+      type: Office.MailboxEnums.ItemNotificationMessageType
+        .InformationalMessage,
+      message: msg,
+      icon: 'Icon.80x80',
+      persistent: true
+    }
+    Office.context.mailbox.item.notificationMessages.replaceAsync(
+      'action',
+      msgDetails
+    )
+  } else {
+    Office.context.ui.messageParent(msg)
   }
-  Office.context.mailbox.item.notificationMessages.replaceAsync(
-    'action',
-    msgDetails
-  )
 }
 
 /**

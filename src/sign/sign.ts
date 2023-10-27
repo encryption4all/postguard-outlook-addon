@@ -123,7 +123,6 @@ async function executeIrmaDisclosureSession(policy: AttributeCon) {
   yivi.use(YiviWeb)
   // disclose and retrieve JWT URL
   const jwtUrl = await yivi.start()
-  // retrieve JWT, add to local storage, and return
   const localJwt: string = await $.ajax({ url: jwtUrl })
 
   const msg = {

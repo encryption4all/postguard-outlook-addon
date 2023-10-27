@@ -27,7 +27,8 @@ import {
   Policy,
   checkLocalStorage,
   hashCon,
-  getPublicKey
+  getPublicKey,
+  storeLocalStorage
 } from '../helpers/utils'
 
 // eslint-disable-next-line no-undef
@@ -42,7 +43,6 @@ const EMAIL_ATTRIBUTE_TYPE = 'pbdf.sidn-pbdf.email.email'
 
 const mod_promise = import('@e4a/pg-wasm') // require('@e4a/pg-wasm')
 import { ISealOptions } from '@e4a/pg-wasm'
-import jwtDecode, { JwtPayload } from 'jwt-decode'
 
 const getLogger = require('webpack-log')
 const encryptLog = getLogger({ name: 'PostGuard encrypt log' })
@@ -468,7 +468,9 @@ function bccMsgAndDialog() {
  * Adds info message to email and shows dialog that message is successfully encrypted and send
  */
 function successMsgAndDialog() {
-  showInfoMessage('Successfully signed, encrypted and sent')
+  showInfoMessage('Successfully signed, encrypted and sent email')
+  globalEvent.completed()
+
   var fullUrl =
     'https://' +
     location.hostname +
@@ -769,13 +771,8 @@ async function processSignMsgMessage(arg) {
     encryptLog.info(`Signing keys: ${JSON.stringify(messageFromDialog)}`)
     const signingJwt = messageFromDialog.result.jwt
 
-    // store in local storage
-    const hashPolicy = await hashCon(g.signingpolicy)
-    const decoded = jwtDecode<JwtPayload>(signingJwt)
-    window.localStorage.setItem(
-      `jwt_${hashPolicy}`,
-      JSON.stringify({ jwt: signingJwt, exp: decoded.exp })
-    )
+    // store signing JWT in local storage
+    storeLocalStorage(g.signingpolicy, signingJwt)
 
     encryptAndSendEmail(accessToken, g.accessPolicy, signingJwt).catch(
       (err) => {
