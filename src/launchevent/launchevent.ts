@@ -16,6 +16,7 @@ import {
   secondsTill4AM,
   buildEncryptedBody,
   extractArmoredPayload,
+  parseMimeContent,
 } from "../utils";
 import type { AttributeCon, Policy, SealPolicy, ComposeState } from "../types";
 
@@ -375,16 +376,24 @@ async function decryptBytes(
   await unsealer.unseal(userEmail, usk, writableDecrypt);
   console.log("[PostGuard] Decryption complete, length:", decryptedData.length);
 
-  const { body, isHtml } = parseMimeContent(decryptedData);
+  const { subject, body, isHtml } = parseMimeContent(decryptedData);
 
-  const decryptedBody = {
-    coercionType: isHtml ? Office.CoercionType.Html : Office.CoercionType.Text,
-    content: body,
-  };
+  // Prepend the original subject since event.completed() cannot set the subject field.
+  let content: string;
+  if (isHtml) {
+    content = `<h2 style="margin:0 0 12px">${subject}</h2>${body}`;
+  } else {
+    content = `${subject}\n\n${body}`;
+  }
 
+  // Use the OnMessageRead event API to replace the displayed message content.
+  // This is a display-only replacement; the launch event re-fires on each open.
   (event as any).completed({
     allowEvent: true,
-    emailBody: decryptedBody,
+    emailBody: {
+      coercionType: isHtml ? Office.CoercionType.Html : Office.CoercionType.Text,
+      content,
+    },
   });
 }
 
@@ -406,8 +415,8 @@ async function onMessageReadHandler(event: Office.AddinCommands.Event): Promise<
     await mod.default();
     console.log("[PostGuard] WASM and keys loaded");
 
-    // Try attachment first
-    const attachmentId = await findEncryptedAttachment(item);
+    // Try attachment first (item.attachments is a sync property in read mode)
+    const attachmentId = findEncryptedAttachment(item);
     if (attachmentId) {
       console.log("[PostGuard] Found encrypted attachment:", attachmentId);
       const base64Content = await getAttachmentContent(item, attachmentId);
@@ -446,23 +455,14 @@ async function onMessageReadHandler(event: Office.AddinCommands.Event): Promise<
 
 // ─── Read helpers ──────────────────────────────────────────────────
 
-function findEncryptedAttachment(item: Office.MessageRead): Promise<string | null> {
-  return new Promise((resolve) => {
-    try {
-      (item as any).getAttachmentsAsync((result: Office.AsyncResult<Office.AttachmentDetails[]>) => {
-        if (result.status !== Office.AsyncResultStatus.Succeeded) {
-          resolve(null);
-          return;
-        }
-        const pgAttachment = result.value.find(
-          (att: Office.AttachmentDetails) => att.name === PG_ATTACHMENT_NAME
-        );
-        resolve(pgAttachment?.id || null);
-      });
-    } catch {
-      resolve(null);
-    }
-  });
+function findEncryptedAttachment(item: Office.MessageRead): string | null {
+  try {
+    const attachments: Office.AttachmentDetails[] = (item as any).attachments ?? [];
+    const pgAttachment = attachments.find((att) => att.name === PG_ATTACHMENT_NAME);
+    return pgAttachment?.id || null;
+  } catch {
+    return null;
+  }
 }
 
 function getAttachmentContent(item: Office.MessageRead, attachmentId: string): Promise<string> {
@@ -475,30 +475,6 @@ function getAttachmentContent(item: Office.MessageRead, attachmentId: string): P
       resolve(result.value.content);
     });
   });
-}
-
-function parseMimeContent(mimeData: string): { subject: string; body: string; isHtml: boolean } {
-  const subjectMatch = mimeData.match(/^Subject:\s*(.+)$/im);
-  const subject = subjectMatch ? subjectMatch[1].trim() : "(no subject)";
-
-  const headerEndIndex = mimeData.indexOf("\r\n\r\n");
-  let body = headerEndIndex !== -1 ? mimeData.substring(headerEndIndex + 4) : mimeData;
-
-  const contentTypeMatch = mimeData.match(
-    /^Content-Type:\s*multipart\/mixed;\s*boundary="?([^"\r\n]+)"?/im
-  );
-  if (contentTypeMatch) {
-    const boundary = contentTypeMatch[1];
-    const parts = body.split(`--${boundary}`);
-    if (parts.length > 1) {
-      const firstPart = parts[1];
-      const partHeaderEnd = firstPart.indexOf("\r\n\r\n");
-      body = partHeaderEnd !== -1 ? firstPart.substring(partHeaderEnd + 4) : firstPart;
-    }
-  }
-
-  const isHtml = /<html|<div|<p|<br/i.test(body);
-  return { subject, body, isHtml };
 }
 
 // ─── Register handlers ─────────────────────────────────────────────

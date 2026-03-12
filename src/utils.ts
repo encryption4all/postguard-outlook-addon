@@ -190,6 +190,32 @@ export function cleanUpCache(): void {
   }
 }
 
+// ─── MIME parsing ──────────────────────────────────────────────────
+
+export function parseMimeContent(mimeData: string): { subject: string; body: string; isHtml: boolean } {
+  const subjectMatch = mimeData.match(/^Subject:\s*(.+)$/im);
+  const subject = subjectMatch ? subjectMatch[1].trim() : "(no subject)";
+
+  const headerEndIndex = mimeData.indexOf("\r\n\r\n");
+  let body = headerEndIndex !== -1 ? mimeData.substring(headerEndIndex + 4) : mimeData;
+
+  const contentTypeMatch = mimeData.match(
+    /^Content-Type:\s*multipart\/mixed;\s*boundary="?([^"\r\n]+)"?/im
+  );
+  if (contentTypeMatch) {
+    const boundary = contentTypeMatch[1];
+    const parts = body.split(`--${boundary}`);
+    if (parts.length > 1) {
+      const firstPart = parts[1];
+      const partHeaderEnd = firstPart.indexOf("\r\n\r\n");
+      body = partHeaderEnd !== -1 ? firstPart.substring(partHeaderEnd + 4) : firstPart;
+    }
+  }
+
+  const isHtml = /<html|<div|<p|<br/i.test(body);
+  return { subject, body, isHtml };
+}
+
 // ─── Armor & body helpers ──────────────────────────────────────────
 
 export function armorBase64(base64: string): string {

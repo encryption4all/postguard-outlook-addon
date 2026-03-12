@@ -70,6 +70,8 @@ async function initPostGuard(): Promise<void> {
     retrieveVerificationKey(),
     import("@e4a/pg-wasm"),
   ]);
+  // Initialize the WASM module (default export is the init function)
+  await mod.default();
   masterPublicKey = pk;
   masterVerificationKey = vk;
   pgWasm = mod;
@@ -85,25 +87,17 @@ async function detectEncryption(): Promise<{
   const item = Office.context.mailbox.item;
   if (!item) return { isEncrypted: false };
 
-  // Check attachment first
-  const attachmentResult = await new Promise<{ attachmentId?: string }>((resolve) => {
-    try {
-      item.getAttachmentsAsync((result) => {
-        if (result.status !== Office.AsyncResultStatus.Succeeded) {
-          console.log("[PostGuard] getAttachmentsAsync failed:", result.error);
-          resolve({});
-          return;
-        }
-        const pgAttachment = result.value.find(
-          (att: Office.AttachmentDetails) => att.name === PG_ATTACHMENT_NAME
-        );
-        resolve({ attachmentId: pgAttachment?.id });
-      });
-    } catch (e) {
-      console.log("[PostGuard] detectEncryption attachment error:", e);
-      resolve({});
+  // Check attachments (read-mode uses the .attachments property, not getAttachmentsAsync)
+  let attachmentResult: { attachmentId?: string } = {};
+  try {
+    const attachments: Office.AttachmentDetails[] = (item as any).attachments ?? [];
+    const pgAttachment = attachments.find((att) => att.name === PG_ATTACHMENT_NAME);
+    if (pgAttachment) {
+      attachmentResult = { attachmentId: pgAttachment.id };
     }
-  });
+  } catch (e) {
+    console.log("[PostGuard] detectEncryption attachment error:", e);
+  }
 
   if (attachmentResult.attachmentId) {
     return { isEncrypted: true, attachmentId: attachmentResult.attachmentId };
@@ -380,11 +374,8 @@ function displayDecryptedContent(mimeData: string, senderIdentity: unknown): voi
 }
 
 // Main initialization
-Office.onReady(async (info) => {
-  console.log("[PostGuard] Office.onReady fired, host:", info.host);
-
-  cleanUpCache();
-
+// Handle the current message: check cache from launch event, detect encryption, etc.
+async function handleCurrentItem(): Promise<void> {
   // Don't block on PKG init - detect encryption first, init WASM only when user decrypts
   try {
     const { isEncrypted, attachmentId, armoredBase64 } = await detectEncryption();
@@ -420,6 +411,21 @@ Office.onReady(async (info) => {
     console.error("[PostGuard] Init error:", e);
     showSection("pg-not-encrypted");
   }
+}
+
+// Main initialization
+Office.onReady(async (info) => {
+  console.log("[PostGuard] Office.onReady fired, host:", info.host);
+
+  cleanUpCache();
+
+  await handleCurrentItem();
+
+  // Re-run when the user switches messages (pinned taskpane)
+  Office.context.mailbox.addHandlerAsync(
+    Office.EventType.ItemChanged,
+    () => handleCurrentItem()
+  );
 
   const btnRetry = document.getElementById("btn-retry");
   if (btnRetry) {
