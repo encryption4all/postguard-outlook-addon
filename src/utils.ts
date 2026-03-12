@@ -231,7 +231,7 @@ export function buildEncryptedBody(sender: string, base64Encrypted: string): str
   let fallbackLinkHtml: string;
   if (base64Encrypted.length <= PG_MAX_URL_FRAGMENT_SIZE) {
     const urlSafe = toUrlSafeBase64(base64Encrypted);
-    const fallbackUrl = `${POSTGUARD_WEBSITE_URL}/fallback#${urlSafe}`;
+    const fallbackUrl = `${POSTGUARD_WEBSITE_URL}/decrypt#${urlSafe}`;
     fallbackLinkHtml =
       `<div class="outer">` +
       `<div class="numberCounter">3</div>` +
@@ -245,7 +245,7 @@ export function buildEncryptedBody(sender: string, base64Encrypted: string): str
       `<div class="numberCounter">3</div>` +
       `<div style="margin-left: 34px">` +
       `Or decrypt in your browser via ` +
-      `<a href="${POSTGUARD_WEBSITE_URL}/fallback">postguard.eu/fallback</a>. ` +
+      `<a href="${POSTGUARD_WEBSITE_URL}/decrypt">postguard.eu/decrypt</a>. ` +
       `Upload the attached <code>postguard.encrypted</code> file on that page.` +
       `</div></div>`;
   }
