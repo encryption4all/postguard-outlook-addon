@@ -12,6 +12,7 @@ import {
   getSigningKeys,
   checkJwtCache,
   invalidateJwtCache,
+  storeJwtCache,
   PG_CLIENT_HEADER,
   PKG_URL,
   secondsTill4AM,
@@ -302,6 +303,57 @@ async function onMessageSendHandler(event: Office.AddinCommands.Event): Promise<
   }
 }
 
+// ─── Yivi dialog for decryption (from launch event) ─────────────────
+
+async function openYiviDialogForDecryption(
+  con: AttributeCon,
+  hints?: AttributeCon,
+  senderId?: string
+): Promise<string> {
+  const dialogData = {
+    hostname: PKG_URL,
+    header: PG_CLIENT_HEADER,
+    con,
+    sort: "Decryption",
+    hints,
+    senderId,
+    validity: secondsTill4AM(),
+  };
+
+  const encodedData = encodeURIComponent(JSON.stringify(dialogData));
+  const origin = window.location.origin;
+  const dialogUrl = `${origin}/dialog.html?data=${encodedData}`;
+
+  return new Promise<string>((resolve, reject) => {
+    Office.context.ui.displayDialogAsync(
+      dialogUrl,
+      { height: 60, width: 40, promptBeforeOpen: false },
+      (asyncResult) => {
+        if (asyncResult.status !== Office.AsyncResultStatus.Succeeded) {
+          reject(new Error("Failed to open Yivi dialog"));
+          return;
+        }
+        const dialog = asyncResult.value;
+
+        dialog.addEventHandler(Office.EventType.DialogMessageReceived, (arg: { message: string }) => {
+          dialog.close();
+          try {
+            const message = JSON.parse(arg.message);
+            if (message.jwt) resolve(message.jwt);
+            else reject(new Error(message.error || "No JWT"));
+          } catch {
+            reject(new Error("Invalid dialog response"));
+          }
+        });
+
+        dialog.addEventHandler(Office.EventType.DialogEventReceived, () => {
+          reject(new Error("Dialog was closed"));
+        });
+      }
+    );
+  });
+}
+
 // ─── OnMessageRead handler ─────────────────────────────────────────
 
 async function getReadBody(item: Office.MessageRead): Promise<string> {
@@ -353,14 +405,18 @@ async function decryptBytes(
     return { t, v };
   });
 
+  const senderEmail = Office.context.mailbox.item?.from?.emailAddress;
+
+  // Try cached JWT first; fall back to Yivi dialog
+  let usedCache = false;
   let jwt: string;
   try {
     jwt = await checkJwtCache(hints);
+    usedCache = true;
     console.log("[PostGuard] Got cached JWT");
   } catch {
-    console.log("[PostGuard] No cached JWT, cannot auto-decrypt");
-    event.completed({ allowEvent: false });
-    return;
+    console.log("[PostGuard] No cached JWT, opening Yivi dialog");
+    jwt = await openYiviDialogForDecryption(keyRequest.con, hints, senderEmail);
   }
 
   const tryUnseal = async (token: string) => {
@@ -386,12 +442,15 @@ async function decryptBytes(
   try {
     decryptedData = await tryUnseal(jwt);
   } catch (e) {
-    // Cached JWT led to a bad key — invalidate so the taskpane can request fresh credentials
-    console.warn("[PostGuard] Cached JWT failed, invalidating cache:", e);
+    if (!usedCache) throw e;
+    // Cached JWT led to a bad key — invalidate and retry with Yivi dialog
+    console.warn("[PostGuard] Cached JWT failed, requesting fresh credentials:", e);
     await invalidateJwtCache(hints);
-    event.completed({ allowEvent: false });
-    return;
+    jwt = await openYiviDialogForDecryption(keyRequest.con, hints, senderEmail);
+    decryptedData = await tryUnseal(jwt);
   }
+
+  await storeJwtCache(hints, jwt);
   console.log("[PostGuard] Decryption complete, length:", decryptedData.length);
 
   const { subject, body, isHtml } = parseMimeContent(decryptedData);
