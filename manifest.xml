@@ -1,29 +1,35 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<OfficeApp xmlns="http://schemas.microsoft.com/office/appforoffice/1.1"
+<OfficeApp
+  xmlns="http://schemas.microsoft.com/office/appforoffice/1.1"
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
   xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0"
-  xmlns:mailappor="http://schemas.microsoft.com/office/mailappversionoverrides/1.0" xsi:type="MailApp">
+  xmlns:mailappor="http://schemas.microsoft.com/office/mailappversionoverrides/1.0"
+  xsi:type="MailApp">
+
   <Id>7274321f-8067-4844-ae11-dabe76ad38c0</Id>
-  <Version>0.0.1</Version>
+  <Version>0.2.0</Version>
   <ProviderName>PostGuard</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
-  <DisplayName DefaultValue="PostGuard outlook add-in"/>
-  <Description DefaultValue="PostGuard - easy and secure emailing"/>
-  <IconUrl DefaultValue="https://localhost:3000/assets/64.png"/>
-  <HighResolutionIconUrl DefaultValue="https://localhost:3000/assets/128.png"/>
-  <SupportUrl DefaultValue="https://PostGuard.eu"/>
+  <DisplayName DefaultValue="PostGuard"/>
+  <Description DefaultValue="Encrypt and decrypt emails using identity-based encryption with Yivi."/>
+  <IconUrl DefaultValue="https://localhost:3000/assets/icon-64.png"/>
+  <HighResolutionIconUrl DefaultValue="https://localhost:3000/assets/icon-128.png"/>
+  <SupportUrl DefaultValue="https://postguard.eu"/>
+
   <AppDomains>
-    <AppDomain>https://login.microsoftonline.com</AppDomain>
-    <AppDomain>https://login.windows.net</AppDomain>
+    <AppDomain>https://postguard-main.cs.ru.nl</AppDomain>
   </AppDomains>
+
   <Hosts>
     <Host Name="Mailbox"/>
   </Hosts>
+
   <Requirements>
     <Sets>
-      <Set Name="Mailbox" MinVersion="1.4"/>
+      <Set Name="Mailbox" MinVersion="1.3"/>
     </Sets>
   </Requirements>
+
   <FormSettings>
     <Form xsi:type="ItemRead">
       <DesktopSettings>
@@ -32,247 +38,202 @@
       </DesktopSettings>
     </Form>
   </FormSettings>
+
   <Permissions>ReadWriteItem</Permissions>
   <Rule xsi:type="RuleCollection" Mode="Or">
-    <Rule xsi:type="ItemIs" ItemType="Message" FormType="Edit"/>
+    <Rule xsi:type="ItemIs" ItemType="Message" FormType="Read"/>
   </Rule>
-  <DisableEntityHighlighting>false</DisableEntityHighlighting>
+  <DisableEntityHighlighting>true</DisableEntityHighlighting>
+
   <VersionOverrides xmlns="http://schemas.microsoft.com/office/mailappversionoverrides" xsi:type="VersionOverridesV1_0">
+
     <Requirements>
-      <bt:Sets DefaultMinVersion="1.4">
+      <bt:Sets DefaultMinVersion="1.3">
         <bt:Set Name="Mailbox"/>
       </bt:Sets>
     </Requirements>
+
     <Hosts>
       <Host xsi:type="MailHost">
         <DesktopFormFactor>
-          <FunctionFile resid="Encrypt.Url"/>
+
+          <FunctionFile resid="CommandsUrl"/>
+
           <ExtensionPoint xsi:type="MessageReadCommandSurface">
             <OfficeTab id="TabDefault">
-              <Group id="msgReadGroup">
+              <Group id="pgReadGroup">
                 <Label resid="GroupLabel"/>
-                <Control xsi:type="Button" id="msgReadOpenPaneButton">
-                  <Label resid="TaskpaneButton.Label"/>
+                <Control xsi:type="Button" id="pgReadPaneButton">
+                  <Label resid="ReadBtnLabel"/>
                   <Supertip>
-                    <Title resid="TaskpaneButton.Label"/>
-                    <Description resid="TaskpaneButton.Tooltip"/>
+                    <Title resid="ReadBtnLabel"/>
+                    <Description resid="ReadBtnTooltip"/>
                   </Supertip>
                   <Icon>
-                    <bt:Image size="16" resid="Icon.16x16"/>
-                    <bt:Image size="32" resid="Icon.32x32"/>
-                    <bt:Image size="80" resid="Icon.80x80"/>
+                    <bt:Image size="16" resid="Icon16"/>
+                    <bt:Image size="32" resid="Icon32"/>
+                    <bt:Image size="80" resid="Icon80"/>
                   </Icon>
                   <Action xsi:type="ShowTaskpane">
-                    <SourceLocation resid="Taskpane.Url"/>
+                    <SourceLocation resid="TaskpaneUrl"/>
                   </Action>
                 </Control>
               </Group>
             </OfficeTab>
           </ExtensionPoint>
+
           <ExtensionPoint xsi:type="MessageComposeCommandSurface">
             <OfficeTab id="TabDefault">
-              <Group id="msgComposeGroup">
+              <Group id="pgComposeGroup">
                 <Label resid="GroupLabel"/>
-                <Control xsi:type="Button" id="EncryptButton">
-                  <Label resid="EncryptButton.Label"/>
+                <Control xsi:type="Button" id="pgComposePaneButton">
+                  <Label resid="ComposeBtnLabel"/>
                   <Supertip>
-                    <Title resid="EncryptButton.Label"/>
-                    <Description resid="EncryptButton.Tooltip"/>
+                    <Title resid="ComposeBtnLabel"/>
+                    <Description resid="ComposeBtnTooltip"/>
                   </Supertip>
                   <Icon>
-                    <bt:Image size="16" resid="Icon.16x16"/>
-                    <bt:Image size="32" resid="Icon.32x32"/>
-                    <bt:Image size="80" resid="Icon.80x80"/>
+                    <bt:Image size="16" resid="Icon16"/>
+                    <bt:Image size="32" resid="Icon32"/>
+                    <bt:Image size="80" resid="Icon80"/>
                   </Icon>
-                  <Action xsi:type="ExecuteFunction">
-                    <FunctionName>encrypt</FunctionName>
+                  <Action xsi:type="ShowTaskpane">
+                    <SourceLocation resid="ComposeUrl"/>
                   </Action>
                 </Control>
               </Group>
             </OfficeTab>
           </ExtensionPoint>
+
         </DesktopFormFactor>
       </Host>
     </Hosts>
+
     <Resources>
       <bt:Images>
-        <bt:Image id="Icon.16x16" DefaultValue="https://localhost:3000/assets/16.png"/>
-        <bt:Image id="Icon.32x32" DefaultValue="https://localhost:3000/assets/32.png"/>
-        <bt:Image id="Icon.80x80" DefaultValue="https://localhost:3000/assets/80.png"/>
+        <bt:Image id="Icon16" DefaultValue="https://localhost:3000/assets/icon-16.png"/>
+        <bt:Image id="Icon32" DefaultValue="https://localhost:3000/assets/icon-32.png"/>
+        <bt:Image id="Icon80" DefaultValue="https://localhost:3000/assets/icon-80.png"/>
       </bt:Images>
       <bt:Urls>
-        <bt:Url id="Encrypt.Url" DefaultValue="https://localhost:3000/commands.html"/>
-        <bt:Url id="Taskpane.Url" DefaultValue="https://localhost:3000/taskpane.html"/>
+        <bt:Url id="CommandsUrl" DefaultValue="https://localhost:3000/commands.html"/>
+        <bt:Url id="TaskpaneUrl" DefaultValue="https://localhost:3000/taskpane.html"/>
+        <bt:Url id="ComposeUrl" DefaultValue="https://localhost:3000/compose.html"/>
       </bt:Urls>
       <bt:ShortStrings>
-        <bt:String id="GroupLabel" DefaultValue="PostGuard Add-in"/>
-        <bt:String id="TaskpaneButton.Label" DefaultValue="Decrypt email"/>
-        <bt:String id="EncryptButton.Label" DefaultValue="Encrypt and Send email"/>
+        <bt:String id="GroupLabel" DefaultValue="PostGuard"/>
+        <bt:String id="ReadBtnLabel" DefaultValue="PostGuard"/>
+        <bt:String id="ComposeBtnLabel" DefaultValue="PostGuard"/>
       </bt:ShortStrings>
       <bt:LongStrings>
-        <bt:String id="TaskpaneButton.Tooltip" DefaultValue="Opens a dialog to decrypt the selected email."/>
-        <bt:String id="EncryptButton.Tooltip" DefaultValue="Encrypt and send the current email with PostGuard."/>
+        <bt:String id="ReadBtnTooltip" DefaultValue="Open PostGuard to decrypt encrypted messages."/>
+        <bt:String id="ComposeBtnTooltip" DefaultValue="Configure PostGuard encryption settings for this email."/>
       </bt:LongStrings>
     </Resources>
 
-    <!-- VersionOverrides v1.1 to add support for SSO -->
+    <!-- Nested V1.1 overrides for encryption/decryption event-based activation -->
     <VersionOverrides xmlns="http://schemas.microsoft.com/office/mailappversionoverrides/1.1" xsi:type="VersionOverridesV1_1">
       <Requirements>
-        <bt:Sets DefaultMinVersion="1.4">
+        <bt:Sets DefaultMinVersion="1.15">
           <bt:Set Name="Mailbox"/>
         </bt:Sets>
       </Requirements>
       <Hosts>
         <Host xsi:type="MailHost">
+          <Runtimes>
+            <!-- HTML file for the event-based runtime -->
+            <Runtime resid="LaunchEventUrl">
+              <!-- JavaScript file override for classic Outlook on Windows -->
+              <Override type="javascript" resid="LaunchEventJSUrl"/>
+            </Runtime>
+          </Runtimes>
           <DesktopFormFactor>
-            <FunctionFile resid="Encrypt.Url"/>
+            <FunctionFile resid="CommandsUrl"/>
+
+            <!-- Existing ribbon buttons -->
             <ExtensionPoint xsi:type="MessageReadCommandSurface">
               <OfficeTab id="TabDefault">
-                <Group id="msgReadGroup">
+                <Group id="pgReadGroup">
                   <Label resid="GroupLabel"/>
-                  <Control xsi:type="Button" id="msgReadOpenPaneButton">
-                    <Label resid="TaskpaneButton.Label"/>
+                  <Control xsi:type="Button" id="pgReadPaneButton">
+                    <Label resid="ReadBtnLabel"/>
                     <Supertip>
-                      <Title resid="TaskpaneButton.Label"/>
-                      <Description resid="TaskpaneButton.Tooltip"/>
+                      <Title resid="ReadBtnLabel"/>
+                      <Description resid="ReadBtnTooltip"/>
                     </Supertip>
                     <Icon>
-                      <bt:Image size="16" resid="Icon.16x16"/>
-                      <bt:Image size="32" resid="Icon.32x32"/>
-                      <bt:Image size="80" resid="Icon.80x80"/>
+                      <bt:Image size="16" resid="Icon16"/>
+                      <bt:Image size="32" resid="Icon32"/>
+                      <bt:Image size="80" resid="Icon80"/>
                     </Icon>
-                    <Action xsi:type="ExecuteFunction">
-                      <FunctionName>decrypt</FunctionName>
+                    <Action xsi:type="ShowTaskpane">
+                      <SourceLocation resid="TaskpaneUrl"/>
                     </Action>
                   </Control>
-                  <!--Control xsi:type="Button" id="Contoso.settingButton">
-                    <Label resid="TaskpaneButton2.Label"/>
-                    <Supertip>
-                      <Title resid="TaskpaneButton2.Label"/>
-                      <Description resid="TaskpaneButton.Tooltip"/>
-                    </Supertip>
-                    <Icon>
-                      <bt:Image size="16" resid="Icon.16x16"/>
-                      <bt:Image size="32" resid="Icon.32x32"/>
-                      <bt:Image size="80" resid="Icon.80x80"/>
-                    </Icon>
-                    <Action xsi:type="ShowTaskpane">
-                      <SourceLocation resid="Taskpane.Url" />
-                    </Action>
-                  </Control-->
-                  <!--Control xsi:type="Button" id="Contoso.mobileButton1">
-                    <Label resid="SettingButton.Label"/>
-                    <Supertip>
-                      <Title resid="SettingButton.Label"/>
-                      <Description resid="SettingButton.Tooltip"/>
-                    </Supertip>
-                    <Icon>
-                      <bt:Image size="16" resid="Icon.16x16"/>
-                      <bt:Image size="32" resid="Icon.32x32"/>
-                      <bt:Image size="80" resid="Icon.80x80"/>
-                    </Icon>
-                    <Action xsi:type="ShowTaskpane">
-                      <SourceLocation resid="Settings.Url" />
-                    </Action>
-                  </Control-->
                 </Group>
               </OfficeTab>
             </ExtensionPoint>
+
             <ExtensionPoint xsi:type="MessageComposeCommandSurface">
               <OfficeTab id="TabDefault">
-                <Group id="msgComposeGroup">
+                <Group id="pgComposeGroup">
                   <Label resid="GroupLabel"/>
-                  <Control xsi:type="Button" id="EncryptButton">
-                    <Label resid="EncryptButton.Label"/>
+                  <Control xsi:type="Button" id="pgComposePaneButton">
+                    <Label resid="ComposeBtnLabel"/>
                     <Supertip>
-                      <Title resid="EncryptButton.Label"/>
-                      <Description resid="EncryptButton.Tooltip"/>
+                      <Title resid="ComposeBtnLabel"/>
+                      <Description resid="ComposeBtnTooltip"/>
                     </Supertip>
                     <Icon>
-                      <bt:Image size="16" resid="Icon.16x16"/>
-                      <bt:Image size="32" resid="Icon.32x32"/>
-                      <bt:Image size="80" resid="Icon.80x80"/>
+                      <bt:Image size="16" resid="Icon16"/>
+                      <bt:Image size="32" resid="Icon32"/>
+                      <bt:Image size="80" resid="Icon80"/>
                     </Icon>
-                    <Action xsi:type="ExecuteFunction">
-                      <FunctionName>encryptExt</FunctionName>
+                    <Action xsi:type="ShowTaskpane">
+                      <SourceLocation resid="ComposeUrl"/>
                     </Action>
                   </Control>
-                  <!--Control xsi:type="Button" id="EncryptExtButton">
-                    <Label resid="EncryptExtButton.Label"/>
-                    <Supertip>
-                      <Title resid="EncryptExtButton.Label"/>
-                      <Description resid="EncryptExtButton.Tooltip"/>
-                    </Supertip>
-                    <Icon>
-                      <bt:Image size="16" resid="Icon.16x16"/>
-                      <bt:Image size="32" resid="Icon.32x32"/>
-                      <bt:Image size="80" resid="Icon.80x80"/>
-                    </Icon>
-                    <Action xsi:type="ExecuteFunction">
-                      <FunctionName>encryptExt</FunctionName>
-                    </Action>
-                  </Control-->
                 </Group>
               </OfficeTab>
             </ExtensionPoint>
-          </DesktopFormFactor>
-          <MobileFormFactor>
-            <FunctionFile resid="Encrypt.Url"/>
-            <ExtensionPoint xsi:type="MobileMessageReadCommandSurface">
-              <Group id="Contoso.mobileGroup1">
-                <Label resid="GroupLabel"/>
-                <Control xsi:type="MobileButton" id="Contoso.mobileButton1">
-                  <Label resid="TaskpaneButton.Label"/>
-                  <Icon xsi:type="bt:MobileIconList">
-                    <bt:Image size="25" scale="1" resid="Icon.25x25" />
-                    <bt:Image size="25" scale="2" resid="Icon.25x25" />
-                    <bt:Image size="25" scale="3" resid="Icon.25x25" />
-                    <bt:Image size="32" scale="1" resid="Icon.32x32" />
-                    <bt:Image size="32" scale="2" resid="Icon.32x32" />
-                    <bt:Image size="32" scale="3" resid="Icon.32x32" />
-                    <bt:Image size="48" scale="1" resid="Icon.48x48" />
-                    <bt:Image size="48" scale="2" resid="Icon.48x48" />
-                    <bt:Image size="48" scale="3" resid="Icon.48x48" />
-                  </Icon>
-                  <Action xsi:type="ShowTaskpane">
-                    <SourceLocation resid="Taskpane.Url" />
-                  </Action>
-                </Control>
-              </Group>
+
+            <!-- Event-based activation for encryption/decryption -->
+            <ExtensionPoint xsi:type="LaunchEvent">
+              <LaunchEvents>
+                <LaunchEvent Type="OnMessageSend" FunctionName="onMessageSendHandler" SendMode="SoftBlock"/>
+                <LaunchEvent Type="OnMessageRead" FunctionName="onMessageReadHandler" HeaderName="x-postguard"/>
+              </LaunchEvents>
+              <!-- Runtime source location -->
+              <SourceLocation resid="LaunchEventUrl"/>
             </ExtensionPoint>
-          </MobileFormFactor>
+          </DesktopFormFactor>
         </Host>
       </Hosts>
       <Resources>
         <bt:Images>
-          <bt:Image id="Icon.16x16" DefaultValue="https://localhost:3000/assets/16.png"/>
-          <bt:Image id="Icon.25x25" DefaultValue="https://localhost:3000/assets/25.png"/>
-          <bt:Image id="Icon.32x32" DefaultValue="https://localhost:3000/assets/32.png"/>
-          <bt:Image id="Icon.48x48" DefaultValue="https://localhost:3000/assets/48.png"/>
-          <bt:Image id="Icon.80x80" DefaultValue="https://localhost:3000/assets/80.png"/>
+          <bt:Image id="Icon16" DefaultValue="https://localhost:3000/assets/icon-16.png"/>
+          <bt:Image id="Icon32" DefaultValue="https://localhost:3000/assets/icon-32.png"/>
+          <bt:Image id="Icon80" DefaultValue="https://localhost:3000/assets/icon-80.png"/>
         </bt:Images>
         <bt:Urls>
-          <bt:Url id="Encrypt.Url" DefaultValue="https://localhost:3000/commands.html"/>
-          <bt:Url id="Taskpane.Url" DefaultValue="https://localhost:3000/taskpane.html"/>
-          <bt:Url id="Settings.Url" DefaultValue="https://localhost:3000/settings.html"/>
+          <bt:Url id="CommandsUrl" DefaultValue="https://localhost:3000/commands.html"/>
+          <bt:Url id="TaskpaneUrl" DefaultValue="https://localhost:3000/taskpane.html"/>
+          <bt:Url id="ComposeUrl" DefaultValue="https://localhost:3000/compose.html"/>
+          <bt:Url id="LaunchEventUrl" DefaultValue="https://localhost:3000/launchevent.html"/>
+          <bt:Url id="LaunchEventJSUrl" DefaultValue="https://localhost:3000/launchevent.js"/>
         </bt:Urls>
         <bt:ShortStrings>
-          <bt:String id="GroupLabel" DefaultValue="PostGuard Add-in"/>
-          <bt:String id="TaskpaneButton.Label" DefaultValue="Decrypt Email"/>
-          <bt:String id="SettingButton.Label" DefaultValue="Settings"/>
-          <bt:String id="TaskpaneButton2.Label" DefaultValue="Decrypt Email via Taskpane"/>
-          <bt:String id="EncryptButton.Label" DefaultValue="Send encrypted Email"/>
-          <bt:String id="EncryptExtButton.Label" DefaultValue="Send encrypted Email (extended)"/>
+          <bt:String id="GroupLabel" DefaultValue="PostGuard"/>
+          <bt:String id="ReadBtnLabel" DefaultValue="PostGuard"/>
+          <bt:String id="ComposeBtnLabel" DefaultValue="PostGuard"/>
         </bt:ShortStrings>
         <bt:LongStrings>
-          <bt:String id="TaskpaneButton.Tooltip" DefaultValue="Decrypts the selected email with PostGuard."/>
-          <bt:String id="SettingButton.Tooltip" DefaultValue="Adjust settings"/>
-          <bt:String id="EncryptButton.Tooltip" DefaultValue="Encrypts and sends the current email."/>
-          <bt:String id="EncryptExtButton.Tooltip" DefaultValue="Encrypts and sends the current email where identity can be extended."/>
+          <bt:String id="ReadBtnTooltip" DefaultValue="Open PostGuard to decrypt encrypted messages."/>
+          <bt:String id="ComposeBtnTooltip" DefaultValue="Configure PostGuard encryption settings for this email."/>
         </bt:LongStrings>
       </Resources>
-
     </VersionOverrides>
 
   </VersionOverrides>
+
 </OfficeApp>

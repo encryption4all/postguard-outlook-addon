@@ -1,17 +1,8 @@
 {
-  "root": true,
-  "parser": "@typescript-eslint/parser",
-  "plugins": ["@typescript-eslint", "office-addins", "prettier"],
-  "parserOptions": {
-    "ecmaVersion": 6,
-    "sourceType": "module",
-    "ecmaFeatures": {
-      "jsx": true
-    },
-    "project": "./tsconfig.json"
-  },
-  "extends": ["eslint-config-office-addins", "prettier"],
-  "env": {
-    "browser": true
-  }
+  "plugins": [
+    "office-addins"
+  ],
+  "extends": [
+    "plugin:office-addins/recommended"
+  ]
 }
