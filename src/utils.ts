@@ -1,7 +1,11 @@
 import type { AttributeCon, AttributeRequest } from "./types";
 
+export const POSTGUARD_WEBSITE_URL =
+  process.env.POSTGUARD_WEBSITE_URL || "https://postguard.staging.yivi.app";
 export const PKG_URL =
-  process.env.PKG_URL || "https://postguard-main.cs.ru.nl/pkg";
+  process.env.PKG_URL || `${POSTGUARD_WEBSITE_URL}/pkg`;
+export const POSTGUARD_LOGO_URL =
+  process.env.POSTGUARD_LOGO_URL || `${POSTGUARD_WEBSITE_URL}/pg_logo_no_text.png`;
 export const EMAIL_ATTRIBUTE_TYPE = "pbdf.sidn-pbdf.email.email";
 export const POSTGUARD_SUBJECT = "PostGuard Encrypted Email";
 export const PG_ATTACHMENT_NAME = "postguard.encrypted";
@@ -9,8 +13,6 @@ export const PG_ATTACHMENT_NAME = "postguard.encrypted";
 export const PG_ARMOR_BEGIN = "-----BEGIN POSTGUARD MESSAGE-----";
 export const PG_ARMOR_END = "-----END POSTGUARD MESSAGE-----";
 export const PG_ARMOR_DIV_ID = "postguard-armor";
-export const POSTGUARD_WEBSITE_URL =
-  process.env.POSTGUARD_WEBSITE_URL || "https://postguard.eu";
 export const PG_MAX_URL_FRAGMENT_SIZE = 100_000;
 
 const EXT_VERSION = "0.2.0";
@@ -85,6 +87,11 @@ export async function checkJwtCache(con: AttributeCon): Promise<string> {
     throw new Error("jwt has expired");
   }
   return entry.jwt;
+}
+
+export async function invalidateJwtCache(con: AttributeCon): Promise<void> {
+  const hash = await hashCon(con);
+  localStorage.removeItem(`pg-jwt-${hash}`);
 }
 
 export async function storeJwtCache(con: AttributeCon, jwt: string): Promise<void> {
@@ -264,7 +271,7 @@ export function buildEncryptedBody(
   const armorBlock = armorBase64(base64Encrypted);
 
   const htmlContentSection = htmlContent
-    ? `<div style="background:#F4F3F4;text-align:left;padding:20px;margin:40px 0;font-size:12px;">${htmlContent}</div>`
+    ? `<div style="text-align:left;padding:20px 24px;margin:30px 0;font-size:14px;background:#F2F8FD;color:#030E17;line-height:22px;">${htmlContent}</div>`
     : "";
 
   return `<html lang="en">
@@ -274,32 +281,28 @@ export function buildEncryptedBody(
     <meta name="x-apple-disable-message-reformatting">
     <title></title>
 </head>
-<body style="background:#F4F3F4;font-family:Karla,sans-serif;line-height:25px">
-    <div style="width:100%;max-width:600px;margin-left:auto;margin-right:auto;text-align:center;">
-        <div style="margin:50px 0 10px 0">
-            <svg width="84" height="46" viewBox="0 0 84 46" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M44.8262 24.7016V10.9611H49.7197C50.8164 10.9611 51.6825 11.161 52.318 11.5598C52.9535 11.9587 53.4061 12.4728 53.6757 13.1004C53.9453 13.729 54.0797 14.3806 54.0797 15.0543C54.0797 15.5243 54.0006 15.999 53.8453 16.4776C53.689 16.9543 53.4385 17.3955 53.0916 17.7972C52.7448 18.1989 52.2961 18.5238 51.7444 18.7688C51.1927 19.0139 50.5191 19.1369 49.7207 19.1369H46.1887V24.7016H44.8271H44.8262Z" fill="#022E3D"/>
-                <path d="M35.5799 24.2392C35.638 24.0749 35.6847 23.899 35.7428 23.7232C37.8475 16.4026 38.5107 10.0797 38.5107 10.0797L38.503 10.0768C34.4032 8.12104 23.448 2.45261 19.5434 0.587158C14.4955 3.22051 5.707 7.41753 0.578125 10.0778H0.580031C0.580031 10.0778 3.9491 42.1489 19.5434 45.4118H19.5415C27.2058 43.8058 31.904 35.2541 34.7186 26.9725" fill="#0071EB"/>
-                <path d="M19.542 46C19.4868 46 19.4315 45.9923 19.381 45.9769C3.59134 42.6141 0.142239 11.4647 0.00313164 10.1393C-0.0216409 9.89907 0.102222 9.66649 0.315647 9.55597C2.82625 8.25275 6.27155 6.55356 9.60346 4.90916C13.0935 3.18883 16.7018 1.40892 19.2781 0.0653362C19.4372 -0.0182774 19.6306 -0.0221217 19.7936 0.0557255C21.7163 0.974515 25.2578 2.76981 29.0061 4.66985C32.7744 6.57951 36.6713 8.55356 38.7522 9.54636C39.0238 9.62516 39.119 9.85678 39.0895 10.1413C39.0828 10.2057 38.3968 16.5997 36.3026 23.8866L36.2273 24.1259C36.1959 24.2326 36.1625 24.3383 36.1273 24.4382C36.0167 24.7429 35.6871 24.8976 35.3822 24.791C35.0802 24.6814 34.9229 24.344 35.0325 24.0394C35.062 23.9567 35.0878 23.8712 35.1145 23.7837L35.1926 23.5339C36.9514 17.4137 37.7013 11.9231 37.8852 10.4209C35.6356 9.34068 32.0045 7.50118 28.4849 5.71743C24.9053 3.90291 21.5153 2.18547 19.5544 1.23881C16.9828 2.57471 13.4813 4.3008 10.0922 5.97211C6.92897 7.53194 3.66376 9.1427 1.2027 10.4113C1.66861 14.1922 5.53409 41.7318 19.5449 44.8111C25.6389 43.4675 30.5582 37.4012 34.1693 26.7804C34.2722 26.4738 34.6028 26.3094 34.9077 26.4161C35.2116 26.5199 35.3736 26.8553 35.2688 27.161C31.491 38.272 26.2402 44.6064 19.6592 45.9856C19.6192 45.9952 19.5801 45.9981 19.5411 45.9981L19.542 46Z" fill="#022E3D"/>
-            </svg>
-        </div>
-        <div style="background:#fff;padding:80px;">
-            <p style="color:#00A2D5;font-size:21px;margin-top:0;margin-bottom:5px;">
-              ${sender}
-            </p>
-            <p style="font-size:21px;margin-top:5px;">
-              sent you an encrypted email
-            </p>
-            ${htmlContentSection}
-            <a href="${decryptUrl}" style="display:inline-block;font-weight:600;margin:20px 0;max-width:300px;width:100%;background:#00A2D5;border:none;border-radius:31px;color:#fff;padding:.7em 0;text-decoration:none;font-size:12px;">
-              Decrypt this email
-            </a>
-            <div style="text-align:left;padding-top:40px;border-top:2px solid #F4F3F4">
-                <p>Decrypt link</p>
-                <a style="color:#00A2D5;font-size:12px;font-weight:700;line-height:14px;" href="${decryptUrl}">
-                  ${decryptUrl}
-                </a>
+<body style="background:#F2F8FD;background-color:#F2F8FD;font-family:Overpass,sans-serif;line-height:25px;color:#030E17;margin:0;padding:0">
+    <div style="background:#F2F8FD;background-color:#F2F8FD;padding:1em;">
+        <div style="background:#F2F8FD;width:100%;max-width:600px;margin-left:auto;margin-right:auto;text-align:center;">
+            <div style="margin:50px 0 20px 0">
+                <img src="${POSTGUARD_LOGO_URL}" alt="PostGuard" width="82" height="82" style="display:block;margin:0 auto;" />
             </div>
+            <div style="background:#FFFFFF;padding:60px 50px;border-radius:8px;text-align:center;">
+                <p style="font-size:22px;font-weight:700;color:#030E17;margin:0 0 5px 0;line-height:30px;">
+                ${sender} sent you an encrypted email
+                </p>
+                ${htmlContentSection}
+                <a href="${decryptUrl}" style="display:inline-block;font-weight:600;margin:25px 0;max-width:350px;width:100%;background:#030E17;border:none;border-radius:6px;color:#ffffff;padding:14px 0;text-decoration:none;font-size:16px;">
+                Decrypt this email
+                </a>
+                <div style="text-align:left;padding-top:30px;">
+                    <p style="color:#5F7381;font-size:16px;font-weight:600;margin:0 0 4px 0;">Decrypt link</p>
+                    <a style="color:#3095DE;font-size:13px;font-weight:400;line-height:18px;word-break:break-all;" href="${decryptUrl}">
+                    ${decryptUrl}
+                    </a>
+                </div>
+            </div>
+            <div style="height:40px;"></div>
         </div>
     </div>
     <div id="${PG_ARMOR_DIV_ID}" style="display:none;font-size:0;max-height:0;overflow:hidden;mso-hide:all">${armorBlock}</div>

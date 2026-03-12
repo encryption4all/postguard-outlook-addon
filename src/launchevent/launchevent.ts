@@ -11,6 +11,7 @@ import {
   getUSK,
   getSigningKeys,
   checkJwtCache,
+  invalidateJwtCache,
   PG_CLIENT_HEADER,
   PKG_URL,
   secondsTill4AM,
@@ -318,14 +319,16 @@ async function decryptBytes(
   vk: string,
   event: Office.AddinCommands.Event
 ): Promise<void> {
-  const readable = new ReadableStream<Uint8Array>({
-    start(controller) {
-      controller.enqueue(bytes);
-      controller.close();
-    },
-  });
+  const createReadable = () =>
+    new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(bytes);
+        controller.close();
+      },
+    });
 
-  const unsealer = await mod.StreamUnsealer.new(readable, vk);
+  // First unsealer: inspect the header to find our recipient entry
+  const unsealer = await mod.StreamUnsealer.new(createReadable(), vk);
   const userEmail = Office.context.mailbox.userProfile.emailAddress.toLowerCase();
   const recipients = unsealer.inspect_header();
   const me = recipients.get(userEmail);
@@ -360,20 +363,35 @@ async function decryptBytes(
     return;
   }
 
-  const usk = await getUSK(jwt, keyRequest.ts);
+  const tryUnseal = async (token: string) => {
+    const usk = await getUSK(token, keyRequest.ts);
+    const unsealer2 = await mod.StreamUnsealer.new(createReadable(), vk);
 
-  let decryptedData = "";
-  const decoder = new TextDecoder();
-  const writableDecrypt = new WritableStream({
-    write(chunk: Uint8Array) {
-      decryptedData += decoder.decode(chunk, { stream: true });
-    },
-    close() {
-      decryptedData += decoder.decode();
-    },
-  });
+    let decryptedData = "";
+    const decoder = new TextDecoder();
+    const writableDecrypt = new WritableStream({
+      write(chunk: Uint8Array) {
+        decryptedData += decoder.decode(chunk, { stream: true });
+      },
+      close() {
+        decryptedData += decoder.decode();
+      },
+    });
 
-  await unsealer.unseal(userEmail, usk, writableDecrypt);
+    await unsealer2.unseal(userEmail, usk, writableDecrypt);
+    return decryptedData;
+  };
+
+  let decryptedData: string;
+  try {
+    decryptedData = await tryUnseal(jwt);
+  } catch (e) {
+    // Cached JWT led to a bad key — invalidate so the taskpane can request fresh credentials
+    console.warn("[PostGuard] Cached JWT failed, invalidating cache:", e);
+    await invalidateJwtCache(hints);
+    event.completed({ allowEvent: false });
+    return;
+  }
   console.log("[PostGuard] Decryption complete, length:", decryptedData.length);
 
   const { subject, body, isHtml } = parseMimeContent(decryptedData);

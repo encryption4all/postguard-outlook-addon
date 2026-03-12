@@ -12,6 +12,7 @@ import {
   retrieveVerificationKey,
   getUSK,
   checkJwtCache,
+  invalidateJwtCache,
   storeJwtCache,
   secondsTill4AM,
   cleanUpCache,
@@ -256,14 +257,16 @@ async function decryptMessage(source: { attachmentId: string } | { base64: strin
       bytes[i] = binaryString.charCodeAt(i);
     }
 
-    const readable = new ReadableStream<Uint8Array>({
-      start(controller) {
-        controller.enqueue(bytes);
-        controller.close();
-      },
-    });
+    const createReadable = () =>
+      new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(bytes);
+          controller.close();
+        },
+      });
 
-    const unsealer = await pgWasm!.StreamUnsealer.new(readable, masterVerificationKey!);
+    // First unsealer: inspect the header to find our recipient entry
+    const unsealer = await pgWasm!.StreamUnsealer.new(createReadable(), masterVerificationKey!);
 
     const userEmail = Office.context.mailbox.userProfile.emailAddress.toLowerCase();
     const recipients = unsealer.inspect_header();
@@ -290,28 +293,52 @@ async function decryptMessage(source: { attachmentId: string } | { base64: strin
     });
 
     const senderEmail = Office.context.mailbox.item?.from?.emailAddress;
-    const jwt = await checkJwtCache(hints).catch(() =>
-      startYiviAuth(keyRequest.con, senderEmail)
-    );
 
-    const usk = await getUSK(jwt, keyRequest.ts);
+    // Try cached JWT first; if decryption fails (e.g. stale cache), invalidate and retry with Yivi
+    let usedCache = false;
+    let jwt: string;
+    try {
+      jwt = await checkJwtCache(hints);
+      usedCache = true;
+      console.log("[PostGuard] Using cached JWT");
+    } catch {
+      jwt = await startYiviAuth(keyRequest.con, senderEmail);
+    }
 
-    let decryptedData = "";
-    const decoder = new TextDecoder();
-    const writable = new WritableStream({
-      write(chunk: Uint8Array) {
-        decryptedData += decoder.decode(chunk, { stream: true });
-      },
-      close() {
-        decryptedData += decoder.decode();
-      },
-    });
+    const tryUnseal = async (token: string) => {
+      const usk = await getUSK(token, keyRequest.ts);
+      const unsealer2 = await pgWasm!.StreamUnsealer.new(createReadable(), masterVerificationKey!);
 
-    const senderIdentity = await unsealer.unseal(userEmail, usk, writable);
-    console.log("[PostGuard] Sender verification:", senderIdentity);
+      let decryptedData = "";
+      const decoder = new TextDecoder();
+      const writable = new WritableStream({
+        write(chunk: Uint8Array) {
+          decryptedData += decoder.decode(chunk, { stream: true });
+        },
+        close() {
+          decryptedData += decoder.decode();
+        },
+      });
 
+      const senderIdentity = await unsealer2.unseal(userEmail, usk, writable);
+      return { decryptedData, senderIdentity };
+    };
+
+    let result: { decryptedData: string; senderIdentity: unknown };
+    try {
+      result = await tryUnseal(jwt);
+    } catch (e) {
+      if (!usedCache) throw e;
+      // Cached JWT led to a bad key — invalidate and retry with fresh Yivi auth
+      console.warn("[PostGuard] Cached JWT failed, requesting fresh credentials:", e);
+      await invalidateJwtCache(hints);
+      jwt = await startYiviAuth(keyRequest.con, senderEmail);
+      result = await tryUnseal(jwt);
+    }
+
+    console.log("[PostGuard] Sender verification:", result.senderIdentity);
     await storeJwtCache(hints, jwt);
-    displayDecryptedContent(decryptedData, senderIdentity);
+    displayDecryptedContent(result.decryptedData, result.senderIdentity);
   } catch (e: unknown) {
     console.error("[PostGuard] Decryption error:", e);
     if (e instanceof Error) {

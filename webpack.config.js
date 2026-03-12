@@ -122,8 +122,9 @@ module.exports = async (env, options) => {
         ],
       }),
       new webpack.DefinePlugin({
-        "process.env.PKG_URL": JSON.stringify(process.env.PKG_URL || ""),
         "process.env.POSTGUARD_WEBSITE_URL": JSON.stringify(process.env.POSTGUARD_WEBSITE_URL || ""),
+        "process.env.PKG_URL": JSON.stringify(process.env.PKG_URL || ""),
+        "process.env.POSTGUARD_LOGO_URL": JSON.stringify(process.env.POSTGUARD_LOGO_URL || ""),
       }),
     ],
     experiments: {
