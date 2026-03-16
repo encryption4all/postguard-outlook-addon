@@ -1,169 +1,137 @@
-<!-- Copyright (c) Microsoft Corporation. All rights reserved. Licensed under the MIT License. -->
-<!-- This file shows how to design a first-run page that provides a welcome screen to the user about the features of the add-in. -->
-
 <!DOCTYPE html>
 <html>
   <head>
     <meta charset="UTF-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
-    <title>PostGuard Outlook Add-In - Decryption</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PostGuard</title>
+    <script
+      type="text/javascript"
+      src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"
+    ></script>
+    <link
+      rel="stylesheet"
+      href="https://res-1.cdn.office.net/files/fabric-cdn-prod_20230815.002/office-ui-fabric-core/11.1.0/css/fabric.min.css"
+    />
+  </head>
 
-    <!-- Office JavaScript API -->
-    <script type="text/javascript" src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <body class="ms-font-m ms-Fabric">
+    <div id="pg-container">
 
-    <!-- JQuery JS API -->
-    <script src="https://code.jquery.com/jquery.min.js"></script>
-
-    <!-- For more information on Office UI Fabric, visit https://developer.microsoft.com/fabric. -->
-    <link rel="stylesheet" href="https://static2.sharepointonline.com/files/fabric/office-ui-fabric-core/9.6.1/css/fabric.min.css" />
-
-    <link href="https://overpass-30e2.kxcdn.com/overpass.css" rel="stylesheet" type="text/css" />
-    <link href="https://fonts.cdnfonts.com/css/sf-pro-display" rel="stylesheet">
-
-      <!-- Fonts>
-    <link rel="preconnect" href="https://fonts.gstatic.com" />
-    <link href="https://fonts.googleapis.com/css2?family=Karla:wght@300;700&family=Roboto:wght@100&display=swap" rel="stylesheet"
-    /-->
-
-      <!-- CSS -->
-      <link href="decrypt.css" rel="stylesheet" type="text/css" />
-    </head>
-
-    <body class="ms-font-m ms-welcome ms-Fabric">
-      <section id="sideload-msg" class="ms-welcome__main">
-        <h2 class="ms-font-xl">Please sideload your add-in to see app body.</h2>
+      <!-- Loading state -->
+      <section id="pg-loading" class="pg-section">
+        <div class="pg-center">
+          <i class="ms-Icon ms-Icon--ProgressRingDots ms-font-xxl"></i>
+          <p class="ms-font-m">Initializing PostGuard...</p>
+        </div>
       </section>
-      <main id="app-body" hidden="true">
 
-        <div style="background-color: #001730; height: 40px; padding: 0px; margin: 0px">
-          <object style="margin-top: 3px; margin-left: 14px; padding: 0" height="34px" data="assets/postguard_full_logo.svg" type="image/svg+xml"></object>
+      <!-- Sideload message -->
+      <section id="sideload-msg" class="pg-section" style="display: none">
+        <h2 class="ms-font-xl">
+          Please
+          <a
+            target="_blank"
+            href="https://learn.microsoft.com/office/dev/add-ins/testing/test-debug-office-add-ins#sideload-an-office-add-in-for-testing"
+            >sideload</a
+          >
+          your add-in to see the app body.
+        </h2>
+      </section>
+
+      <!-- Encrypted message detected -->
+      <section id="pg-encrypted" class="pg-section" style="display: none">
+        <div class="pg-info-banner">
+          <i class="ms-Icon ms-Icon--Lock ms-font-xl"></i>
+          <span class="ms-font-m-plus">This message is encrypted with PostGuard</span>
         </div>
+        <p class="ms-font-m pg-description">
+          This email has been encrypted using identity-based encryption. To read its contents, you
+          need to verify your identity using the Yivi app.
+        </p>
+        <button id="btn-decrypt" class="pg-button pg-button-primary ms-font-m">
+          <i class="ms-Icon ms-Icon--Unlock"></i>
+          Decrypt Message
+        </button>
+      </section>
 
-        <div id="center" class="center">
-
-          <p id="status-container" hidden="true">
-            <b>Status:</b>
-            <label id="status"></label>
-          </p>
-
-          <div id="loading">Loading ...</div>
-
-          <div id="info_message">
-            <p id="info_message_text">You received a PostGuard encrypted email from</p>
-            <p id="item-sender"></p>
-          </div>
-
-          <div id="header_text">
-            <h3>You need to prove who you are to decrypt and read this email.</h3>
-          </div>
-
-          <div id="decryptinfo">
-            <div id="decryptinfo_irma">
-              <div style="flex-basis: 7%">
-                <img alt="IRMA" src="/assets/irma_logo.svg" id="logo" />
-              </div>
-              <div id="irma_scan">
-            Scan the QR code with the IRMA app to disclose your identity matching the policy.
-              </div>
-            </div>
-            <div id="qrcodecontainer">
-              <div id="qrcode"></div>
-            </div>
-          </div>
-
-          <div id="irmaapp">
-            <div class="irma">
-              <div id="whatisirma">
-                <p>
-                  <b>What is the IRMA app?</b>
-                </p>
-                <p>The IRMA app is a separate privacy-friendly authentication app (which is used also for other authentication purposes).<br/>
-                <a href="https://irma.app">More information about IRMA</a>
-              </p>
-            </div>
-            <div id="download_irma">
-              <p>
-                <b>Download the free IRMA app:</b>
-              </p>
-              <a href="https://play.google.com/store/apps/details?id=org.irmacard.cardemu">
-                <img alt="Get it on Google Play" src="/assets/google-play-badge.png" />
-              </a>
-            &nbsp;&nbsp;&nbsp;
-              <a href="https://apps.apple.com/us/app/irma-authentication/id1294092994">
-                <img src="/assets/download-on-the-app-store-badge.png" alt="Download on the App Store" />
-              </a>
-            </div>
-          </div>
+      <!-- Was encrypted (already decrypted) -->
+      <section id="pg-was-encrypted" class="pg-section" style="display: none">
+        <div class="pg-info-banner pg-info-banner-success">
+          <i class="ms-Icon ms-Icon--CompletedSolid ms-font-xl"></i>
+          <span class="ms-font-m-plus">This message was encrypted with PostGuard</span>
         </div>
-        <div id="decrypted">
-          <div style="display: flex; margin-top: 31px; align-items: center">
-            <div style="flex-basis: 12%">
-              <svg style="max-width: 100%" width="71" height="76" viewBox="0 0 71 76" fill="none"
-                xmlns="http://www.w3.org/2000/svg">
-                <path d="M65.9446 75.4079H4.38096C2.21045 75.4079 0.43457 73.6321 0.43457 71.4616V28.2486C0.43457 26.0781 2.21045 24.3022 4.38096 24.3022H65.9446C68.1151 24.3022 69.891 26.0781 69.891 28.2486V71.4616C69.9897 73.6321 68.1151 75.4079 65.9446 75.4079Z" fill="#E9E9EA"/>
-                <path d="M9.01953 75.4082L35.1495 55.5015L59.7856 75.4082H9.01953Z" fill="#F1F1F1"/>
-                <path d="M35.3309 0.531181L1.49062 25.1961C-0.581231 27.1693 0.306706 32.0036 4.94371 32.0036C4.94371 32.0036 4.94371 32.0036 5.04237 32.0036H66.5074C66.5074 32.0036 66.5074 32.0036 66.606 32.0036C69.4672 32.0036 71.0457 27.3666 69.1712 25.1961L35.3309 0.531181Z" fill="#E9E9EA"/>
-                <path d="M35.052 55.5015L9.07812 75.5" stroke="white" stroke-width="0.5"/>
-                <path d="M0.482422 28.2643L6.7161 29.3977L35.0509 44.9818L62.5356 29.3977L69.6193 28.2643" stroke="white" stroke-width="0.5"/>
-                <g filter="url(#filter0_i_309_27500)">
-                  <path d="M1.54043 25.1649L35.3807 0.5L69.221 25.1649C69.9238 25.9787 70.1412 27.1392 69.9876 28.272L62.3969 29.508L34.9134 44.9819L6.81401 29.354L0.50606 28.2524C0.388888 27.0917 0.748376 25.9193 1.54043 25.1649Z" fill="#C2C2C2"/>
-                </g>
-                <path d="M0.535156 28.2327L6.76883 29.3661L35.1036 44.9502L62.5883 29.3661L69.672 28.2327" stroke="white" stroke-width="0.5"/>
-                <path d="M45.7792 51.1818C45.8169 51.09 45.8394 50.9981 45.8771 50.8992C47.1035 46.922 47.4948 43.4816 47.4948 43.4816C45.0945 42.422 38.6987 39.3419 36.4188 38.3246C33.4692 39.7587 28.3375 42.0405 25.3428 43.4816C25.3428 43.4816 27.3067 60.9095 36.4188 62.6826C40.8959 61.8066 43.6348 57.1653 45.2826 52.6583" fill="#54D6A7"/>
-                <path d="M36.4195 63.0077C36.4195 63.0077 36.3517 63.0077 36.3216 62.9935C27.1042 61.1639 25.0876 44.2376 25.0048 43.517C24.9898 43.3828 25.065 43.2627 25.1854 43.1991C26.6527 42.4927 28.6617 41.5673 30.6106 40.6772C32.6497 39.7376 34.7566 38.7698 36.2614 38.0421C36.3517 37.9998 36.4646 37.9927 36.5624 38.0421C37.6836 38.5437 39.7528 39.5186 41.9424 40.55C44.1396 41.5885 46.4195 42.6623 47.6309 43.1991C47.7889 43.2415 47.8416 43.3687 47.8266 43.5241C47.8266 43.5594 47.4202 47.0351 46.2013 50.9912L46.1561 51.1183C46.1411 51.1748 46.1185 51.2313 46.0959 51.2879C46.0282 51.4503 45.8401 51.5351 45.6595 51.4786C45.4864 51.4221 45.3886 51.2384 45.4564 51.0689C45.4714 51.0265 45.4864 50.977 45.5015 50.9276L45.5466 50.7934C46.5775 47.466 47.0139 44.4849 47.1193 43.6654C45.8025 43.0791 43.6881 42.0759 41.6339 41.1081C39.5421 40.1191 37.5632 39.1866 36.4195 38.6709C34.9146 39.3985 32.8754 40.3381 30.8965 41.2423C29.053 42.09 27.1418 42.966 25.7046 43.6583C25.9755 45.7141 28.2328 60.6835 36.4119 62.3577C39.971 61.6301 42.8454 58.331 44.9522 52.5594C45.0124 52.3899 45.208 52.3051 45.3811 52.3616C45.5617 52.4182 45.652 52.6018 45.5918 52.7643C43.3871 58.8044 40.3171 62.2447 36.4797 62.9935C36.4571 62.9935 36.4345 62.9935 36.4119 62.9935L36.4195 63.0077Z" fill="#181817"/>
-                <path d="M29.2354 55.8376L41.568 56.9608C41.568 56.9608 41.0713 59.8784 40.6725 60.2458C40.2737 60.6131 37.5198 62.6547 36.3911 62.5558C35.2625 62.4569 29.9126 59.4334 29.2354 55.8376Z" fill="white"/>
-                <path d="M36.4195 63.0077C36.4195 63.0077 36.3517 63.0077 36.3216 62.9935C27.1042 61.1639 25.0876 44.2376 25.0048 43.517C24.9898 43.3828 25.065 43.2627 25.1854 43.1991C26.6527 42.4927 28.6617 41.5673 30.6106 40.6772C32.6497 39.7376 34.7566 38.7698 36.2614 38.0421C36.3517 37.9998 36.4646 37.9927 36.5624 38.0421C37.6836 38.5437 39.7528 39.5186 41.9424 40.55C44.1396 41.5885 46.4195 42.6623 47.6309 43.1991C47.7889 43.2415 47.8416 43.3687 47.8266 43.5241C47.8266 43.5594 47.4202 47.0351 46.2013 50.9912L46.1561 51.1183C46.1411 51.1748 46.1185 51.2313 46.0959 51.2879C46.0282 51.4503 45.8401 51.5351 45.6595 51.4786C45.4864 51.4221 45.3886 51.2384 45.4564 51.0689C45.4714 51.0265 45.4864 50.977 45.5015 50.9276L45.5466 50.7934C46.5775 47.466 47.0139 44.4849 47.1193 43.6654C45.8025 43.0791 43.6881 42.0759 41.6339 41.1081C39.5421 40.1191 37.5632 39.1866 36.4195 38.6709C34.9146 39.3985 32.8754 40.3381 30.8965 41.2423C29.053 42.09 27.1418 42.966 25.7046 43.6583C25.9755 45.7141 28.2328 60.6835 36.4119 62.3577C39.971 61.6301 42.8454 58.331 44.9522 52.5594C45.0124 52.3899 45.208 52.3051 45.3811 52.3616C45.5617 52.4182 45.652 52.6018 45.5918 52.7643C43.3871 58.8044 40.3171 62.2447 36.4797 62.9935C36.4571 62.9935 36.4345 62.9935 36.4119 62.9935L36.4195 63.0077Z" fill="#181817"/>
-                <path d="M42.5536 49.5994L46.2105 51.0335L46.7297 52.1143L41.8613 53.4354L42.5536 49.5994Z" fill="white"/>
-                <path d="M36.4197 62.167C36.4197 62.167 36.352 62.167 36.3219 62.1529C27.6462 60.4292 25.75 44.5131 25.6748 43.835C25.6597 43.7007 25.735 43.5806 25.8553 43.5171C27.2323 42.853 29.1285 41.9841 30.9569 41.1434C32.8682 40.2675 34.8471 39.3561 36.2617 38.6709C36.352 38.6285 36.4649 38.6215 36.5627 38.6709C37.6161 39.1372 39.5649 40.0555 41.6191 41.0304C43.6883 42.0053 45.8253 43.0155 46.9615 43.5171C47.112 43.5665 47.1722 43.6937 47.1571 43.842C47.1571 43.8773 46.7734 47.1411 45.6297 50.864L45.592 50.9841C45.577 51.0406 45.5544 51.0901 45.5394 51.1466C45.4792 51.3091 45.2835 51.4009 45.1029 51.3373C44.9299 51.2808 44.8321 51.0971 44.8998 50.9276C44.9148 50.8852 44.9299 50.8428 44.9449 50.7934L44.9901 50.6662C45.9457 47.5579 46.3595 44.7745 46.4649 43.9833C45.2384 43.4323 43.2519 42.4927 41.3181 41.5885C39.3618 40.6631 37.5032 39.7871 36.4272 39.3067C35.0202 39.9849 33.1014 40.8679 31.2429 41.7227C29.5122 42.5139 27.7214 43.3405 26.3745 43.9833C26.6379 45.9613 28.7673 59.9559 36.4197 61.5242C39.753 60.8389 42.4468 57.7447 44.4257 52.3263C44.4859 52.1568 44.6816 52.072 44.8546 52.1285C45.0352 52.1851 45.1255 52.3687 45.0653 52.5312C42.9886 58.211 40.1067 61.4535 36.4874 62.16C36.4649 62.16 36.4423 62.16 36.4197 62.16V62.167Z" fill="white"/>
-                <path d="M36.4195 63.0077C36.4195 63.0077 36.3517 63.0077 36.3216 62.9935C27.1042 61.1639 25.0876 44.2376 25.0048 43.517C24.9898 43.3828 25.065 43.2627 25.1854 43.1991C26.6527 42.4927 28.6617 41.5673 30.6106 40.6772C32.6497 39.7376 34.7566 38.7698 36.2614 38.0421C36.3517 37.9998 36.4646 37.9927 36.5624 38.0421C37.6836 38.5437 39.7528 39.5186 41.9424 40.55C44.1396 41.5885 46.4195 42.6623 47.6309 43.1991C47.7889 43.2415 47.8416 43.3687 47.8266 43.5241C47.8266 43.5594 47.4202 47.0351 46.2013 50.9912L46.1561 51.1183C46.1411 51.1748 46.1185 51.2313 46.0959 51.2879C46.0282 51.4503 45.8401 51.5351 45.6595 51.4786C45.4864 51.4221 45.3886 51.2384 45.4564 51.0689C45.4714 51.0265 45.4864 50.977 45.5015 50.9276L45.5466 50.7934C46.5775 47.466 47.0139 44.4849 47.1193 43.6654C45.8025 43.0791 43.6881 42.0759 41.6339 41.1081C39.5421 40.1191 37.5632 39.1866 36.4195 38.6709C34.9146 39.3985 32.8754 40.3381 30.8965 41.2423C29.053 42.09 27.1418 42.966 25.7046 43.6583C25.9755 45.7141 28.2328 60.6835 36.4119 62.3577C39.971 61.6301 42.8454 58.331 44.9522 52.5594C45.0124 52.3899 45.208 52.3051 45.3811 52.3616C45.5617 52.4182 45.652 52.6018 45.5918 52.7643C43.3871 58.8044 40.3171 62.2447 36.4797 62.9935C36.4571 62.9935 36.4345 62.9935 36.4119 62.9935L36.4195 63.0077Z" fill="#022E3D"/>
-                <path d="M42.4166 53.9862C42.2812 53.9862 42.1458 53.9085 42.1006 53.7814C42.0329 53.6189 42.1232 53.4352 42.3038 53.3716L46.4422 51.9234C46.4422 51.9234 46.4874 51.8881 46.4949 51.8599C46.5024 51.8316 46.4798 51.8033 46.4498 51.7963L42.6348 50.2562C42.4618 50.1856 42.3865 50.0019 42.4543 49.8394C42.5295 49.677 42.7251 49.5993 42.8982 49.6699L46.7131 51.2099C46.999 51.323 47.1796 51.5843 47.1721 51.881C47.1646 52.1707 46.9689 52.425 46.683 52.5239L42.5446 53.9721C42.5069 53.9862 42.4618 53.9933 42.4242 53.9933L42.4166 53.9862Z" fill="#022E3D"/>
-                <path d="M41.7106 57.1085L41.831 56.2113L42.1696 53.6681L42.6963 49.7262C42.734 49.486 42.7415 49.2458 42.7415 49.0127C42.7415 46.2011 40.5067 43.7497 37.4518 43.3895C34.141 42.9939 31.1237 45.1979 30.7023 48.3063L30.0703 52.9688L30.0853 52.884C30.0853 52.884 29.8596 54.6289 29.2275 56.2678" fill="white"/>
-                <path d="M42.0489 57.1508L41.3717 57.0731L42.3649 49.6909C42.395 49.4719 42.41 49.2529 42.41 49.0197C42.41 46.3282 40.2656 44.0464 37.4213 43.7144C34.3062 43.34 31.4469 45.424 31.0481 48.3557L30.4311 52.9334C30.4236 53.004 30.1903 54.7348 29.5507 56.3879L28.9111 56.1689C29.4454 54.7843 29.6862 53.3007 29.7388 52.9405L30.3709 48.2709C30.8148 44.993 34.0052 42.6618 37.5041 43.0786C40.6869 43.453 43.0872 46.0032 43.0872 49.0197C43.0872 49.2811 43.0722 49.5284 43.0346 49.7756L42.0413 57.1579L42.0489 57.1508Z" fill="#022E3D"/>
-                <path d="M38.4964 49.1689C38.7899 48.4201 39.9562 48.4624 40.2196 49.2183C40.2948 49.4373 40.3324 49.6705 40.3174 49.9106C40.2948 50.1862 40.197 50.4334 40.0691 50.6595C39.6251 51.4083 38.4137 51.1964 38.3384 50.3416C38.3234 50.2073 38.3234 50.0661 38.3384 49.9106C38.361 49.6351 38.4212 49.3879 38.504 49.1689H38.4964Z" fill="#022E3D"/>
-                <path d="M39.8968 61.3829C39.8141 61.3829 39.7313 61.3547 39.6711 61.2982C39.5357 61.1781 39.5206 60.9803 39.6485 60.8461C41.1083 59.3555 41.4168 56.7628 41.4168 56.7346C41.4393 56.558 41.6049 56.4308 41.793 56.452C41.9811 56.4732 42.1166 56.6286 42.094 56.8052C42.0789 56.9183 41.7554 59.631 40.1451 61.284C40.0774 61.3547 39.9871 61.39 39.8968 61.39V61.3829Z" fill="#022E3D"/>
-                <path d="M37.5638 48.3136C37.4961 48.3136 37.4208 48.2924 37.3606 48.25C37.2101 48.144 37.18 47.9462 37.2929 47.8049C37.323 47.7696 37.9626 46.9713 38.9709 46.8301C39.5728 46.7453 40.1597 46.9078 40.7241 47.3104C40.8745 47.4164 40.9046 47.6142 40.7918 47.7555C40.6789 47.8968 40.4682 47.925 40.3177 47.8191C39.7384 47.4093 39.1514 47.3387 38.5871 47.6071C38.1281 47.8191 37.8422 48.1794 37.8347 48.1794C37.7669 48.2641 37.6691 48.3065 37.5638 48.3065V48.3136Z" fill="#022E3D"/>
-                <defs>
-                  <filter id="filter0_i_309_27500" x="-0.515625" y="-5.5" width="70.5498" height="50.4819" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
-                    <feFlood flood-opacity="0" result="BackgroundImageFix"/>
-                    <feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
-                    <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
-                    <feOffset dx="-1" dy="-6"/>
-                    <feGaussianBlur stdDeviation="5"/>
-                    <feComposite in2="hardAlpha" operator="arithmetic" k2="-1" k3="1"/>
-                    <feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.15 0"/>
-                    <feBlend mode="normal" in2="shape" result="effect1_innerShadow_309_27500"/>
-                  </filter>
-                </defs>
-              </svg>
-            </div>
+        <div id="pg-badges-container"></div>
+      </section>
 
-            <div style="font-size: 14px; line-height: 20px;">
-              <b>Successfully decrypted the email.</b>
-              <br>
-        You can decrypt emails until 04:00 without disclosing again.</div>
-            </div>
+      <!-- Decrypted content display -->
+      <section id="pg-decrypted" class="pg-section" style="display: none">
+        <div class="pg-info-banner pg-info-banner-success">
+          <i class="ms-Icon ms-Icon--CompletedSolid ms-font-xl"></i>
+          <span class="ms-font-m-plus">Message decrypted successfully</span>
+        </div>
+        <div id="pg-sender-badges" class="pg-badges"></div>
+        <div id="pg-decrypted-subject" class="pg-decrypted-field">
+          <label class="ms-font-s pg-label">Subject:</label>
+          <p class="ms-font-m-plus" id="pg-subject-text"></p>
+        </div>
+        <div id="pg-decrypted-body" class="pg-decrypted-field">
+          <label class="ms-font-s pg-label">Message:</label>
+          <div id="pg-body-content" class="pg-body-content"></div>
+        </div>
+        <div id="pg-decrypted-attachments" class="pg-decrypted-field" style="display: none">
+          <label class="ms-font-s pg-label">Attachments:</label>
+          <ul id="pg-attachments-list" class="pg-attachments-list"></ul>
+        </div>
+      </section>
 
-            <div id="bg_decrypted_txt">
-              <div id="decrypted_subject"></div>
-              <div id="from_received">
-                <div id="decrypted_from">
-                </div>
-                <div id="decrypted_received"></div>
-              </div>
-              <div id="decrypted_to">
-                <b>To: </b>
-              </div>
-              <div id="decrypted_cc">
-                <b>Cc: </b>
-              </div>
-              <div id="decrypted_text">
-              </div>
-            </div>
-            <div id="attachments">
-              <p>Attachments (click to download):</p>
-              <div id="attachmentList"></div>
-            </div>
-          </div>
-        </main>
-      </body>
-    </html>
+      <!-- Yivi QR code (inline authentication) -->
+      <section id="pg-yivi" class="pg-section" style="display: none">
+        <div class="pg-info-banner">
+          <i class="ms-Icon ms-Icon--AuthenticatorApp ms-font-xl"></i>
+          <span class="ms-font-m-plus">Verify Your Identity</span>
+        </div>
+        <p class="ms-font-m pg-description" id="pg-yivi-heading">
+          Scan the QR code below with your Yivi app to prove your identity and decrypt this message.
+        </p>
+        <div id="pg-sender-info" style="display: none">
+          <span class="ms-font-s pg-muted">Encrypted by: </span>
+          <span class="ms-font-m" id="pg-sender-email"></span>
+        </div>
+        <div id="yivi-web-form" class="pg-yivi-container"></div>
+        <button id="btn-cancel-yivi" class="pg-button pg-button-secondary ms-font-m" style="margin-top: 12px">
+          <i class="ms-Icon ms-Icon--Cancel"></i>
+          Cancel
+        </button>
+      </section>
+
+      <!-- Decryption in progress -->
+      <section id="pg-decrypting" class="pg-section" style="display: none">
+        <div class="pg-center">
+          <i class="ms-Icon ms-Icon--ProgressRingDots ms-font-xxl"></i>
+          <p class="ms-font-m">Decrypting message...</p>
+        </div>
+      </section>
+
+      <!-- Error state -->
+      <section id="pg-error" class="pg-section" style="display: none">
+        <div class="pg-info-banner pg-info-banner-error">
+          <i class="ms-Icon ms-Icon--ErrorBadge ms-font-xl"></i>
+          <span class="ms-font-m-plus" id="pg-error-message">Decryption failed</span>
+        </div>
+        <button id="btn-retry" class="pg-button pg-button-secondary ms-font-m">
+          <i class="ms-Icon ms-Icon--Refresh"></i>
+          Try Again
+        </button>
+      </section>
+
+      <!-- Not encrypted -->
+      <section id="pg-not-encrypted" class="pg-section" style="display: none">
+        <div class="pg-center">
+          <i class="ms-Icon ms-Icon--Mail ms-font-xxl pg-muted"></i>
+          <p class="ms-font-m pg-muted">This message is not encrypted with PostGuard.</p>
+        </div>
+      </section>
+    </div>
+  </body>
+</html>

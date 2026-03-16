@@ -28,7 +28,6 @@ body {
   min-height: 100vh;
 }
 
-/* Header */
 #pg-header {
   background-color: var(--pg-primary);
   color: var(--pg-white);
@@ -50,10 +49,72 @@ body {
   border-radius: 4px;
 }
 
-/* Sections */
 .pg-section {
   padding: 16px;
   flex: 1;
+}
+
+/* Toggle */
+.pg-toggle-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background-color: var(--pg-light-bg);
+  border-radius: 4px;
+  margin-bottom: 16px;
+}
+
+.pg-toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pg-toggle {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 22px;
+  flex-shrink: 0;
+}
+
+.pg-toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.pg-toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #c8c6c4;
+  transition: 0.3s;
+  border-radius: 22px;
+}
+
+.pg-toggle-slider:before {
+  position: absolute;
+  content: "";
+  height: 16px;
+  width: 16px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: 0.3s;
+  border-radius: 50%;
+}
+
+.pg-toggle input:checked + .pg-toggle-slider {
+  background-color: var(--pg-accent);
+}
+
+.pg-toggle input:checked + .pg-toggle-slider:before {
+  transform: translateX(22px);
 }
 
 /* Info banners */
@@ -68,12 +129,25 @@ body {
   margin-bottom: 16px;
 }
 
-.pg-info-banner-success {
-  background-color: var(--pg-success);
+.pg-info-banner-warning {
+  background-color: var(--pg-warning);
+  color: var(--pg-primary);
 }
 
-.pg-info-banner-error {
-  background-color: var(--pg-error);
+/* Cards */
+.pg-card {
+  border: 1px solid var(--pg-border);
+  border-radius: 4px;
+  padding: 12px 16px;
+  margin-bottom: 12px;
+}
+
+.pg-card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px 0;
+  font-weight: 600;
 }
 
 /* Buttons */
@@ -83,7 +157,7 @@ body {
   justify-content: center;
   gap: 8px;
   width: 100%;
-  padding: 10px 16px;
+  padding: 8px 12px;
   border: none;
   border-radius: 4px;
   cursor: pointer;
@@ -110,14 +184,16 @@ body {
   background-color: var(--pg-border);
 }
 
-/* Description */
 .pg-description {
-  color: #323130;
-  margin-bottom: 16px;
-  line-height: 1.5;
+  color: #605e5c;
+  margin: 0 0 8px 0;
+  line-height: 1.4;
 }
 
-/* Center content */
+.pg-muted {
+  color: #a19f9d;
+}
+
 .pg-center {
   display: flex;
   flex-direction: column;
@@ -128,76 +204,86 @@ body {
   gap: 12px;
 }
 
-.pg-muted {
-  color: #a19f9d;
+/* Recipients */
+.pg-recipient-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
 }
 
-/* Decrypted content */
-.pg-decrypted-field {
-  margin-bottom: 12px;
+.pg-recipient-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--pg-border);
 }
 
-.pg-label {
+.pg-recipient-item:last-child {
+  border-bottom: none;
+}
+
+.pg-recipient-email {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pg-recipient-policy {
+  font-size: 11px;
   color: #605e5c;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-bottom: 4px;
-  display: block;
-}
-
-.pg-body-content {
-  background-color: var(--pg-light-bg);
-  border: 1px solid var(--pg-border);
-  border-radius: 4px;
-  padding: 12px;
-  max-height: 400px;
-  overflow-y: auto;
-  word-wrap: break-word;
+  background: var(--pg-light-bg);
+  padding: 2px 8px;
+  border-radius: 10px;
 }
 
 /* Badges */
 .pg-badges {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 16px;
+  gap: 6px;
+  margin-bottom: 8px;
 }
 
 .pg-badge {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  border-radius: 12px;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 10px;
   background-color: var(--pg-light-bg);
   border: 1px solid var(--pg-border);
-  font-size: 12px;
+  font-size: 11px;
 }
 
-.pg-badge-icon {
-  font-size: 14px;
+/* Attribute config */
+.pg-attr-group {
+  margin-bottom: 12px;
+  padding: 8px;
+  background: var(--pg-light-bg);
+  border-radius: 4px;
 }
 
-/* Attachments */
-.pg-attachments-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
+.pg-attr-group-header {
+  font-weight: 600;
+  margin-bottom: 6px;
 }
 
-.pg-attachments-list li {
+.pg-attr-option {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 12px;
-  border: 1px solid var(--pg-border);
-  border-radius: 4px;
-  margin-bottom: 4px;
+  padding: 4px 0;
   cursor: pointer;
 }
 
-.pg-attachments-list li:hover {
-  background-color: var(--pg-light-bg);
+.pg-attr-option input[type="radio"] {
+  margin: 0;
+}
+
+.pg-attr-option label {
+  cursor: pointer;
+  font-size: 13px;
 }
 
 /* Yivi QR container */

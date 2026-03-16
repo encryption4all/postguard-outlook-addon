@@ -2,29 +2,34 @@
 
 import type { ISealOptions } from "@e4a/pg-wasm";
 import {
+  PG_ATTACHMENT_NAME,
   EMAIL_ATTRIBUTE_TYPE,
   POSTGUARD_SUBJECT,
-  PG_ATTACHMENT_NAME,
   toEmail,
-  generateBoundary,
   retrievePublicKey,
+  retrieveVerificationKey,
+  getUSK,
   getSigningKeys,
   checkJwtCache,
+  invalidateJwtCache,
   PG_CLIENT_HEADER,
   PKG_URL,
   secondsTill4AM,
   buildEncryptedBody,
+  extractArmoredPayload,
+  parseMimeContent,
 } from "../utils";
-import type { Policy, SealPolicy, ComposeState, AttributeCon } from "../types";
+import type { AttributeCon, Policy, SealPolicy, ComposeState } from "../types";
 
 const PG_HEADER_NAME = "x-postguard";
 const PG_HEADER_VALUE = "0.1.0";
 
 Office.onReady(() => {
-  // Ready
+  console.log("[PostGuard LaunchEvent] Office.onReady fired");
 });
 
-// Get compose state saved by the task pane
+// ─── Compose helpers (for OnMessageSend) ───────────────────────────
+
 function getComposeState(): ComposeState {
   const saved = sessionStorage.getItem("pg-compose-state");
   if (!saved) return { encrypt: false };
@@ -35,14 +40,12 @@ function getComposeState(): ComposeState {
   }
 }
 
-// Get body content
 async function getBody(item: Office.MessageCompose): Promise<{ body: string; isHtml: boolean }> {
   return new Promise((resolve, reject) => {
     item.body.getAsync(Office.CoercionType.Html, (result) => {
       if (result.status === Office.AsyncResultStatus.Succeeded) {
         resolve({ body: result.value, isHtml: true });
       } else {
-        // Fallback to plain text
         item.body.getAsync(Office.CoercionType.Text, (textResult) => {
           if (textResult.status === Office.AsyncResultStatus.Succeeded) {
             resolve({ body: textResult.value, isHtml: false });
@@ -55,7 +58,6 @@ async function getBody(item: Office.MessageCompose): Promise<{ body: string; isH
   });
 }
 
-// Get subject
 async function getSubject(item: Office.MessageCompose): Promise<string> {
   return new Promise((resolve) => {
     item.subject.getAsync((result) => {
@@ -64,25 +66,21 @@ async function getSubject(item: Office.MessageCompose): Promise<string> {
   });
 }
 
-// Get recipients
 async function getRecipients(item: Office.MessageCompose): Promise<string[]> {
   const toPromise = new Promise<Office.EmailAddressDetails[]>((resolve) => {
     item.to.getAsync((r) =>
       resolve(r.status === Office.AsyncResultStatus.Succeeded ? r.value : [])
     );
   });
-
   const ccPromise = new Promise<Office.EmailAddressDetails[]>((resolve) => {
     item.cc.getAsync((r) =>
       resolve(r.status === Office.AsyncResultStatus.Succeeded ? r.value : [])
     );
   });
-
   const [toList, ccList] = await Promise.all([toPromise, ccPromise]);
   return [...toList, ...ccList].map((r) => toEmail(r.emailAddress));
 }
 
-// Get sender email
 async function getSender(item: Office.MessageCompose): Promise<string> {
   return new Promise((resolve) => {
     item.from.getAsync((result) => {
@@ -95,7 +93,6 @@ async function getSender(item: Office.MessageCompose): Promise<string> {
   });
 }
 
-// Set body content
 async function setBody(item: Office.MessageCompose, content: string, isHtml: boolean): Promise<void> {
   return new Promise((resolve, reject) => {
     const coercionType = isHtml ? Office.CoercionType.Html : Office.CoercionType.Text;
@@ -106,7 +103,6 @@ async function setBody(item: Office.MessageCompose, content: string, isHtml: boo
   });
 }
 
-// Set subject
 async function setSubject(item: Office.MessageCompose, subject: string): Promise<void> {
   return new Promise((resolve, reject) => {
     item.subject.setAsync(subject, (result) => {
@@ -116,7 +112,6 @@ async function setSubject(item: Office.MessageCompose, subject: string): Promise
   });
 }
 
-// Add attachment
 async function addAttachment(
   item: Office.MessageCompose,
   base64: string,
@@ -131,7 +126,6 @@ async function addAttachment(
   });
 }
 
-// Set internet header on the message (used to signal encryption to OnMessageRead)
 async function setInternetHeader(
   item: Office.MessageCompose,
   name: string,
@@ -145,53 +139,8 @@ async function setInternetHeader(
   });
 }
 
-// Open Yivi dialog for signing (used during encryption)
-async function openYiviDialogForSigning(con: AttributeCon): Promise<string> {
-  const dialogData = {
-    hostname: PKG_URL,
-    header: PG_CLIENT_HEADER,
-    con,
-    sort: "Signing",
-    validity: secondsTill4AM(),
-  };
+// ─── OnMessageSend handler ─────────────────────────────────────────
 
-  const encodedData = encodeURIComponent(JSON.stringify(dialogData));
-  const dialogUrl = `${window.location.origin}/dialog.html?data=${encodedData}`;
-
-  return new Promise<string>((resolve, reject) => {
-    Office.context.ui.displayDialogAsync(
-      dialogUrl,
-      { height: 60, width: 40, promptBeforeOpen: false },
-      (asyncResult) => {
-        if (asyncResult.status !== Office.AsyncResultStatus.Succeeded) {
-          reject(new Error("Failed to open signing dialog"));
-          return;
-        }
-        const dialog = asyncResult.value;
-
-        dialog.addEventHandler(Office.EventType.DialogMessageReceived, (arg: { message: string }) => {
-          dialog.close();
-          try {
-            const message = JSON.parse(arg.message);
-            if (message.jwt) resolve(message.jwt);
-            else reject(new Error(message.error || "No JWT"));
-          } catch {
-            reject(new Error("Invalid dialog response"));
-          }
-        });
-
-        dialog.addEventHandler(Office.EventType.DialogEventReceived, () => {
-          reject(new Error("Dialog was closed"));
-        });
-      }
-    );
-  });
-}
-
-/**
- * OnMessageSend event handler - encrypts the email before sending.
- * This is the Outlook equivalent of Thunderbird's compose.onBeforeSend.
- */
 async function onMessageSendHandler(event: Office.AddinCommands.Event): Promise<void> {
   console.log("[PostGuard] onMessageSendHandler triggered");
 
@@ -208,7 +157,6 @@ async function onMessageSendHandler(event: Office.AddinCommands.Event): Promise<
     const item = Office.context.mailbox.item as unknown as Office.MessageCompose;
     console.log("[PostGuard] Got mailbox item");
 
-    // Get message details
     console.log("[PostGuard] Fetching message details...");
     const [originalSubject, { body, isHtml }, recipients, from] = await Promise.all([
       getSubject(item),
@@ -231,15 +179,15 @@ async function onMessageSendHandler(event: Office.AddinCommands.Event): Promise<
       return;
     }
 
-    // Load WASM module and public key
     console.log("[PostGuard] Loading WASM module and public key...");
     const [pk, mod] = await Promise.all([retrievePublicKey(), import("@e4a/pg-wasm")]);
+    // Initialize the WASM module (default export is the init function)
+    await mod.default();
     console.log("[PostGuard] WASM and public key loaded");
 
     const timestamp = Math.round(Date.now() / 1000);
     const customPolicies = state.policy;
 
-    // Build encryption policy per recipient
     const policy: SealPolicy = {};
     for (const recipientEmail of recipients) {
       if (customPolicies && customPolicies[recipientEmail] && customPolicies[recipientEmail].length > 0) {
@@ -250,7 +198,6 @@ async function onMessageSendHandler(event: Office.AddinCommands.Event): Promise<
           con: [{ t: EMAIL_ATTRIBUTE_TYPE, v: recipientEmail }],
         };
       }
-      // Normalize email values to lowercase
       policy[recipientEmail].con = policy[recipientEmail].con.map(({ t, v }) => {
         if (t === EMAIL_ATTRIBUTE_TYPE) return { t, v: (v || "").toLowerCase() };
         return { t, v };
@@ -258,14 +205,12 @@ async function onMessageSendHandler(event: Office.AddinCommands.Event): Promise<
     }
     console.log("[PostGuard] Policy built:", JSON.stringify(policy));
 
-    // Sign with email under the public signing identity
     const pubSignId: AttributeCon = [{ t: EMAIL_ATTRIBUTE_TYPE, v: from }];
 
-    // Get signing JWT (cached or via dialog)
     console.log("[PostGuard] Getting signing JWT...");
-    const jwt = await checkJwtCache(pubSignId).catch(() => {
-      console.log("[PostGuard] No cached JWT, opening signing dialog...");
-      return openYiviDialogForSigning(pubSignId);
+    const jwt = await checkJwtCache(pubSignId).catch((e) => {
+      console.log("[PostGuard] No cached JWT:", e.message);
+      throw new Error("No cached signing JWT. Please configure your signing identity in the compose pane before sending.");
     });
     console.log("[PostGuard] Got signing JWT");
 
@@ -279,7 +224,6 @@ async function onMessageSendHandler(event: Office.AddinCommands.Event): Promise<
       ...(privSignKey && { privSignKey }),
     };
 
-    // Build inner MIME message
     const date = new Date();
     const contentType = isHtml ? "text/html; charset=utf-8" : "text/plain; charset=utf-8";
 
@@ -295,7 +239,6 @@ async function onMessageSendHandler(event: Office.AddinCommands.Event): Promise<
     innerMime += body;
     console.log("[PostGuard] Inner MIME built, length:", innerMime.length);
 
-    // Encrypt using pg-wasm
     const encoder = new TextEncoder();
     const readable = new ReadableStream<Uint8Array>({
       start(controller) {
@@ -314,12 +257,11 @@ async function onMessageSendHandler(event: Office.AddinCommands.Event): Promise<
       },
     });
 
-    console.log("[PostGuard] Sealing with options:", sealOptions);
+    console.log("[PostGuard] Sealing...");
     const tStart = performance.now();
     await mod.sealStream(pk, sealOptions, readable, writable);
-    console.log(`[PostGuard] Encryption took ${performance.now() - tStart} ms, encrypted size: ${encrypted.length} bytes`);
+    console.log(`[PostGuard] Encryption took ${performance.now() - tStart} ms, size: ${encrypted.length} bytes`);
 
-    // Convert encrypted data to base64 for attachment
     let binary = "";
     for (let i = 0; i < encrypted.length; i++) {
       binary += String.fromCharCode(encrypted[i]);
@@ -356,26 +298,204 @@ async function onMessageSendHandler(event: Office.AddinCommands.Event): Promise<
         message: `PostGuard encryption failed: ${e instanceof Error ? e.message : "Unknown error"}`,
       });
     }
-    // Block sending on encryption failure
     event.completed({ allowEvent: false });
   }
 }
 
-/**
- * Simple action command for ribbon button.
- */
-function action(event: Office.AddinCommands.Event): void {
-  const message: Office.NotificationMessageDetails = {
-    type: Office.MailboxEnums.ItemNotificationMessageType.InformationalMessage,
-    message: "PostGuard is active.",
-    icon: "Icon.80x80",
-    persistent: false,
-  };
+// ─── OnMessageRead handler ─────────────────────────────────────────
 
-  Office.context.mailbox.item.notificationMessages.replaceAsync("pgAction", message);
-  event.completed();
+async function getReadBody(item: Office.MessageRead): Promise<string> {
+  return new Promise((resolve, reject) => {
+    item.body.getAsync(Office.CoercionType.Html, (result) => {
+      if (result.status === Office.AsyncResultStatus.Succeeded) resolve(result.value);
+      else reject(new Error("Failed to get body"));
+    });
+  });
 }
 
-// Register functions with Office
-Office.actions.associate("action", action);
+async function decryptBytes(
+  bytes: Uint8Array,
+  mod: typeof import("@e4a/pg-wasm"),
+  vk: string,
+  event: Office.AddinCommands.Event
+): Promise<void> {
+  const createReadable = () =>
+    new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(bytes);
+        controller.close();
+      },
+    });
+
+  // First unsealer: inspect the header to find our recipient entry
+  const unsealer = await mod.StreamUnsealer.new(createReadable(), vk);
+  const userEmail = Office.context.mailbox.userProfile.emailAddress.toLowerCase();
+  const recipients = unsealer.inspect_header();
+  const me = recipients.get(userEmail);
+
+  if (!me) {
+    console.log("[PostGuard] User not in recipients:", userEmail);
+    event.completed({ allowEvent: false });
+    return;
+  }
+
+  const keyRequest = { ...me };
+  let hints: AttributeCon = me.con;
+
+  hints = hints.map(({ t, v }) => {
+    if (t === EMAIL_ATTRIBUTE_TYPE) return { t, v: userEmail };
+    return { t, v };
+  });
+
+  keyRequest.con = keyRequest.con.map(({ t, v }: { t: string; v: string }) => {
+    if (t === EMAIL_ATTRIBUTE_TYPE) return { t, v: userEmail };
+    if (v === "" || v?.includes("*")) return { t };
+    return { t, v };
+  });
+
+  let jwt: string;
+  try {
+    jwt = await checkJwtCache(hints);
+    console.log("[PostGuard] Got cached JWT");
+  } catch {
+    console.log("[PostGuard] No cached JWT, cannot auto-decrypt");
+    event.completed({ allowEvent: false });
+    return;
+  }
+
+  const tryUnseal = async (token: string) => {
+    const usk = await getUSK(token, keyRequest.ts);
+    const unsealer2 = await mod.StreamUnsealer.new(createReadable(), vk);
+
+    let decryptedData = "";
+    const decoder = new TextDecoder();
+    const writableDecrypt = new WritableStream({
+      write(chunk: Uint8Array) {
+        decryptedData += decoder.decode(chunk, { stream: true });
+      },
+      close() {
+        decryptedData += decoder.decode();
+      },
+    });
+
+    await unsealer2.unseal(userEmail, usk, writableDecrypt);
+    return decryptedData;
+  };
+
+  let decryptedData: string;
+  try {
+    decryptedData = await tryUnseal(jwt);
+  } catch (e) {
+    // Cached JWT led to a bad key — invalidate so the taskpane can request fresh credentials
+    console.warn("[PostGuard] Cached JWT failed, invalidating cache:", e);
+    await invalidateJwtCache(hints);
+    event.completed({ allowEvent: false });
+    return;
+  }
+  console.log("[PostGuard] Decryption complete, length:", decryptedData.length);
+
+  const { subject, body, isHtml } = parseMimeContent(decryptedData);
+
+  // Prepend the original subject since event.completed() cannot set the subject field.
+  let content: string;
+  if (isHtml) {
+    content = `<h2 style="margin:0 0 12px">${subject}</h2>${body}`;
+  } else {
+    content = `${subject}\n\n${body}`;
+  }
+
+  // Use the OnMessageRead event API to replace the displayed message content.
+  // This is a display-only replacement; the launch event re-fires on each open.
+  (event as any).completed({
+    allowEvent: true,
+    emailBody: {
+      coercionType: isHtml ? Office.CoercionType.Html : Office.CoercionType.Text,
+      content,
+    },
+  });
+}
+
+async function onMessageReadHandler(event: Office.AddinCommands.Event): Promise<void> {
+  console.log("[PostGuard] onMessageReadHandler triggered");
+  try {
+    const item = Office.context.mailbox.item;
+    if (!item) {
+      console.log("[PostGuard] No mailbox item");
+      event.completed({ allowEvent: false });
+      return;
+    }
+
+    const [, vk, mod] = await Promise.all([
+      retrievePublicKey(),
+      retrieveVerificationKey(),
+      import("@e4a/pg-wasm"),
+    ]);
+    await mod.default();
+    console.log("[PostGuard] WASM and keys loaded");
+
+    // Try attachment first (item.attachments is a sync property in read mode)
+    const attachmentId = findEncryptedAttachment(item);
+    if (attachmentId) {
+      console.log("[PostGuard] Found encrypted attachment:", attachmentId);
+      const base64Content = await getAttachmentContent(item, attachmentId);
+      const binaryString = atob(base64Content);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      console.log("[PostGuard] Attachment decoded, size:", bytes.length);
+      await decryptBytes(bytes, mod, vk, event);
+      return;
+    }
+
+    // Fallback: extract armored payload from body
+    console.log("[PostGuard] No attachment found, checking body for armor...");
+    const bodyHtml = await getReadBody(item);
+    const armoredBase64 = extractArmoredPayload(bodyHtml);
+    if (armoredBase64) {
+      console.log("[PostGuard] Found armored payload in body, length:", armoredBase64.length);
+      const binaryString = atob(armoredBase64);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      await decryptBytes(bytes, mod, vk, event);
+      return;
+    }
+
+    console.log("[PostGuard] No encrypted content found");
+    event.completed({ allowEvent: true });
+  } catch (e: unknown) {
+    console.error("[PostGuard] OnMessageRead error:", e);
+    event.completed({ allowEvent: false });
+  }
+}
+
+// ─── Read helpers ──────────────────────────────────────────────────
+
+function findEncryptedAttachment(item: Office.MessageRead): string | null {
+  try {
+    const attachments: Office.AttachmentDetails[] = (item as any).attachments ?? [];
+    const pgAttachment = attachments.find((att) => att.name === PG_ATTACHMENT_NAME);
+    return pgAttachment?.id || null;
+  } catch {
+    return null;
+  }
+}
+
+function getAttachmentContent(item: Office.MessageRead, attachmentId: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    item.getAttachmentContentAsync(attachmentId, (result) => {
+      if (result.status !== Office.AsyncResultStatus.Succeeded) {
+        reject(new Error("Failed to get attachment content"));
+        return;
+      }
+      resolve(result.value.content);
+    });
+  });
+}
+
+// ─── Register handlers ─────────────────────────────────────────────
+
 Office.actions.associate("onMessageSendHandler", onMessageSendHandler);
+Office.actions.associate("onMessageReadHandler", onMessageReadHandler);

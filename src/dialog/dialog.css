@@ -1,0 +1,131 @@
+:root {
+  --pg-primary: #022e3d;
+  --pg-accent: #006ef4;
+  --pg-white: #ffffff;
+  --pg-light-bg: #f3f2f1;
+  --pg-border: #edebe9;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--pg-white);
+  font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+#pg-dialog-container {
+  max-width: 500px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+#pg-dialog-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--pg-border);
+}
+
+#pg-dialog-header h1 {
+  margin: 0;
+  color: var(--pg-primary);
+}
+
+#pg-dialog-info {
+  margin-bottom: 16px;
+}
+
+#pg-dialog-heading {
+  color: #323130;
+  line-height: 1.5;
+}
+
+.pg-muted {
+  color: #a19f9d;
+}
+
+.pg-section-title {
+  color: #605e5c;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 12px 0 6px 0;
+}
+
+/* Attribute table */
+.pg-attribute-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 12px;
+}
+
+.pg-attribute-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--pg-border);
+  font-size: 13px;
+}
+
+.pg-attribute-table td:first-child {
+  color: #605e5c;
+  width: 40%;
+}
+
+.pg-attribute-table td.value {
+  font-weight: 600;
+}
+
+/* Yivi container */
+.pg-yivi-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 300px;
+  margin: 16px 0;
+  padding: 16px;
+  background-color: var(--pg-light-bg);
+  border-radius: 8px;
+  border: 1px solid var(--pg-border);
+}
+
+/* Help section */
+#pg-yivi-help {
+  margin-top: 16px;
+}
+
+#pg-yivi-help summary {
+  cursor: pointer;
+  color: var(--pg-accent);
+  font-weight: 600;
+}
+
+.pg-help-content {
+  padding: 8px 0;
+}
+
+.pg-link {
+  color: var(--pg-accent);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.pg-link:hover {
+  text-decoration: underline;
+}
+
+/* Yivi web form styling overrides */
+.pg-yivi-container .yivi-web-header {
+  display: none;
+}
+
+.pg-yivi-container canvas {
+  max-width: 250px !important;
+  max-height: 250px !important;
+}

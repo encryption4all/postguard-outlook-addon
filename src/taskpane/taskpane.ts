@@ -1,219 +1,467 @@
-/* eslint-disable no-undef */
-/*
- * Copyright (c) Microsoft Corporation. All rights reserved. Licensed under the MIT license.
- * See LICENSE in the project root for license information.
- */
-/* global $, Office, OfficeRuntime */
+/* global Office */
 
-// images references in the manifest
-import '../../assets/16.png'
-import '../../assets/32.png'
-import '../../assets/80.png'
+import "./taskpane.css";
+import {
+  PG_ATTACHMENT_NAME,
+  PKG_URL,
+  PG_CLIENT_HEADER,
+  EMAIL_ATTRIBUTE_TYPE,
+  toEmail,
+  typeToImage,
+  retrievePublicKey,
+  retrieveVerificationKey,
+  getUSK,
+  checkJwtCache,
+  invalidateJwtCache,
+  storeJwtCache,
+  secondsTill4AM,
+  cleanUpCache,
+  extractArmoredPayload,
+} from "../utils";
+import type { AttributeCon, Badge } from "../types";
 
-import 'web-streams-polyfill'
+// Module-level state
+let pgWasm: typeof import("@e4a/pg-wasm") | null = null;
+let masterPublicKey: string | null = null;
+let masterVerificationKey: string | null = null;
 
-import { getGlobal, getItemRestId, isPostGuardEmail } from '../helpers/utils'
-import { successMailReceived } from '../decryptdialog/decrypt'
+// UI Helpers
+function showSection(id: string): void {
+  const sections = document.querySelectorAll(".pg-section");
+  sections.forEach((s) => ((s as HTMLElement).style.display = "none"));
+  const section = document.getElementById(id);
+  if (section) section.style.display = "block";
+}
 
-import * as sso from 'office-addin-sso'
-let retryGetAccessToken = 0
+function showError(message: string): void {
+  const el = document.getElementById("pg-error-message");
+  if (el) el.textContent = message;
+  showSection("pg-error");
+}
 
-const getLogger = require('webpack-log')
-const decryptLog = getLogger({ name: 'PostGuard decrypt log' })
+function renderBadges(containerId: string, badges: Badge[]): void {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  container.innerHTML = "";
 
-var item: Office.MessageRead
+  const iconMap: Record<string, string> = {
+    envelope: "Mail",
+    phone: "Phone",
+    personal: "Contact",
+    education: "Education",
+    health: "Health",
+    calendar: "Calendar",
+  };
 
-const g = getGlobal() as any
+  for (const badge of badges) {
+    const el = document.createElement("span");
+    el.className = "pg-badge";
+    const iconName = iconMap[badge.type] || "Contact";
+    el.innerHTML = `<i class="ms-Icon ms-Icon--${iconName} pg-badge-icon"></i>${badge.value}`;
+    container.appendChild(el);
+  }
+}
 
-/**
- * onReady function called when file is initialized
- */
-Office.onReady((info) => {
-  if (info.host === Office.HostType.Outlook) {
-    document.getElementById('sideload-msg').style.display = 'none'
-    document.getElementById('app-body').hidden = false
-    item = Office.context.mailbox.item
-    $(function () {
-      if (isPostGuardEmail()) {
-        getGraphAPIToken()
-        enableSenderinfo(item.sender.emailAddress)
-      } else {
-        write('No Postguard email, cannot decrypt.')
+// Initialize WASM module and keys (lazy, only when needed)
+async function initPostGuard(): Promise<void> {
+  if (pgWasm && masterPublicKey && masterVerificationKey) return;
+  console.log("[PostGuard] Initializing...");
+  const [pk, vk, mod] = await Promise.all([
+    retrievePublicKey(),
+    retrieveVerificationKey(),
+    import("@e4a/pg-wasm"),
+  ]);
+  // Initialize the WASM module (default export is the init function)
+  await mod.default();
+  masterPublicKey = pk;
+  masterVerificationKey = vk;
+  pgWasm = mod;
+  console.log("[PostGuard] Initialization complete.");
+}
+
+// Check if the current message has a postguard.encrypted attachment or armored body
+async function detectEncryption(): Promise<{
+  isEncrypted: boolean;
+  attachmentId?: string;
+  armoredBase64?: string;
+}> {
+  const item = Office.context.mailbox.item;
+  if (!item) return { isEncrypted: false };
+
+  // Check attachments (read-mode uses the .attachments property, not getAttachmentsAsync)
+  let attachmentResult: { attachmentId?: string } = {};
+  try {
+    const attachments: Office.AttachmentDetails[] = (item as any).attachments ?? [];
+    const pgAttachment = attachments.find((att) => att.name === PG_ATTACHMENT_NAME);
+    if (pgAttachment) {
+      attachmentResult = { attachmentId: pgAttachment.id };
+    }
+  } catch (e) {
+    console.log("[PostGuard] detectEncryption attachment error:", e);
+  }
+
+  if (attachmentResult.attachmentId) {
+    return { isEncrypted: true, attachmentId: attachmentResult.attachmentId };
+  }
+
+  // Fallback: check body for armored payload
+  try {
+    const bodyHtml = await new Promise<string>((resolve, reject) => {
+      item.body.getAsync(Office.CoercionType.Html, (result) => {
+        if (result.status === Office.AsyncResultStatus.Succeeded) resolve(result.value);
+        else reject(new Error("Failed to get body"));
+      });
+    });
+    const armoredBase64 = extractArmoredPayload(bodyHtml);
+    if (armoredBase64) {
+      return { isEncrypted: true, armoredBase64 };
+    }
+  } catch (e) {
+    console.log("[PostGuard] detectEncryption body check error:", e);
+  }
+
+  return { isEncrypted: false };
+}
+
+// Get the encrypted attachment content as base64
+async function getAttachmentContent(attachmentId: string): Promise<string> {
+  const item = Office.context.mailbox.item;
+  return new Promise((resolve, reject) => {
+    item.getAttachmentContentAsync(attachmentId, (result) => {
+      if (result.status !== Office.AsyncResultStatus.Succeeded) {
+        reject(new Error("Failed to get attachment content"));
+        return;
       }
-    })
+      resolve(result.value.content);
+    });
+  });
+}
+
+// Active Yivi session (so we can abort it)
+let activeYiviSession: { abort: () => void } | null = null;
+
+// Start inline Yivi authentication in the taskpane
+async function startYiviAuth(con: AttributeCon, senderId?: string): Promise<string> {
+  showSection("pg-yivi");
+
+  // Show sender info if available
+  if (senderId) {
+    const senderInfo = document.getElementById("pg-sender-info");
+    const senderEmail = document.getElementById("pg-sender-email");
+    if (senderInfo) senderInfo.style.display = "block";
+    if (senderEmail) senderEmail.textContent = senderId;
   }
-})
 
-/**
- * Shows a message in the taskpane, and disables all other elements
- * @param message Message to be displayed
- */
-function write(message) {
-  decryptLog.warn(message)
-  document.getElementById('info_message').style.display = 'none'
-  document.getElementById('decryptinfo').style.display = 'none'
-  document.getElementById('irmaapp').style.display = 'none'
-  document.getElementById('header_text').style.display = 'none'
-  document.getElementById('decrypted').style.display = 'none'
-  document.getElementById('loading').style.display = 'none'
-  document.getElementById('status-container').hidden = false
-  document.getElementById('status').innerHTML = message
-}
+  // Clear any previous Yivi form content
+  const formEl = document.getElementById("yivi-web-form");
+  if (formEl) formEl.innerHTML = "";
 
-/**
- * Enables sender information
- * @param sender The sender of the mail
- */
-function enableSenderinfo(sender: string) {
-  document.getElementById('item-sender').hidden = false
-  document.getElementById('item-sender').innerHTML = sender
-}
-
-/**
- * Callback from graph API token request
- * @param token MS Graph API authentication token
- */
-async function graphAPITokenCallback(token) {
-  var getMessageUrl =
-    'https://graph.microsoft.com/v1.0/me/messages/' +
-    getItemRestId() +
-    '/$value'
-
-  decryptLog.info('Try to receive MIME')
-
-  try {
-    const mime = await $.ajax({
-      url: getMessageUrl,
-      headers: { Authorization: 'Bearer ' + token }
-    })
-
-    g.token = token
-    g.recipient = Office.context.mailbox.userProfile.emailAddress
-    g.mailId = item.itemId
-    g.attachmentId = item.attachments[0].id
-    g.msgFunc = write
-
-    await successMailReceived(mime)
-  } catch (error) {
-    console.error(error)
+  // Shim process for Node.js polyfills used by yivi-client's dependencies
+  if (typeof (window as any).process === "undefined") {
+    (window as any).process = { env: {}, version: "", browser: true };
   }
-}
 
-/**
- * Initializes dialog for authentication to Graph API
- */
-async function getGraphAPIToken() {
-  showLoginPopup()
-}
+  // Dynamically import Yivi modules
+  const [YiviCore, YiviClient, YiviWeb] = await Promise.all([
+    import("@privacybydesign/yivi-core"),
+    import("@privacybydesign/yivi-client"),
+    import("@privacybydesign/yivi-web"),
+  ]);
 
-var loginDialog
+  return new Promise<string>((resolve, reject) => {
+    const yivi = new YiviCore.default({
+      debugging: false,
+      element: "#yivi-web-form",
+      language: navigator.language.startsWith("nl") ? "nl" : "en",
+      translations: {
+        header: "",
+        helper: "Scan with your Yivi app to decrypt",
+      },
+      state: {
+        serverSentEvents: false,
+        polling: {
+          endpoint: "status",
+          interval: 500,
+          startState: "INITIALIZED",
+        },
+      },
+      session: {
+        url: PKG_URL,
+        start: {
+          url: (o: { url: string }) => `${o.url}/v2/request/start`,
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...PG_CLIENT_HEADER,
+          },
+          body: JSON.stringify({ con, validity: secondsTill4AM() }),
+        },
+        result: {
+          url: (o: { url: string }, { sessionToken }: { sessionToken: string }) =>
+            `${o.url}/v2/request/jwt/${sessionToken}`,
+          headers: PG_CLIENT_HEADER,
+          parseResponse: (r: Response) => r.text(),
+        },
+      },
+    });
 
-/**
- * This handler responds to the success or failure message that the pop-up dialog receives from the identity provider
- * @param arg The message received
- */
-async function processMessage(arg) {
-  let messageFromDialog = JSON.parse(arg.message)
+    yivi.use(YiviClient.default);
+    yivi.use(YiviWeb.default);
 
-  if (messageFromDialog.status === 'success') {
-    // We now have a valid access token.
-    loginDialog.close()
-    console.log('Valid token: ', JSON.stringify(messageFromDialog.result))
-    console.log('Status2: ', JSON.stringify(messageFromDialog.status2))
-    graphAPITokenCallback(messageFromDialog.result.accessToken)
-  } else {
-    // Something went wrong with authentication or the authorization of the web application.
-    console.log(
-      'Message from dialog error: ',
-      JSON.stringify(messageFromDialog)
-    )
-  }
-}
+    activeYiviSession = {
+      abort: () => {
+        try { yivi.abort(); } catch { /* ignore */ }
+        reject(new Error("Yivi session cancelled"));
+      },
+    };
 
-/**
- * Use the Office dialog API to open a pop-up and display the sign-in page for the identity provider.
- */
-async function showLoginPopup() {
-  try {
-    let bootstrapToken: string = await OfficeRuntime.auth.getAccessToken({
-      allowSignInPrompt: true
-    })
-    let exchangeResponse: any = await sso.getGraphToken(bootstrapToken)
-    if (exchangeResponse.claims) {
-      // Microsoft Graph requires an additional form of authentication. Have the Office host
-      // get a new token using the Claims string, which tells AAD to prompt the user for all
-      // required forms of authentication.
-      let mfaBootstrapToken: string = await OfficeRuntime.auth.getAccessToken({
-        authChallenge: exchangeResponse.claims
+    // Cancel button
+    const btnCancel = document.getElementById("btn-cancel-yivi");
+    if (btnCancel) {
+      btnCancel.onclick = () => {
+        activeYiviSession?.abort();
+        activeYiviSession = null;
+        showSection("pg-encrypted");
+      };
+    }
+
+    yivi
+      .start()
+      .then((jwt: string) => {
+        activeYiviSession = null;
+        resolve(jwt);
       })
-      exchangeResponse = sso.getGraphToken(mfaBootstrapToken)
+      .catch((e: Error) => {
+        activeYiviSession = null;
+        reject(e);
+      });
+  });
+}
+
+// Main decryption flow — accepts attachment ID or raw base64 string
+async function decryptMessage(source: { attachmentId: string } | { base64: string }): Promise<void> {
+  showSection("pg-decrypting");
+
+  try {
+    await initPostGuard();
+
+    let base64Content: string;
+    if ("attachmentId" in source) {
+      base64Content = await getAttachmentContent(source.attachmentId);
+    } else {
+      base64Content = source.base64;
+    }
+    const binaryString = atob(base64Content);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
     }
 
-    if (exchangeResponse.error) {
-      // AAD errors are returned to the client with HTTP code 200, so they do not trigger
-      // the catch block below.
-      handleAADErrors(exchangeResponse)
-    } else {
-      // makeGraphApiCall makes an AJAX call to the MS Graph endpoint. Errors are caught
-      // in the .fail callback of that call
-      const response: any = await sso.makeGraphApiCall(
-        exchangeResponse.access_token
-      )
-      console.log(response)
-      sso.showMessage('Your data has been added to the document.')
+    const createReadable = () =>
+      new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(bytes);
+          controller.close();
+        },
+      });
+
+    // First unsealer: inspect the header to find our recipient entry
+    const unsealer = await pgWasm!.StreamUnsealer.new(createReadable(), masterVerificationKey!);
+
+    const userEmail = Office.context.mailbox.userProfile.emailAddress.toLowerCase();
+    const recipients = unsealer.inspect_header();
+    const me = recipients.get(userEmail);
+
+    if (!me) {
+      throw Object.assign(new Error("Your email address was not found in the encryption recipients"), {
+        name: "RecipientUnknownError",
+      });
     }
-  } catch (exception) {
-    // if handleClientSideErrors returns true then we will try to authenticate via the fallback
-    // dialog rather than simply throw and error
-    if (exception.code) {
-      if (sso.handleClientSideErrors(exception)) {
-        dialogFallback()
+
+    const keyRequest = Object.assign({}, me);
+    let hints = me.con;
+
+    hints = hints.map(({ t, v }: { t: string; v: string }) => {
+      if (t === EMAIL_ATTRIBUTE_TYPE) return { t, v: userEmail };
+      return { t, v };
+    });
+
+    keyRequest.con = keyRequest.con.map(({ t, v }: { t: string; v: string }) => {
+      if (t === EMAIL_ATTRIBUTE_TYPE) return { t, v: userEmail };
+      if (v === "" || v.includes("*")) return { t };
+      return { t, v };
+    });
+
+    const senderEmail = Office.context.mailbox.item?.from?.emailAddress;
+
+    // Try cached JWT first; if decryption fails (e.g. stale cache), invalidate and retry with Yivi
+    let usedCache = false;
+    let jwt: string;
+    try {
+      jwt = await checkJwtCache(hints);
+      usedCache = true;
+      console.log("[PostGuard] Using cached JWT");
+    } catch {
+      jwt = await startYiviAuth(keyRequest.con, senderEmail);
+    }
+
+    const tryUnseal = async (token: string) => {
+      const usk = await getUSK(token, keyRequest.ts);
+      const unsealer2 = await pgWasm!.StreamUnsealer.new(createReadable(), masterVerificationKey!);
+
+      let decryptedData = "";
+      const decoder = new TextDecoder();
+      const writable = new WritableStream({
+        write(chunk: Uint8Array) {
+          decryptedData += decoder.decode(chunk, { stream: true });
+        },
+        close() {
+          decryptedData += decoder.decode();
+        },
+      });
+
+      const senderIdentity = await unsealer2.unseal(userEmail, usk, writable);
+      return { decryptedData, senderIdentity };
+    };
+
+    let result: { decryptedData: string; senderIdentity: unknown };
+    try {
+      result = await tryUnseal(jwt);
+    } catch (e) {
+      if (!usedCache) throw e;
+      // Cached JWT led to a bad key — invalidate and retry with fresh Yivi auth
+      console.warn("[PostGuard] Cached JWT failed, requesting fresh credentials:", e);
+      await invalidateJwtCache(hints);
+      jwt = await startYiviAuth(keyRequest.con, senderEmail);
+      result = await tryUnseal(jwt);
+    }
+
+    console.log("[PostGuard] Sender verification:", result.senderIdentity);
+    await storeJwtCache(hints, jwt);
+    displayDecryptedContent(result.decryptedData, result.senderIdentity);
+  } catch (e: unknown) {
+    console.error("[PostGuard] Decryption error:", e);
+    if (e instanceof Error) {
+      if (e.name === "RecipientUnknownError") {
+        showError("Your email address is not among the recipients of this encrypted message.");
+      } else if (e.name === "OperationError") {
+        showError("Decryption failed. The message could not be decrypted with your credentials.");
+      } else if (e.message === "Dialog was closed" || e.message === "Yivi session cancelled") {
+        showSection("pg-encrypted");
+      } else {
+        showError(e.message);
       }
     } else {
-      sso.showMessage('EXCEPTION: ' + JSON.stringify(exception))
+      showError("An unexpected error occurred during decryption.");
     }
   }
 }
 
-function handleAADErrors(exchangeResponse: any): void {
-  // On rare occasions the bootstrap token is unexpired when Office validates it,
-  // but expires by the time it is sent to AAD for exchange. AAD will respond
-  // with "The provided value for the 'assertion' is not valid. The assertion has expired."
-  // Retry the call of getAccessToken (no more than once). This time Office will return a
-  // new unexpired bootstrap token.
+function displayDecryptedContent(mimeData: string, senderIdentity: unknown): void {
+  const subjectMatch = mimeData.match(/^Subject:\s*(.+)$/im);
+  const subject = subjectMatch ? subjectMatch[1].trim() : "(no subject)";
 
-  if (
-    exchangeResponse.error_description.indexOf('AADSTS500133') !== -1 &&
-    retryGetAccessToken <= 0
-  ) {
-    retryGetAccessToken++
-    processMessage(null)
-  } else {
-    dialogFallback()
+  const headerEndIndex = mimeData.indexOf("\r\n\r\n");
+  let body = headerEndIndex !== -1 ? mimeData.substring(headerEndIndex + 4) : mimeData;
+
+  const contentTypeMatch = mimeData.match(/^Content-Type:\s*multipart\/mixed;\s*boundary="?([^"\r\n]+)"?/im);
+  if (contentTypeMatch) {
+    const boundary = contentTypeMatch[1];
+    const parts = body.split(`--${boundary}`);
+    if (parts.length > 1) {
+      const firstPart = parts[1];
+      const partHeaderEnd = firstPart.indexOf("\r\n\r\n");
+      body = partHeaderEnd !== -1 ? firstPart.substring(partHeaderEnd + 4) : firstPart;
+    }
+  }
+
+  const subjectEl = document.getElementById("pg-subject-text");
+  if (subjectEl) subjectEl.textContent = subject;
+
+  const bodyEl = document.getElementById("pg-body-content");
+  if (bodyEl) {
+    if (body.includes("<html") || body.includes("<HTML") || body.includes("<div") || body.includes("<p")) {
+      bodyEl.innerHTML = body;
+    } else {
+      bodyEl.textContent = body;
+    }
+  }
+
+  if (senderIdentity) {
+    const identity = senderIdentity as { public: { con: Array<{ t: string; v: string }> }; private?: { con: Array<{ t: string; v: string }> } };
+    const privBadges = identity.private?.con ?? [];
+    const badges: Badge[] = [...identity.public.con, ...privBadges].map(({ t, v }) => ({
+      type: typeToImage(t),
+      value: v,
+    }));
+    renderBadges("pg-sender-badges", badges);
+  }
+
+  showSection("pg-decrypted");
+}
+
+// Main initialization
+// Handle the current message: check cache from launch event, detect encryption, etc.
+async function handleCurrentItem(): Promise<void> {
+  // Don't block on PKG init - detect encryption first, init WASM only when user decrypts
+  try {
+    const { isEncrypted, attachmentId, armoredBase64 } = await detectEncryption();
+    console.log("[PostGuard] Encryption detected:", isEncrypted);
+
+    if (isEncrypted && (attachmentId || armoredBase64)) {
+      showSection("pg-encrypted");
+
+      const source = attachmentId ? { attachmentId } : { base64: armoredBase64! };
+      const btnDecrypt = document.getElementById("btn-decrypt");
+      if (btnDecrypt) {
+        btnDecrypt.onclick = () => decryptMessage(source);
+      }
+    } else {
+      // Check X-PostGuard header
+      const item = Office.context.mailbox.item;
+      if (item && item.getAllInternetHeadersAsync) {
+        item.getAllInternetHeadersAsync((result) => {
+          if (result.status === Office.AsyncResultStatus.Succeeded) {
+            const headers = result.value;
+            if (headers.toLowerCase().includes("x-postguard")) {
+              showSection("pg-was-encrypted");
+              return;
+            }
+          }
+          showSection("pg-not-encrypted");
+        });
+      } else {
+        showSection("pg-not-encrypted");
+      }
+    }
+  } catch (e) {
+    console.error("[PostGuard] Init error:", e);
+    showSection("pg-not-encrypted");
   }
 }
 
-function dialogFallback() {
-  var fullUrl =
-    location.protocol +
-    '//' +
-    location.hostname +
-    (location.port ? ':' + location.port : '') +
-    '/fallbackauthdialog.html' +
-    '?currentAccountMail=' +
-    Office.context.mailbox.userProfile.emailAddress
+// Main initialization
+Office.onReady(async (info) => {
+  console.log("[PostGuard] Office.onReady fired, host:", info.host);
 
-  // height and width are percentages of the size of the parent Office application, e.g., PowerPoint, Excel, Word, etc.
-  Office.context.ui.displayDialogAsync(
-    fullUrl,
-    { height: 60, width: 30 },
-    function (result) {
-      console.log('Dialog has initialized. Wiring up events')
-      loginDialog = result.value
-      loginDialog.addEventHandler(
-        Office.EventType.DialogMessageReceived,
-        processMessage
-      )
-    }
-  )
-}
+  cleanUpCache();
+
+  await handleCurrentItem();
+
+  // Re-run when the user switches messages (pinned taskpane)
+  Office.context.mailbox.addHandlerAsync(
+    Office.EventType.ItemChanged,
+    () => handleCurrentItem()
+  );
+
+  const btnRetry = document.getElementById("btn-retry");
+  if (btnRetry) {
+    btnRetry.onclick = async () => {
+      const { isEncrypted, attachmentId, armoredBase64 } = await detectEncryption();
+      if (isEncrypted) {
+        const retrySource = attachmentId ? { attachmentId } : { base64: armoredBase64! };
+        await decryptMessage(retrySource);
+      }
+    };
+  }
+});
