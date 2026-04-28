@@ -16,7 +16,8 @@
       "dom.iterable"
     ],
     "strict": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "ignoreDeprecations": "6.0"
   },
   "exclude": [
     "node_modules",
