@@ -18,7 +18,7 @@ export const PG_MAX_URL_FRAGMENT_SIZE = 100_000;
 const EXT_VERSION = "0.2.0";
 
 export const PG_CLIENT_HEADER: Record<string, string> = {
-  "X-PostGuard-Client-Version": `Outlook,web,pg4outlook,${EXT_VERSION}`,
+  "X-PostGuard-Client-Version": `Outlook,web,pg4ol,${EXT_VERSION}`,
 };
 
 export function toEmail(identity: string): string {
