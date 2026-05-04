@@ -263,17 +263,21 @@ function runEncryptDialog(payload: DialogMessage): Promise<EncryptResult> {
     const heightPct = pctOfScreen(YIVI_DIALOG_TARGET_HEIGHT_PX, screenH);
     log(`dialog size: target ${YIVI_DIALOG_TARGET_WIDTH_PX}×${YIVI_DIALOG_TARGET_HEIGHT_PX}px on ${screenW}×${screenH} screen → ${widthPct}%×${heightPct}%`);
 
-    // promptBeforeOpen MUST stay at the default (true). The Office-level
-    // "PostGuard is opening another window" confirmation is what gives
-    // displayDialogAsync a user gesture; without it, browsers and Mac's
-    // WKWebView silently block the popup the dialog needs. Web users had
-    // it working previously only because they had already clicked Allow
-    // once and Safari remembered. The launchevent context counts as a
-    // background event, not a user-initiated action, so we cannot suppress
-    // the prompt the way a taskpane button click could.
+    // promptBeforeOpen branches on platform. On Mac the WKWebView
+    // popup blocker has no per-site override the user can reach, so the
+    // Office-level "PostGuard is opening another window" prompt is the
+    // only user gesture that releases the popup — keep it on (true).
+    // On Web/Windows, browsers expose their own popup-permission UI, so
+    // a returning user with permission granted can skip the extra
+    // Office prompt for a one-click flow (false). Brand-new Web users
+    // still see the browser's native popup-blocker indicator on the
+    // first send and can accept there once.
+    const isMac = Office.context.platform === Office.PlatformType.Mac;
+    log(`platform=${Office.context.platform} → promptBeforeOpen=${isMac}`);
+
     Office.context.ui.displayDialogAsync(
       YIVI_DIALOG_URL,
-      { height: heightPct, width: widthPct, displayInIframe: false },
+      { height: heightPct, width: widthPct, displayInIframe: false, promptBeforeOpen: isMac },
       (asyncResult) => {
         log(`displayDialogAsync status=${asyncResult.status}`);
         if (asyncResult.status !== Office.AsyncResultStatus.Succeeded) {
