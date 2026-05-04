@@ -7,7 +7,7 @@ const webpack = require("webpack");
 require("dotenv").config();
 
 const urlDev = "https://localhost:3000/";
-const urlProd = "https://addin.postguard.eu/";
+const urlProd = process.env.ADDIN_PUBLIC_URL || "https://addin.postguard.eu/";
 
 const requiredEnv = ["PKG_URL", "CRYPTIFY_URL", "POSTGUARD_WEBSITE_URL"];
 const envDefaults = {
