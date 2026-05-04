@@ -12,11 +12,10 @@ ARG POSTGUARD_WEBSITE_URL=https://postguard.eu
 ENV ADDIN_PUBLIC_URL=${ADDIN_PUBLIC_URL} \
     PKG_URL=${PKG_URL} \
     CRYPTIFY_URL=${CRYPTIFY_URL} \
-    POSTGUARD_WEBSITE_URL=${POSTGUARD_WEBSITE_URL} \
-    NODE_ENV=production
+    POSTGUARD_WEBSITE_URL=${POSTGUARD_WEBSITE_URL}
 
 COPY package.json package-lock.json ./
-RUN npm ci --no-audit --no-fund
+RUN npm ci --no-audit --no-fund --include=dev
 
 COPY . .
 RUN npx webpack --mode production
