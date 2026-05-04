@@ -6,7 +6,7 @@ export const CRYPTIFY_URL: string = process.env.CRYPTIFY_URL as string;
 export const POSTGUARD_WEBSITE_URL: string = process.env.POSTGUARD_WEBSITE_URL as string;
 
 export const CLIENT_NAME = "Outlook";
-export const CLIENT_ID = "pg4outlook";
+export const CLIENT_ID = "pg4ol";
 
 export function clientHeaders(addinVersion: string): Record<string, string> {
   return {
