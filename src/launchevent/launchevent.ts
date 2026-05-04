@@ -558,6 +558,16 @@ function onMessageSendHandler(event: Office.AddinCommands.Event): void {
 log("script loaded");
 Office.onReady((info) => {
   log(`Office.onReady fired; host=${info?.host} platform=${info?.platform}`);
+  // Eager platform diagnostic so DevTools shows it without waiting for
+  // a Send + handler dispatch + dialog open. Same logic that decides
+  // promptBeforeOpen inside runEncryptDialog.
+  const rawPlatform = Office.context?.platform;
+  const platformTypeMac = Office.PlatformType?.Mac;
+  log(
+    `platform check: rawPlatform=${String(rawPlatform)} (typeof=${typeof rawPlatform}) ` +
+      `Office.PlatformType.Mac=${String(platformTypeMac)} (typeof=${typeof platformTypeMac}) ` +
+      `isMac=${rawPlatform === platformTypeMac}`
+  );
   Office.actions.associate("onMessageSendHandler", onMessageSendHandler);
   log("handler associated");
 });
