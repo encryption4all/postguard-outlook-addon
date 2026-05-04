@@ -263,35 +263,18 @@ function runEncryptDialog(payload: DialogMessage): Promise<EncryptResult> {
     const heightPct = pctOfScreen(YIVI_DIALOG_TARGET_HEIGHT_PX, screenH);
     log(`dialog size: target ${YIVI_DIALOG_TARGET_WIDTH_PX}×${YIVI_DIALOG_TARGET_HEIGHT_PX}px on ${screenW}×${screenH} screen → ${widthPct}%×${heightPct}%`);
 
-    // promptBeforeOpen branches on platform. New Outlook for Mac
-    // (WKWebView) has no per-site popup-permission UI, so the Office-
-    // level "PostGuard is opening another window" prompt is the only
-    // user gesture that releases the popup — keep it on (true). On
-    // Web/Windows the host browser exposes its own popup permission;
-    // once granted, the popup opens with no extra prompt needed, so
-    // suppressing the Office prompt (false) gives a one-click send.
-    // First-time Web users may need to allow popups for the host once
-    // via the browser's native indicator.
-    const rawPlatform = Office.context.platform;
-    const platformTypeMac = Office.PlatformType?.Mac;
-    const isMac = rawPlatform === platformTypeMac;
-    const platformDebug =
-      `rawPlatform=${String(rawPlatform)} (typeof=${typeof rawPlatform}) ` +
-      `Office.PlatformType.Mac=${String(platformTypeMac)} (typeof=${typeof platformTypeMac}) ` +
-      `isMac=${isMac} promptBeforeOpen=${isMac}`;
-    log(platformDebug);
-
+    // promptBeforeOpen MUST stay at the default (true). The Office-level
+    // "PostGuard is opening another window" confirmation is the user
+    // gesture that releases the popup the dialog needs. Without it Mac
+    // WKWebView and any Web browser without a previously-granted popup
+    // permission silently block the popup with no surfaced UI.
     Office.context.ui.displayDialogAsync(
       YIVI_DIALOG_URL,
-      { height: heightPct, width: widthPct, displayInIframe: false, promptBeforeOpen: isMac },
+      { height: heightPct, width: widthPct, displayInIframe: false },
       (asyncResult) => {
         log(`displayDialogAsync status=${asyncResult.status}`);
         if (asyncResult.status !== Office.AsyncResultStatus.Succeeded) {
-          reject(
-            new Error(
-              `displayDialogAsync failed: ${asyncResult.error?.message} | ${platformDebug}`
-            )
-          );
+          reject(new Error(`displayDialogAsync failed: ${asyncResult.error?.message}`));
           return;
         }
         const dialog = asyncResult.value;
@@ -558,16 +541,6 @@ function onMessageSendHandler(event: Office.AddinCommands.Event): void {
 log("script loaded");
 Office.onReady((info) => {
   log(`Office.onReady fired; host=${info?.host} platform=${info?.platform}`);
-  // Eager platform diagnostic so DevTools shows it without waiting for
-  // a Send + handler dispatch + dialog open. Same logic that decides
-  // promptBeforeOpen inside runEncryptDialog.
-  const rawPlatform = Office.context?.platform;
-  const platformTypeMac = Office.PlatformType?.Mac;
-  log(
-    `platform check: rawPlatform=${String(rawPlatform)} (typeof=${typeof rawPlatform}) ` +
-      `Office.PlatformType.Mac=${String(platformTypeMac)} (typeof=${typeof platformTypeMac}) ` +
-      `isMac=${rawPlatform === platformTypeMac}`
-  );
   Office.actions.associate("onMessageSendHandler", onMessageSendHandler);
   log("handler associated");
 });
