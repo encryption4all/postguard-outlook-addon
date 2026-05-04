@@ -271,8 +271,20 @@ function runEncryptDialog(payload: DialogMessage): Promise<EncryptResult> {
     // which counts as the user gesture WKWebView needs to release the
     // popup. We keep promptBeforeOpen: false on Web/Windows so the
     // existing one-click UX is unchanged.
-    const isMac = Office.context.platform === Office.PlatformType.Mac;
-    log(`platform=${Office.context.platform} → promptBeforeOpen=${isMac}`);
+    // Verbose platform diagnostics so we can confirm in the Smart Alert
+    // that isMac is actually evaluating true on Outlook for Mac. The
+    // launchevent runtime may report platform via a different shape
+    // than the taskpane (Office.PlatformType might even be undefined),
+    // so log every relevant value rather than guessing.
+    const rawPlatform = Office.context.platform;
+    const platformTypeMac = Office.PlatformType?.Mac;
+    const isMac = rawPlatform === platformTypeMac;
+    const platformDebug =
+      `rawPlatform=${String(rawPlatform)} (typeof=${typeof rawPlatform}) ` +
+      `Office.PlatformType.Mac=${String(platformTypeMac)} (typeof=${typeof platformTypeMac}) ` +
+      `Office.PlatformType=${JSON.stringify(Office.PlatformType ?? null)} ` +
+      `isMac=${isMac} promptBeforeOpen=${isMac}`;
+    log(platformDebug);
 
     Office.context.ui.displayDialogAsync(
       YIVI_DIALOG_URL,
@@ -280,7 +292,11 @@ function runEncryptDialog(payload: DialogMessage): Promise<EncryptResult> {
       (asyncResult) => {
         log(`displayDialogAsync status=${asyncResult.status}`);
         if (asyncResult.status !== Office.AsyncResultStatus.Succeeded) {
-          reject(new Error(`displayDialogAsync failed: ${asyncResult.error?.message}`));
+          reject(
+            new Error(
+              `displayDialogAsync failed: ${asyncResult.error?.message} | ${platformDebug}`
+            )
+          );
           return;
         }
         const dialog = asyncResult.value;
