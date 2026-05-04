@@ -272,8 +272,14 @@ function runEncryptDialog(payload: DialogMessage): Promise<EncryptResult> {
     // suppressing the Office prompt (false) gives a one-click send.
     // First-time Web users may need to allow popups for the host once
     // via the browser's native indicator.
-    const isMac = Office.context.platform === Office.PlatformType.Mac;
-    log(`platform=${Office.context.platform} → promptBeforeOpen=${isMac}`);
+    const rawPlatform = Office.context.platform;
+    const platformTypeMac = Office.PlatformType?.Mac;
+    const isMac = rawPlatform === platformTypeMac;
+    const platformDebug =
+      `rawPlatform=${String(rawPlatform)} (typeof=${typeof rawPlatform}) ` +
+      `Office.PlatformType.Mac=${String(platformTypeMac)} (typeof=${typeof platformTypeMac}) ` +
+      `isMac=${isMac} promptBeforeOpen=${isMac}`;
+    log(platformDebug);
 
     Office.context.ui.displayDialogAsync(
       YIVI_DIALOG_URL,
@@ -281,7 +287,11 @@ function runEncryptDialog(payload: DialogMessage): Promise<EncryptResult> {
       (asyncResult) => {
         log(`displayDialogAsync status=${asyncResult.status}`);
         if (asyncResult.status !== Office.AsyncResultStatus.Succeeded) {
-          reject(new Error(`displayDialogAsync failed: ${asyncResult.error?.message}`));
+          reject(
+            new Error(
+              `displayDialogAsync failed: ${asyncResult.error?.message} | ${platformDebug}`
+            )
+          );
           return;
         }
         const dialog = asyncResult.value;
