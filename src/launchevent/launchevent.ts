@@ -236,11 +236,19 @@ const YIVI_DIALOG_TARGET_HEIGHT_PX = 520;
 // always closes itself.
 const DEBUG_KEEP_DIALOG_OPEN = false;
 
+// New Outlook for Mac (≥16.84) advertises Mailbox 1.13 and is supposed
+// to support displayDialogAsync from a launchevent runtime, but in
+// practice rejects small dialogs (we observed E_FAIL / -2147467259 with
+// width≈16% on a 1920-wide screen). The Web/Windows runtimes silently
+// clamp; Mac doesn't. Floor at 30% to stay above whatever minimum Mac's
+// dialog manager actually enforces.
+const MIN_DIALOG_PCT = 30;
+
 function pctOfScreen(targetPx: number, screenPx: number): number {
   // displayDialogAsync clamps to [1, 99]. Round up so we don't drop
   // below the QR's minimum useful size on huge monitors.
   const pct = Math.ceil((targetPx / screenPx) * 100);
-  return Math.min(99, Math.max(1, pct));
+  return Math.min(99, Math.max(MIN_DIALOG_PCT, pct));
 }
 
 // Opens the Yivi dialog with an encrypt-request payload and waits for
@@ -293,6 +301,7 @@ function runEncryptDialog(payload: DialogMessage): Promise<EncryptResult> {
             `platform=${platform}`,
             `host=${host}`,
             `mbx1.13=${supports113}`,
+            `size=${widthPct}%×${heightPct}%`,
             `url=${YIVI_DIALOG_URL}`,
           ].join(" | ");
           log(`displayDialogAsync rejected: ${detail}`);
