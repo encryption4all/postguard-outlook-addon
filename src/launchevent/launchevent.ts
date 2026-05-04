@@ -236,11 +236,17 @@ const YIVI_DIALOG_TARGET_HEIGHT_PX = 520;
 // always closes itself.
 const DEBUG_KEEP_DIALOG_OPEN = false;
 
+// Floor the dialog size at 30% of the screen. The popup blocker — fixed
+// via promptBeforeOpen — was the real cause of the launchevent dialog
+// failures, but on a 3440×1440 ultrawide our 300px target still resolves
+// to 9% width, which renders the Yivi QR uncomfortably small even when
+// the host accepts it. 30% gives the dialog enough room for the QR plus
+// title and Cancel button across screen sizes.
+const MIN_DIALOG_PCT = 30;
+
 function pctOfScreen(targetPx: number, screenPx: number): number {
-  // displayDialogAsync clamps to [1, 99]. Round up so we don't drop
-  // below the QR's minimum useful size on huge monitors.
   const pct = Math.ceil((targetPx / screenPx) * 100);
-  return Math.min(99, Math.max(1, pct));
+  return Math.min(99, Math.max(MIN_DIALOG_PCT, pct));
 }
 
 // Opens the Yivi dialog with an encrypt-request payload and waits for
