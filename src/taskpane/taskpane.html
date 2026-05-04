@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
@@ -9,129 +9,89 @@
       type="text/javascript"
       src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"
     ></script>
-    <link
-      rel="stylesheet"
-      href="https://res-1.cdn.office.net/files/fabric-cdn-prod_20230815.002/office-ui-fabric-core/11.1.0/css/fabric.min.css"
-    />
+    <link href="taskpane.css" rel="stylesheet" type="text/css" />
   </head>
+  <body class="pg-app">
+    <div id="pg-status" class="pg-status pg-status-hidden" role="status"></div>
 
-  <body class="ms-font-m ms-Fabric">
-    <div id="pg-container">
+    <main class="pg-main">
+      <!-- Loading view -->
+      <section id="view-loading" class="pg-view">
+        <div class="pg-spinner" aria-label="Loading"></div>
+      </section>
 
-      <!-- Loading state -->
-      <section id="pg-loading" class="pg-section">
-        <div class="pg-center">
-          <i class="ms-Icon ms-Icon--ProgressRingDots ms-font-xxl"></i>
-          <p class="ms-font-m">Initializing PostGuard...</p>
+      <!-- Compose view -->
+      <section id="view-compose" class="pg-view" hidden>
+        <div class="pg-toggle-row">
+          <label class="pg-switch">
+            <input type="checkbox" id="pg-toggle-encrypt" />
+            <span class="pg-switch-track"></span>
+          </label>
+          <span id="pg-toggle-label" class="pg-toggle-label"></span>
+        </div>
+
+        <div id="pg-bcc-warning" class="pg-warning" hidden></div>
+
+        <div id="pg-manage-section" class="pg-policy-section">
+          <h3 id="pg-manage-title" class="pg-section-title"></h3>
+          <div id="pg-manage-panel"></div>
+        </div>
+
+        <div id="pg-sign-section" class="pg-policy-section">
+          <h3 id="pg-sign-title" class="pg-section-title"></h3>
+          <div id="pg-sign-panel"></div>
+        </div>
+
+        <button id="pg-btn-encrypt-send" class="pg-btn pg-btn-primary" type="button" hidden></button>
+      </section>
+
+      <!-- Yivi flow view (QR + scan) -->
+      <section id="view-yivi" class="pg-view" hidden>
+        <h2 id="pg-yivi-title" class="pg-section-title"></h2>
+        <p id="pg-yivi-subtitle" class="pg-subtitle"></p>
+        <div id="yivi-web-form" class="pg-yivi-host"></div>
+        <div class="pg-button-row pg-button-row-end">
+          <button id="pg-btn-yivi-cancel" class="pg-btn pg-btn-secondary" type="button">Cancel</button>
         </div>
       </section>
 
-      <!-- Sideload message -->
-      <section id="sideload-msg" class="pg-section" style="display: none">
-        <h2 class="ms-font-xl">
-          Please
-          <a
-            target="_blank"
-            href="https://learn.microsoft.com/office/dev/add-ins/testing/test-debug-office-add-ins#sideload-an-office-add-in-for-testing"
-            >sideload</a
-          >
-          your add-in to see the app body.
-        </h2>
+      <!-- Read-mode encrypted detection -->
+      <section id="view-read-encrypted" class="pg-view" hidden>
+        <p id="pg-read-encrypted-text" class="pg-subtitle"></p>
+        <button id="pg-btn-decrypt" class="pg-btn pg-btn-primary" type="button"></button>
       </section>
 
-      <!-- Encrypted message detected -->
-      <section id="pg-encrypted" class="pg-section" style="display: none">
-        <div class="pg-info-banner">
-          <i class="ms-Icon ms-Icon--Lock ms-font-xl"></i>
-          <span class="ms-font-m-plus">This message is encrypted with PostGuard</span>
-        </div>
-        <p class="ms-font-m pg-description">
-          This email has been encrypted using identity-based encryption. To read its contents, you
-          need to verify your identity using the Yivi app.
-        </p>
-        <button id="btn-decrypt" class="pg-button pg-button-primary ms-font-m">
-          <i class="ms-Icon ms-Icon--Unlock"></i>
-          Decrypt Message
-        </button>
-      </section>
-
-      <!-- Was encrypted (already decrypted) -->
-      <section id="pg-was-encrypted" class="pg-section" style="display: none">
-        <div class="pg-info-banner pg-info-banner-success">
-          <i class="ms-Icon ms-Icon--CompletedSolid ms-font-xl"></i>
-          <span class="ms-font-m-plus">This message was encrypted with PostGuard</span>
-        </div>
-        <div id="pg-badges-container"></div>
-      </section>
-
-      <!-- Decrypted content display -->
-      <section id="pg-decrypted" class="pg-section" style="display: none">
-        <div class="pg-info-banner pg-info-banner-success">
-          <i class="ms-Icon ms-Icon--CompletedSolid ms-font-xl"></i>
-          <span class="ms-font-m-plus">Message decrypted successfully</span>
-        </div>
-        <div id="pg-sender-badges" class="pg-badges"></div>
-        <div id="pg-decrypted-subject" class="pg-decrypted-field">
-          <label class="ms-font-s pg-label">Subject:</label>
-          <p class="ms-font-m-plus" id="pg-subject-text"></p>
-        </div>
-        <div id="pg-decrypted-body" class="pg-decrypted-field">
-          <label class="ms-font-s pg-label">Message:</label>
-          <div id="pg-body-content" class="pg-body-content"></div>
-        </div>
-        <div id="pg-decrypted-attachments" class="pg-decrypted-field" style="display: none">
-          <label class="ms-font-s pg-label">Attachments:</label>
-          <ul id="pg-attachments-list" class="pg-attachments-list"></ul>
+      <!-- Read-mode was-encrypted (decrypted previously) -->
+      <section id="view-read-was-encrypted" class="pg-view" hidden>
+        <div class="pg-info">
+          <span id="pg-was-encrypted-text"></span>
         </div>
       </section>
 
-      <!-- Yivi QR code (inline authentication) -->
-      <section id="pg-yivi" class="pg-section" style="display: none">
-        <div class="pg-info-banner">
-          <i class="ms-Icon ms-Icon--AuthenticatorApp ms-font-xl"></i>
-          <span class="ms-font-m-plus">Verify Your Identity</span>
-        </div>
-        <p class="ms-font-m pg-description" id="pg-yivi-heading">
-          Scan the QR code below with your Yivi app to prove your identity and decrypt this message.
-        </p>
-        <div id="pg-sender-info" style="display: none">
-          <span class="ms-font-s pg-muted">Encrypted by: </span>
-          <span class="ms-font-m" id="pg-sender-email"></span>
-        </div>
-        <div id="yivi-web-form" class="pg-yivi-container"></div>
-        <button id="btn-cancel-yivi" class="pg-button pg-button-secondary ms-font-m" style="margin-top: 12px">
-          <i class="ms-Icon ms-Icon--Cancel"></i>
-          Cancel
-        </button>
+      <!-- Read-mode plaintext (just decrypted) -->
+      <section id="view-decrypted" class="pg-view" hidden>
+        <div id="pg-decrypted-badges" class="pg-badges"></div>
+        <div id="pg-decrypted-meta" class="pg-meta"></div>
+        <h3 id="pg-decrypted-subject" class="pg-decrypted-subject"></h3>
+        <iframe
+          id="pg-decrypted-body"
+          class="pg-decrypted-body"
+          sandbox="allow-same-origin"
+          referrerpolicy="no-referrer"
+        ></iframe>
+        <div id="pg-decrypted-attachments" class="pg-decrypted-attachments" hidden></div>
       </section>
 
-      <!-- Decryption in progress -->
-      <section id="pg-decrypting" class="pg-section" style="display: none">
-        <div class="pg-center">
-          <i class="ms-Icon ms-Icon--ProgressRingDots ms-font-xxl"></i>
-          <p class="ms-font-m">Decrypting message...</p>
-        </div>
+      <!-- Not-applicable (read mode but no PostGuard content) -->
+      <section id="view-read-noop" class="pg-view" hidden>
+        <p class="pg-subtitle">This message is not encrypted with PostGuard.</p>
       </section>
 
-      <!-- Error state -->
-      <section id="pg-error" class="pg-section" style="display: none">
-        <div class="pg-info-banner pg-info-banner-error">
-          <i class="ms-Icon ms-Icon--ErrorBadge ms-font-xl"></i>
-          <span class="ms-font-m-plus" id="pg-error-message">Decryption failed</span>
-        </div>
-        <button id="btn-retry" class="pg-button pg-button-secondary ms-font-m">
-          <i class="ms-Icon ms-Icon--Refresh"></i>
-          Try Again
-        </button>
+      <!-- Error view -->
+      <section id="view-error" class="pg-view" hidden>
+        <div class="pg-error" id="pg-error-text"></div>
+        <button id="pg-error-retry" class="pg-btn pg-btn-secondary" type="button">Retry</button>
       </section>
-
-      <!-- Not encrypted -->
-      <section id="pg-not-encrypted" class="pg-section" style="display: none">
-        <div class="pg-center">
-          <i class="ms-Icon ms-Icon--Mail ms-font-xxl pg-muted"></i>
-          <p class="ms-font-m pg-muted">This message is not encrypted with PostGuard.</p>
-        </div>
-      </section>
-    </div>
+    </main>
   </body>
 </html>

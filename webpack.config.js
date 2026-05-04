@@ -4,9 +4,21 @@ const devCerts = require("office-addin-dev-certs");
 const CopyWebpackPlugin = require("copy-webpack-plugin");
 const HtmlWebpackPlugin = require("html-webpack-plugin");
 const webpack = require("webpack");
+require("dotenv").config();
 
 const urlDev = "https://localhost:3000/";
-const urlProd = "https://www.contoso.com/"; // CHANGE THIS TO YOUR PRODUCTION DEPLOYMENT LOCATION
+const urlProd = "https://addin.postguard.eu/";
+
+const requiredEnv = ["PKG_URL", "CRYPTIFY_URL", "POSTGUARD_WEBSITE_URL"];
+const envDefaults = {
+  PKG_URL: "https://staging.postguard.eu/pkg",
+  CRYPTIFY_URL: "https://fileshare.staging.postguard.eu",
+  POSTGUARD_WEBSITE_URL: "https://staging.postguard.eu",
+};
+const resolvedEnv = {};
+for (const key of requiredEnv) {
+  resolvedEnv[key] = process.env[key] || envDefaults[key];
+}
 
 async function getHttpsOptions() {
   const httpsOptions = await devCerts.getHttpsServerOptions();
@@ -16,81 +28,58 @@ async function getHttpsOptions() {
 module.exports = async (env, options) => {
   const dev = options.mode === "development";
   const config = {
-    devtool: "source-map",
+    devtool: dev ? "source-map" : false,
     entry: {
       polyfill: ["core-js/stable", "regenerator-runtime/runtime"],
-      taskpane: "./src/taskpane/taskpane.ts",
-      compose: "./src/compose/compose.ts",
-      dialog: "./src/dialog/dialog.ts",
+      taskpane: ["./src/taskpane/taskpane.ts", "./src/taskpane/taskpane.html"],
       commands: "./src/commands/commands.ts",
       launchevent: "./src/launchevent/launchevent.ts",
+      "yivi-dialog": ["./src/yivi-dialog/yivi-dialog.ts", "./src/yivi-dialog/yivi-dialog.html"],
     },
     output: {
       clean: true,
     },
+    experiments: {
+      asyncWebAssembly: true,
+      syncWebAssembly: true,
+    },
     resolve: {
-      extensions: [".ts", ".html", ".js"],
-      fallback: {
-        buffer: require.resolve("buffer/"),
-        url: require.resolve("url/"),
-        events: require.resolve("events/"),
-        https: require.resolve("https-browserify"),
-        http: require.resolve("stream-http"),
-      },
+      extensions: [".ts", ".html", ".js", ".mjs", ".wasm"],
     },
     module: {
       rules: [
         {
           test: /\.ts$/,
           exclude: /node_modules/,
-          use: {
-            loader: "babel-loader",
-          },
+          use: { loader: "babel-loader" },
         },
         {
           test: /\.html$/,
           exclude: /node_modules/,
-          use: {
-            loader: "html-loader",
-            options: {
-              sources: {
-                urlFilter: (attribute, value) => {
-                  // Don't process external URLs (like office.js CDN or Fabric CSS)
-                  if (/^https?:\/\//.test(value)) return false;
-                  return true;
-                },
-              },
-            },
-          },
-        },
-        {
-          test: /\.css$/,
-          use: ["style-loader", "css-loader"],
+          use: "html-loader",
         },
         {
           test: /\.(png|jpg|jpeg|gif|ico|svg)$/,
           type: "asset/resource",
-          generator: {
-            filename: "assets/[name][ext][query]",
-          },
+          generator: { filename: "assets/[name][ext][query]" },
+        },
+        {
+          test: /\.wasm$/,
+          type: "asset/resource",
+          generator: { filename: "[name][ext]" },
         },
       ],
     },
     plugins: [
+      new webpack.DefinePlugin({
+        "process.env.PKG_URL": JSON.stringify(resolvedEnv.PKG_URL),
+        "process.env.CRYPTIFY_URL": JSON.stringify(resolvedEnv.CRYPTIFY_URL),
+        "process.env.POSTGUARD_WEBSITE_URL": JSON.stringify(resolvedEnv.POSTGUARD_WEBSITE_URL),
+      }),
       new HtmlWebpackPlugin({
         filename: "taskpane.html",
         template: "./src/taskpane/taskpane.html",
         chunks: ["polyfill", "taskpane"],
-      }),
-      new HtmlWebpackPlugin({
-        filename: "compose.html",
-        template: "./src/compose/compose.html",
-        chunks: ["polyfill", "compose"],
-      }),
-      new HtmlWebpackPlugin({
-        filename: "dialog.html",
-        template: "./src/dialog/dialog.html",
-        chunks: ["polyfill", "dialog"],
       }),
       new HtmlWebpackPlugin({
         filename: "commands.html",
@@ -100,43 +89,37 @@ module.exports = async (env, options) => {
       new HtmlWebpackPlugin({
         filename: "launchevent.html",
         template: "./src/launchevent/launchevent.html",
-        chunks: ["polyfill", "launchevent"],
+        chunks: ["launchevent"],
+      }),
+      new HtmlWebpackPlugin({
+        filename: "yivi-dialog.html",
+        template: "./src/yivi-dialog/yivi-dialog.html",
+        chunks: ["polyfill", "yivi-dialog"],
       }),
       new CopyWebpackPlugin({
         patterns: [
+          { from: "assets/*", to: "assets/[name][ext][query]" },
           {
-            from: "assets/*",
-            to: "assets/[name][ext][query]",
-          },
-          {
-            from: "manifest*.{json,xml}",
+            from: "manifest*.xml",
             to: "[name][ext]",
             transform(content) {
-              if (dev) {
-                return content;
-              } else {
-                return content.toString().replace(new RegExp(urlDev, "g"), urlProd);
-              }
+              if (dev) return content;
+              return content.toString().replace(new RegExp(urlDev, "g"), urlProd);
             },
           },
         ],
       }),
-      new webpack.DefinePlugin({
-        "process.env.POSTGUARD_WEBSITE_URL": JSON.stringify(process.env.POSTGUARD_WEBSITE_URL || ""),
-        "process.env.PKG_URL": JSON.stringify(process.env.PKG_URL || ""),
-        "process.env.POSTGUARD_LOGO_URL": JSON.stringify(process.env.POSTGUARD_LOGO_URL || ""),
-      }),
     ],
-    experiments: {
-      asyncWebAssembly: true,
-    },
     devServer: {
       headers: {
         "Access-Control-Allow-Origin": "*",
       },
       server: {
         type: "https",
-        options: env.WEBPACK_BUILD || options.https !== undefined ? options.https : await getHttpsOptions(),
+        options:
+          env.WEBPACK_BUILD || options.https !== undefined
+            ? options.https
+            : await getHttpsOptions(),
       },
       port: process.env.npm_package_config_dev_server_port || 3000,
     },

@@ -4,7 +4,10 @@
       "@babel/preset-env",
       {
         "targets": {
-          "esmodules": false
+          "edge": "100",
+          "safari": "15",
+          "chrome": "100",
+          "firefox": "100"
         }
       }
     ],
