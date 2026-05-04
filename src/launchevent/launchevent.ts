@@ -236,19 +236,11 @@ const YIVI_DIALOG_TARGET_HEIGHT_PX = 520;
 // always closes itself.
 const DEBUG_KEEP_DIALOG_OPEN = false;
 
-// New Outlook for Mac (≥16.84) advertises Mailbox 1.13 and is supposed
-// to support displayDialogAsync from a launchevent runtime, but in
-// practice rejects small dialogs (we observed E_FAIL / -2147467259 with
-// width≈16% on a 1920-wide screen). The Web/Windows runtimes silently
-// clamp; Mac doesn't. Floor at 30% to stay above whatever minimum Mac's
-// dialog manager actually enforces.
-const MIN_DIALOG_PCT = 30;
-
 function pctOfScreen(targetPx: number, screenPx: number): number {
   // displayDialogAsync clamps to [1, 99]. Round up so we don't drop
   // below the QR's minimum useful size on huge monitors.
   const pct = Math.ceil((targetPx / screenPx) * 100);
-  return Math.min(99, Math.max(MIN_DIALOG_PCT, pct));
+  return Math.min(99, Math.max(1, pct));
 }
 
 // Opens the Yivi dialog with an encrypt-request payload and waits for
@@ -265,47 +257,17 @@ function runEncryptDialog(payload: DialogMessage): Promise<EncryptResult> {
     const heightPct = pctOfScreen(YIVI_DIALOG_TARGET_HEIGHT_PX, screenH);
     log(`dialog size: target ${YIVI_DIALOG_TARGET_WIDTH_PX}×${YIVI_DIALOG_TARGET_HEIGHT_PX}px on ${screenW}×${screenH} screen → ${widthPct}%×${heightPct}%`);
 
-    // Diagnostic context surfaced in the Smart Alert when displayDialogAsync
-     // fails. New Outlook for Mac is currently the main offender — it
-     // returns "An internal error has occurred." with no further detail,
-     // so we attach platform/host/requirement-set info to the rejection.
-    const platform = String(Office.context.platform ?? "?");
-    const host = String(Office.context.host ?? "?");
-    const supports113 = (() => {
-      try {
-        return Office.context.requirements.isSetSupported("Mailbox", "1.13");
-      } catch {
-        return false;
-      }
-    })();
-    log(`pre-dialog diagnostics platform=${platform} host=${host} mbx1.13=${supports113} url=${YIVI_DIALOG_URL}`);
-
-    // displayInIframe and promptBeforeOpen used to be set explicitly here
-    // (false / false). On New Outlook for Mac that combination caused
-    // displayDialogAsync to reject with E_FAIL (-2147467259) before any
-    // navigation attempt. Falling back to defaults — popup window with
-    // the "open another window" prompt — is what Mac WebKit actually
-    // permits from a launchevent runtime. The prompt is harmless on
-    // Web/Windows so we accept it everywhere rather than branching.
     Office.context.ui.displayDialogAsync(
       YIVI_DIALOG_URL,
-      { height: heightPct, width: widthPct },
+      // promptBeforeOpen: false suppresses the "PostGuard is opening
+      // another window" confirmation. Honored because the dialog URL is
+      // on the same origin as the add-in's source location. Requires
+      // Mailbox 1.9 (we require 1.12 in VersionOverridesV1_1).
+      { height: heightPct, width: widthPct, displayInIframe: false, promptBeforeOpen: false },
       (asyncResult) => {
         log(`displayDialogAsync status=${asyncResult.status}`);
         if (asyncResult.status !== Office.AsyncResultStatus.Succeeded) {
-          const err = asyncResult.error;
-          const detail = [
-            `displayDialogAsync failed: ${err?.message ?? "(no message)"}`,
-            `code=${err?.code ?? "?"}`,
-            `name=${err?.name ?? "?"}`,
-            `platform=${platform}`,
-            `host=${host}`,
-            `mbx1.13=${supports113}`,
-            `size=${widthPct}%×${heightPct}%`,
-            `url=${YIVI_DIALOG_URL}`,
-          ].join(" | ");
-          log(`displayDialogAsync rejected: ${detail}`);
-          reject(new Error(detail));
+          reject(new Error(`displayDialogAsync failed: ${asyncResult.error?.message}`));
           return;
         }
         const dialog = asyncResult.value;

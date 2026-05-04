@@ -109,6 +109,25 @@ Despite docs implying it's a general per-session state mechanism, `sessionData`
 methods are not available in launch event handlers. Don't reach for it for
 taskpane↔send-handler communication.
 
+### `displayDialogAsync` from the launchevent runtime needs the add-in domain in `<AppDomains>`
+
+A dialog opened from the regular taskpane is allowed without an `<AppDomains>`
+entry as long as it's same-origin with `<SourceLocation>`. From the *launchevent*
+runtime that rule does not apply: the runtime is hosted inside an
+`outlook.office.com` iframe, so from its point of view the dialog URL is
+cross-origin and Office checks the manifest's `<AppDomains>`. Symptoms:
+
+- **Outlook on the web** rejects with `code=12011` (`BlockedNavigation`) and a
+  message about "different security zones".
+- **New Outlook for Mac** rejects with the generic E_FAIL (HRESULT
+  `-2147467259`, message "An internal error has occurred."). Same root cause,
+  uglier wrapper.
+
+Fix: list the add-in's own host in `<AppDomains>` (`https://addin.postguard.eu`,
+`https://addin.staging.postguard.eu`, and `https://localhost:3000` for the dev
+sideload). It's only the launchevent dialog path that needs this; the taskpane
+keeps working without the explicit entry.
+
 ### `window.location.href` in the launchevent runtime is *not* the add-in origin on every host
 
 On Outlook on Web and new Outlook on Windows, the launchevent runtime loads
