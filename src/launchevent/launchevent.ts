@@ -236,17 +236,11 @@ const YIVI_DIALOG_TARGET_HEIGHT_PX = 520;
 // always closes itself.
 const DEBUG_KEEP_DIALOG_OPEN = false;
 
-// Floor the dialog size at 30% of the screen. Office.js docs claim the
-// valid range is 1–99, but in practice Outlook hosts (Web on ultrawide
-// monitors, New Outlook for Mac) reject very small percentages with no
-// further detail — Web returns `code=12011 BlockedNavigation`, Mac
-// surfaces it as the generic E_FAIL. 30% comfortably clears whatever
-// the actual minimum is across hosts and still fits a 250-300px QR.
-const MIN_DIALOG_PCT = 30;
-
 function pctOfScreen(targetPx: number, screenPx: number): number {
+  // displayDialogAsync clamps to [1, 99]. Round up so we don't drop
+  // below the QR's minimum useful size on huge monitors.
   const pct = Math.ceil((targetPx / screenPx) * 100);
-  return Math.min(99, Math.max(MIN_DIALOG_PCT, pct));
+  return Math.min(99, Math.max(1, pct));
 }
 
 // Opens the Yivi dialog with an encrypt-request payload and waits for
