@@ -257,6 +257,21 @@ function runEncryptDialog(payload: DialogMessage): Promise<EncryptResult> {
     const heightPct = pctOfScreen(YIVI_DIALOG_TARGET_HEIGHT_PX, screenH);
     log(`dialog size: target ${YIVI_DIALOG_TARGET_WIDTH_PX}×${YIVI_DIALOG_TARGET_HEIGHT_PX}px on ${screenW}×${screenH} screen → ${widthPct}%×${heightPct}%`);
 
+    // Diagnostic context surfaced in the Smart Alert when displayDialogAsync
+     // fails. New Outlook for Mac is currently the main offender — it
+     // returns "An internal error has occurred." with no further detail,
+     // so we attach platform/host/requirement-set info to the rejection.
+    const platform = String(Office.context.platform ?? "?");
+    const host = String(Office.context.host ?? "?");
+    const supports113 = (() => {
+      try {
+        return Office.context.requirements.isSetSupported("Mailbox", "1.13");
+      } catch {
+        return false;
+      }
+    })();
+    log(`pre-dialog diagnostics platform=${platform} host=${host} mbx1.13=${supports113} url=${YIVI_DIALOG_URL}`);
+
     Office.context.ui.displayDialogAsync(
       YIVI_DIALOG_URL,
       // promptBeforeOpen: false suppresses the "PostGuard is opening
@@ -267,7 +282,18 @@ function runEncryptDialog(payload: DialogMessage): Promise<EncryptResult> {
       (asyncResult) => {
         log(`displayDialogAsync status=${asyncResult.status}`);
         if (asyncResult.status !== Office.AsyncResultStatus.Succeeded) {
-          reject(new Error(`displayDialogAsync failed: ${asyncResult.error?.message}`));
+          const err = asyncResult.error;
+          const detail = [
+            `displayDialogAsync failed: ${err?.message ?? "(no message)"}`,
+            `code=${err?.code ?? "?"}`,
+            `name=${err?.name ?? "?"}`,
+            `platform=${platform}`,
+            `host=${host}`,
+            `mbx1.13=${supports113}`,
+            `url=${YIVI_DIALOG_URL}`,
+          ].join(" | ");
+          log(`displayDialogAsync rejected: ${detail}`);
+          reject(new Error(detail));
           return;
         }
         const dialog = asyncResult.value;
