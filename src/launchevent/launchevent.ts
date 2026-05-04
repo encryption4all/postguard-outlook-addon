@@ -263,40 +263,21 @@ function runEncryptDialog(payload: DialogMessage): Promise<EncryptResult> {
     const heightPct = pctOfScreen(YIVI_DIALOG_TARGET_HEIGHT_PX, screenH);
     log(`dialog size: target ${YIVI_DIALOG_TARGET_WIDTH_PX}×${YIVI_DIALOG_TARGET_HEIGHT_PX}px on ${screenW}×${screenH} screen → ${widthPct}%×${heightPct}%`);
 
-    // New Outlook for Mac (WKWebView) blocks popup windows from a
-    // launchevent runtime, and iframe mode (displayInIframe: true) had
-    // no parent surface to render into. The remaining lever is the
-    // Office-level "open another window" prompt: with promptBeforeOpen:
-    // true Office shows its own confirmation that the user can accept,
-    // which counts as the user gesture WKWebView needs to release the
-    // popup. We keep promptBeforeOpen: false on Web/Windows so the
-    // existing one-click UX is unchanged.
-    // Verbose platform diagnostics so we can confirm in the Smart Alert
-    // that isMac is actually evaluating true on Outlook for Mac. The
-    // launchevent runtime may report platform via a different shape
-    // than the taskpane (Office.PlatformType might even be undefined),
-    // so log every relevant value rather than guessing.
-    const rawPlatform = Office.context.platform;
-    const platformTypeMac = Office.PlatformType?.Mac;
-    const isMac = rawPlatform === platformTypeMac;
-    const platformDebug =
-      `rawPlatform=${String(rawPlatform)} (typeof=${typeof rawPlatform}) ` +
-      `Office.PlatformType.Mac=${String(platformTypeMac)} (typeof=${typeof platformTypeMac}) ` +
-      `Office.PlatformType=${JSON.stringify(Office.PlatformType ?? null)} ` +
-      `isMac=${isMac} promptBeforeOpen=${isMac}`;
-    log(platformDebug);
-
+    // promptBeforeOpen MUST stay at the default (true). The Office-level
+    // "PostGuard is opening another window" confirmation is what gives
+    // displayDialogAsync a user gesture; without it, browsers and Mac's
+    // WKWebView silently block the popup the dialog needs. Web users had
+    // it working previously only because they had already clicked Allow
+    // once and Safari remembered. The launchevent context counts as a
+    // background event, not a user-initiated action, so we cannot suppress
+    // the prompt the way a taskpane button click could.
     Office.context.ui.displayDialogAsync(
       YIVI_DIALOG_URL,
-      { height: heightPct, width: widthPct, displayInIframe: false, promptBeforeOpen: isMac },
+      { height: heightPct, width: widthPct, displayInIframe: false },
       (asyncResult) => {
         log(`displayDialogAsync status=${asyncResult.status}`);
         if (asyncResult.status !== Office.AsyncResultStatus.Succeeded) {
-          reject(
-            new Error(
-              `displayDialogAsync failed: ${asyncResult.error?.message} | ${platformDebug}`
-            )
-          );
+          reject(new Error(`displayDialogAsync failed: ${asyncResult.error?.message}`));
           return;
         }
         const dialog = asyncResult.value;
