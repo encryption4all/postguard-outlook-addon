@@ -243,118 +243,158 @@ function pctOfScreen(targetPx: number, screenPx: number): number {
   return Math.min(99, Math.max(1, pct));
 }
 
+// Promise wrapper around displayDialogAsync. Resolves with the dialog
+// handle on success, rejects with the Office error otherwise.
+function openDialogAsync(
+  url: string,
+  options: Office.DialogOptions
+): Promise<Office.Dialog> {
+  return new Promise((resolve, reject) => {
+    Office.context.ui.displayDialogAsync(url, options, (asyncResult) => {
+      if (asyncResult.status === Office.AsyncResultStatus.Succeeded) {
+        resolve(asyncResult.value);
+      } else {
+        reject(asyncResult.error ?? new Error("displayDialogAsync failed"));
+      }
+    });
+  });
+}
+
 // Opens the Yivi dialog with an encrypt-request payload and waits for
 // the dialog to post the encrypted result back. Resolves with the
 // envelope; rejects on error or user cancel.
-function runEncryptDialog(payload: DialogMessage): Promise<EncryptResult> {
-  return new Promise((resolve, reject) => {
-    // window.screen.* is in CSS pixels (matching what Office's
-    // percentage interprets). Falls back to a safe 1920×1080 if Office's
-    // launchevent runtime ever surfaces an empty screen object.
-    const screenW = window.screen?.width || 1920;
-    const screenH = window.screen?.height || 1080;
-    const widthPct = pctOfScreen(YIVI_DIALOG_TARGET_WIDTH_PX, screenW);
-    const heightPct = pctOfScreen(YIVI_DIALOG_TARGET_HEIGHT_PX, screenH);
-    log(`dialog size: target ${YIVI_DIALOG_TARGET_WIDTH_PX}×${YIVI_DIALOG_TARGET_HEIGHT_PX}px on ${screenW}×${screenH} screen → ${widthPct}%×${heightPct}%`);
+async function runEncryptDialog(payload: DialogMessage): Promise<EncryptResult> {
+  // window.screen.* is in CSS pixels (matching what Office's percentage
+  // interprets). Falls back to a safe 1920×1080 if the launchevent
+  // runtime ever surfaces an empty screen object.
+  const screenW = window.screen?.width || 1920;
+  const screenH = window.screen?.height || 1080;
+  const widthPct = pctOfScreen(YIVI_DIALOG_TARGET_WIDTH_PX, screenW);
+  const heightPct = pctOfScreen(YIVI_DIALOG_TARGET_HEIGHT_PX, screenH);
+  log(`dialog size: target ${YIVI_DIALOG_TARGET_WIDTH_PX}×${YIVI_DIALOG_TARGET_HEIGHT_PX}px on ${screenW}×${screenH} screen → ${widthPct}%×${heightPct}%`);
 
-    Office.context.ui.displayDialogAsync(
-      YIVI_DIALOG_URL,
-      // promptBeforeOpen: false suppresses the "PostGuard is opening
-      // another window" confirmation. Honored because the dialog URL is
-      // on the same origin as the add-in's source location. Requires
-      // Mailbox 1.9 (we require 1.12 in VersionOverridesV1_1).
-      { height: heightPct, width: widthPct, displayInIframe: false, promptBeforeOpen: false },
-      (asyncResult) => {
-        log(`displayDialogAsync status=${asyncResult.status}`);
-        if (asyncResult.status !== Office.AsyncResultStatus.Succeeded) {
-          reject(new Error(`displayDialogAsync failed: ${asyncResult.error?.message}`));
+  const baseOptions: Office.DialogOptions = {
+    height: heightPct,
+    width: widthPct,
+    displayInIframe: false,
+  };
+
+  // Try to open the dialog without Office's "open another window"
+  // prompt first. Browsers that allow popups from the Outlook host
+  // (Chrome/Edge/Firefox by default, and Safari once the user has
+  // granted permission once) get a one-click send. If that attempt
+  // fails — typically because Apple WebKit blocked the popup with no
+  // surfaced UI — retry with promptBeforeOpen: true so the Office
+  // prompt fires and the user's click on Allow becomes the gesture
+  // that releases the popup. The dialog itself shows a Safari-only
+  // hint pointing at Settings → Websites → Pop-ups so the user can
+  // skip the prompt on subsequent sends.
+  let dialog: Office.Dialog;
+  try {
+    log("displayDialogAsync attempt 1: promptBeforeOpen=false");
+    dialog = await openDialogAsync(YIVI_DIALOG_URL, {
+      ...baseOptions,
+      promptBeforeOpen: false,
+    });
+    log("dialog opened (no prompt)");
+  } catch (e1) {
+    const msg1 = (e1 as { message?: string })?.message ?? String(e1);
+    log(`attempt 1 failed (${msg1}); retrying with promptBeforeOpen=true`);
+    try {
+      dialog = await openDialogAsync(YIVI_DIALOG_URL, {
+        ...baseOptions,
+        promptBeforeOpen: true,
+      });
+      log("dialog opened (after prompt)");
+    } catch (e2) {
+      const msg2 = (e2 as { message?: string })?.message ?? String(e2);
+      throw new Error(`displayDialogAsync failed: ${msg2}`);
+    }
+  }
+
+  return new Promise((resolve, reject) => {
+    const inbound = new ChunkAssembler();
+    let settled = false;
+    // Auto-close on success/error so the user isn't left with a
+    // stale "Encrypted and sent. You can close this window." dialog
+    // after the Send has been released — flip DEBUG_KEEP_DIALOG_OPEN
+    // to opt out when DevTools/log inspection is needed. Cancel
+    // closes itself from the dialog (window.close on the button).
+    const closeDialog = (): void => {
+      if (DEBUG_KEEP_DIALOG_OPEN) return;
+      try {
+        dialog.close();
+      } catch (e) {
+        log(`dialog.close failed: ${String(e)}`);
+      }
+    };
+    const settle = (cb: () => void): void => {
+      if (settled) return;
+      settled = true;
+      cb();
+    };
+
+    const dispatch = (body: DialogMessage): void => {
+      log(`dialog → handler: ${body.type}`);
+      switch (body.type) {
+        case "ready": {
+          const chunks = chunkPayload(payload);
+          log(`sending ${chunks.length} chunk(s) to dialog`);
+          for (const c of chunks) {
+            dialog.messageChild(JSON.stringify(c));
+          }
+          break;
+        }
+        case "encrypt-result":
+          settle(() => {
+            closeDialog();
+            resolve(body as unknown as EncryptResult);
+          });
+          break;
+        case "encrypt-error":
+          settle(() => {
+            closeDialog();
+            reject(new Error(String(body.message ?? "Encryption failed")));
+          });
+          break;
+        case "cancelled":
+          settle(() => reject(new Error("Cancelled in dialog")));
+          break;
+        default:
+          log(`unhandled dialog message: ${body.type}`);
+      }
+    };
+
+    dialog.addEventHandler(
+      Office.EventType.DialogMessageReceived,
+      (arg: { message: string } | { error: number }) => {
+        if ("error" in arg) {
+          log(`dialog message error: ${arg.error}`);
+          settle(() => reject(new Error(`Dialog error ${arg.error}`)));
           return;
         }
-        const dialog = asyncResult.value;
-        const inbound = new ChunkAssembler();
-        let settled = false;
-        // Auto-close on success/error so the user isn't left with a
-        // stale "Encrypted and sent. You can close this window." dialog
-        // after the Send has been released — flip DEBUG_KEEP_DIALOG_OPEN
-        // to opt out when DevTools/log inspection is needed. Cancel
-        // closes itself from the dialog (window.close on the button).
-        const closeDialog = (): void => {
-          if (DEBUG_KEEP_DIALOG_OPEN) return;
-          try {
-            dialog.close();
-          } catch (e) {
-            log(`dialog.close failed: ${String(e)}`);
-          }
-        };
-        const settle = (cb: () => void): void => {
-          if (settled) return;
-          settled = true;
-          cb();
-        };
-
-        const dispatch = (body: DialogMessage): void => {
-          log(`dialog → handler: ${body.type}`);
-          switch (body.type) {
-            case "ready": {
-              const chunks = chunkPayload(payload);
-              log(`sending ${chunks.length} chunk(s) to dialog`);
-              for (const c of chunks) {
-                dialog.messageChild(JSON.stringify(c));
-              }
-              break;
-            }
-            case "encrypt-result":
-              settle(() => {
-                closeDialog();
-                resolve(body as unknown as EncryptResult);
-              });
-              break;
-            case "encrypt-error":
-              settle(() => {
-                closeDialog();
-                reject(new Error(String(body.message ?? "Encryption failed")));
-              });
-              break;
-            case "cancelled":
-              settle(() => reject(new Error("Cancelled in dialog")));
-              break;
-            default:
-              log(`unhandled dialog message: ${body.type}`);
-          }
-        };
-
-        dialog.addEventHandler(
-          Office.EventType.DialogMessageReceived,
-          (arg: { message: string } | { error: number }) => {
-            if ("error" in arg) {
-              log(`dialog message error: ${arg.error}`);
-              settle(() => reject(new Error(`Dialog error ${arg.error}`)));
-              return;
-            }
-            let body: DialogMessage;
-            try {
-              body = JSON.parse(arg.message) as DialogMessage;
-            } catch {
-              log(`could not parse dialog message: ${arg.message}`);
-              return;
-            }
-            if (isChunkMessage(body)) {
-              const reassembled = inbound.ingest(body as ChunkMessage);
-              if (reassembled) dispatch(reassembled as DialogMessage);
-              return;
-            }
-            dispatch(body);
-          }
-        );
-
-        dialog.addEventHandler(Office.EventType.DialogEventReceived, (arg) => {
-          log(`dialog event: ${JSON.stringify(arg)}`);
-          if ("error" in arg && arg.error === 12006) {
-            settle(() => reject(new Error("Dialog closed by user")));
-          }
-        });
+        let body: DialogMessage;
+        try {
+          body = JSON.parse(arg.message) as DialogMessage;
+        } catch {
+          log(`could not parse dialog message: ${arg.message}`);
+          return;
+        }
+        if (isChunkMessage(body)) {
+          const reassembled = inbound.ingest(body as ChunkMessage);
+          if (reassembled) dispatch(reassembled as DialogMessage);
+          return;
+        }
+        dispatch(body);
       }
     );
+
+    dialog.addEventHandler(Office.EventType.DialogEventReceived, (arg) => {
+      log(`dialog event: ${JSON.stringify(arg)}`);
+      if ("error" in arg && arg.error === 12006) {
+        settle(() => reject(new Error("Dialog closed by user")));
+      }
+    });
   });
 }
 
