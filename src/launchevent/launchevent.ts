@@ -263,21 +263,17 @@ function runEncryptDialog(payload: DialogMessage): Promise<EncryptResult> {
     const heightPct = pctOfScreen(YIVI_DIALOG_TARGET_HEIGHT_PX, screenH);
     log(`dialog size: target ${YIVI_DIALOG_TARGET_WIDTH_PX}×${YIVI_DIALOG_TARGET_HEIGHT_PX}px on ${screenW}×${screenH} screen → ${widthPct}%×${heightPct}%`);
 
-    // promptBeforeOpen branches on platform. On Mac the WKWebView
-    // popup blocker has no per-site override the user can reach, so the
-    // Office-level "PostGuard is opening another window" prompt is the
-    // only user gesture that releases the popup — keep it on (true).
-    // On Web/Windows, browsers expose their own popup-permission UI, so
-    // a returning user with permission granted can skip the extra
-    // Office prompt for a one-click flow (false). Brand-new Web users
-    // still see the browser's native popup-blocker indicator on the
-    // first send and can accept there once.
-    const isMac = Office.context.platform === Office.PlatformType.Mac;
-    log(`platform=${Office.context.platform} → promptBeforeOpen=${isMac}`);
-
+    // promptBeforeOpen MUST stay at its default (true). The Office-level
+    // "PostGuard is opening another window" confirmation is the user
+    // gesture that releases the popup the dialog needs — without it Mac
+    // WKWebView and any Web browser without a previously-granted popup
+    // permission silently block the popup with no recoverable error.
+    // Suppressing it (false) appears to work on returning Safari users
+    // whose host permission is cached, but breaks every fresh session
+    // and every Mac install.
     Office.context.ui.displayDialogAsync(
       YIVI_DIALOG_URL,
-      { height: heightPct, width: widthPct, displayInIframe: false, promptBeforeOpen: isMac },
+      { height: heightPct, width: widthPct, displayInIframe: false },
       (asyncResult) => {
         log(`displayDialogAsync status=${asyncResult.status}`);
         if (asyncResult.status !== Office.AsyncResultStatus.Succeeded) {
