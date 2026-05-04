@@ -75,6 +75,12 @@ module.exports = async (env, options) => {
         "process.env.PKG_URL": JSON.stringify(resolvedEnv.PKG_URL),
         "process.env.CRYPTIFY_URL": JSON.stringify(resolvedEnv.CRYPTIFY_URL),
         "process.env.POSTGUARD_WEBSITE_URL": JSON.stringify(resolvedEnv.POSTGUARD_WEBSITE_URL),
+        // The add-in's own public origin. Needed by launchevent.ts to
+        // build the Yivi dialog URL — window.location.href is unreliable
+        // there because New Outlook for Mac runs the launchevent JS
+        // override (JSRuntime.Url) where window.location is an Office-
+        // internal URL, not the add-in origin.
+        "process.env.ADDIN_PUBLIC_URL": JSON.stringify(dev ? urlDev : urlProd),
       }),
       new HtmlWebpackPlugin({
         filename: "taskpane.html",

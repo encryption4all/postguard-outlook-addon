@@ -109,6 +109,19 @@ Despite docs implying it's a general per-session state mechanism, `sessionData`
 methods are not available in launch event handlers. Don't reach for it for
 taskpane↔send-handler communication.
 
+### `window.location.href` in the launchevent runtime is *not* the add-in origin on every host
+
+On Outlook on Web and new Outlook on Windows, the launchevent runtime loads
+`launchevent.html` from your `<bt:Url id="WebViewRuntime.Url">`, so
+`window.location.href` is the add-in origin and you can derive other URLs from
+it. New Outlook for Mac instead uses the `<Override type="javascript"
+resid="JSRuntime.Url"/>` branch and runs `launchevent.js` directly — there
+`window.location` resolves to an Office-internal URL, not the add-in. Passing
+that to `displayDialogAsync` fails with the unhelpful `An internal error has
+occurred.` Use a build-time-injected `process.env.ADDIN_PUBLIC_URL` (see
+`webpack.config.js` DefinePlugin) for any absolute URL the launchevent
+handler hands back to Office.
+
 ---
 
 ## Office.js compose-mode quirks
