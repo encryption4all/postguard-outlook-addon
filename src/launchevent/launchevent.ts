@@ -31,7 +31,12 @@ const HEADER_POSTGUARD = "x-postguard";
 const POSTGUARD_VERSION = "0.1.0";
 const POSTGUARD_ENCRYPTED_FILENAME = "postguard.encrypted";
 const COMPOSE_BUTTON_ID = "postGuardComposeButton";
-const YIVI_DIALOG_URL = "https://localhost:3000/yivi-dialog.html";
+// Derive the dialog URL from the runtime origin so the same code works
+// for dev sideload (localhost), staging (addin.staging.postguard.eu) and
+// production (addin.postguard.eu) without rewriting source. Office's
+// displayDialogAsync only allows same-origin dialogs, subdomains of the
+// source location, or domains explicitly listed in <AppDomains>.
+const YIVI_DIALOG_URL = new URL("yivi-dialog.html", window.location.href).toString();
 
 const NOT_ENCRYPTED_MESSAGE =
   "PostGuard is on but this message is not encrypted yet. " +
