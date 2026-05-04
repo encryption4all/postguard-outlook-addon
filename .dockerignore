@@ -1,0 +1,15 @@
+.git
+.github
+.gitignore
+.claude
+.DS_Store
+node_modules
+dist
+lib
+docs
+CLAUDE.md
+README.md
+*.log
+.env
+.env.*
+!.env.example
