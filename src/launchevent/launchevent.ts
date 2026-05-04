@@ -24,6 +24,7 @@ import {
   isChunkMessage,
   ChunkMessage,
 } from "../lib/dialog-chunk";
+import { ADDIN_PUBLIC_URL } from "../lib/pkg-client";
 
 const HEADER_ENCRYPT_ON_SEND = "x-pg-encrypt-on-send";
 const HEADER_ENCRYPTED_RECIPIENTS = "x-pg-encrypted-recipients";
@@ -31,12 +32,13 @@ const HEADER_POSTGUARD = "x-postguard";
 const POSTGUARD_VERSION = "0.1.0";
 const POSTGUARD_ENCRYPTED_FILENAME = "postguard.encrypted";
 const COMPOSE_BUTTON_ID = "postGuardComposeButton";
-// Derive the dialog URL from the runtime origin so the same code works
-// for dev sideload (localhost), staging (addin.staging.postguard.eu) and
-// production (addin.postguard.eu) without rewriting source. Office's
-// displayDialogAsync only allows same-origin dialogs, subdomains of the
-// source location, or domains explicitly listed in <AppDomains>.
-const YIVI_DIALOG_URL = new URL("yivi-dialog.html", window.location.href).toString();
+// Build the dialog URL from the add-in's public origin, injected at
+// build time. window.location.href is unreliable here: New Outlook for
+// Mac runs launchevent.js via the JSRuntime.Url override, where
+// window.location resolves to an Office-internal URL rather than the
+// add-in origin, and displayDialogAsync rejects with "An internal error
+// has occurred."
+const YIVI_DIALOG_URL = `${ADDIN_PUBLIC_URL}yivi-dialog.html`;
 
 const NOT_ENCRYPTED_MESSAGE =
   "PostGuard is on but this message is not encrypted yet. " +

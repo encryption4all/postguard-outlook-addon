@@ -4,6 +4,10 @@
 export const PKG_URL: string = process.env.PKG_URL as string;
 export const CRYPTIFY_URL: string = process.env.CRYPTIFY_URL as string;
 export const POSTGUARD_WEBSITE_URL: string = process.env.POSTGUARD_WEBSITE_URL as string;
+// Add-in's own public origin (e.g. https://addin.postguard.eu/). Used by the
+// OnMessageSend launchevent runtime to construct the Yivi dialog URL —
+// window.location is unreliable there on New Outlook for Mac.
+export const ADDIN_PUBLIC_URL: string = process.env.ADDIN_PUBLIC_URL as string;
 
 export const CLIENT_NAME = "Outlook";
 export const CLIENT_ID = "pg4ol";
