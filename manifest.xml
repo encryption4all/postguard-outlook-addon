@@ -13,6 +13,14 @@
     <AppDomain>https://postguard.eu</AppDomain>
     <AppDomain>https://staging.postguard.eu</AppDomain>
     <AppDomain>https://yivi.app</AppDomain>
+    <!-- Required for Office.context.ui.displayDialogAsync from the
+         OnMessageSend launchevent runtime. That runtime is hosted inside
+         an outlook.office.com iframe, so the dialog URL counts as
+         cross-origin relative to it and must be allowlisted explicitly,
+         even though it is the same domain as <SourceLocation>. -->
+    <AppDomain>https://addin.postguard.eu</AppDomain>
+    <AppDomain>https://addin.staging.postguard.eu</AppDomain>
+    <AppDomain>https://localhost:3000</AppDomain>
   </AppDomains>
   <Hosts>
     <Host Name="Mailbox"/>
