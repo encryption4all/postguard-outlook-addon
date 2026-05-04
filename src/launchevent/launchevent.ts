@@ -263,18 +263,39 @@ function runEncryptDialog(payload: DialogMessage): Promise<EncryptResult> {
     const heightPct = pctOfScreen(YIVI_DIALOG_TARGET_HEIGHT_PX, screenH);
     log(`dialog size: target ${YIVI_DIALOG_TARGET_WIDTH_PX}×${YIVI_DIALOG_TARGET_HEIGHT_PX}px on ${screenW}×${screenH} screen → ${widthPct}%×${heightPct}%`);
 
-    // promptBeforeOpen MUST stay at the default (true). The Office-level
-    // "PostGuard is opening another window" confirmation is the user
-    // gesture that releases the popup the dialog needs. Without it Mac
-    // WKWebView and any Web browser without a previously-granted popup
-    // permission silently block the popup with no surfaced UI.
+    // promptBeforeOpen branches on rendering engine, not Office's
+    // platform enum. Apple WebKit — Safari and the WKWebView that New
+    // Outlook for Mac runs on — has no per-site popup permission UI
+    // reachable from a launchevent runtime, so the Office-level
+    // "PostGuard is opening another window" prompt is the only user
+    // gesture that releases the popup; we keep it on (true) there.
+    // Blink (Chrome, Edge) and Gecko (Firefox) handle background
+    // popups without intervention, so we skip the extra prompt for a
+    // one-click send. Office.context.platform reports "OfficeOnline"
+    // for every browser on the web, so we match on UA instead.
+    const ua = navigator.userAgent || "";
+    const isAppleWebKit = /AppleWebKit/.test(ua) && !/Chrome|Edg|OPR\//.test(ua);
+    const platformDebug =
+      `ua=${ua} | platform=${Office.context.platform} ` +
+      `isAppleWebKit=${isAppleWebKit} promptBeforeOpen=${isAppleWebKit}`;
+    log(platformDebug);
+
     Office.context.ui.displayDialogAsync(
       YIVI_DIALOG_URL,
-      { height: heightPct, width: widthPct, displayInIframe: false },
+      {
+        height: heightPct,
+        width: widthPct,
+        displayInIframe: false,
+        promptBeforeOpen: isAppleWebKit,
+      },
       (asyncResult) => {
         log(`displayDialogAsync status=${asyncResult.status}`);
         if (asyncResult.status !== Office.AsyncResultStatus.Succeeded) {
-          reject(new Error(`displayDialogAsync failed: ${asyncResult.error?.message}`));
+          reject(
+            new Error(
+              `displayDialogAsync failed: ${asyncResult.error?.message} | ${platformDebug}`
+            )
+          );
           return;
         }
         const dialog = asyncResult.value;
