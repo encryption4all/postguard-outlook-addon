@@ -3,28 +3,15 @@
     "allowJs": true,
     "baseUrl": ".",
     "esModuleInterop": true,
-    "experimentalDecorators": true,
+    "moduleResolution": "node",
+    "module": "esnext",
     "noEmitOnError": true,
     "outDir": "lib",
     "sourceMap": true,
-    "target": "es2020",
-    "module": "esnext",
-    "moduleResolution": "node",
-    "lib": [
-      "es2020",
-      "dom",
-      "dom.iterable"
-    ],
     "strict": true,
-    "skipLibCheck": true
+    "target": "es2020",
+    "lib": ["es2022", "dom"],
+    "types": ["office-js", "office-runtime"]
   },
-  "exclude": [
-    "node_modules",
-    "dist",
-    "lib",
-    "lib-amd"
-  ],
-  "ts-node": {
-    "files": true
-  }
+  "exclude": ["node_modules", "dist", "lib", "lib-amd"]
 }
