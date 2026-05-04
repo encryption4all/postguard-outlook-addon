@@ -264,23 +264,19 @@ function runEncryptDialog(payload: DialogMessage): Promise<EncryptResult> {
     log(`dialog size: target ${YIVI_DIALOG_TARGET_WIDTH_PX}×${YIVI_DIALOG_TARGET_HEIGHT_PX}px on ${screenW}×${screenH} screen → ${widthPct}%×${heightPct}%`);
 
     // New Outlook for Mac (WKWebView) blocks popup windows from a
-    // launchevent runtime with no per-site override available to the
-    // user, which makes the popup-mode dialog (displayInIframe: false)
-    // fail with the misleading "different security zones" error 12011 —
-    // surfaced as a generic E_FAIL on Mac. iframe mode bypasses the
-    // popup blocker. It is reportedly broken in Outlook on the web
-    // (office-js#2129) so we keep popup mode there. Detect Mac via
-    // Office.context.platform and branch the option.
+    // launchevent runtime, and iframe mode (displayInIframe: true) had
+    // no parent surface to render into. The remaining lever is the
+    // Office-level "open another window" prompt: with promptBeforeOpen:
+    // true Office shows its own confirmation that the user can accept,
+    // which counts as the user gesture WKWebView needs to release the
+    // popup. We keep promptBeforeOpen: false on Web/Windows so the
+    // existing one-click UX is unchanged.
     const isMac = Office.context.platform === Office.PlatformType.Mac;
-    log(`platform=${Office.context.platform} → displayInIframe=${isMac}`);
+    log(`platform=${Office.context.platform} → promptBeforeOpen=${isMac}`);
 
     Office.context.ui.displayDialogAsync(
       YIVI_DIALOG_URL,
-      // promptBeforeOpen: false suppresses the "PostGuard is opening
-      // another window" confirmation. Honored because the dialog URL is
-      // on the same origin as the add-in's source location. Requires
-      // Mailbox 1.9 (we require 1.12 in VersionOverridesV1_1).
-      { height: heightPct, width: widthPct, displayInIframe: isMac, promptBeforeOpen: false },
+      { height: heightPct, width: widthPct, displayInIframe: false, promptBeforeOpen: isMac },
       (asyncResult) => {
         log(`displayDialogAsync status=${asyncResult.status}`);
         if (asyncResult.status !== Office.AsyncResultStatus.Succeeded) {
