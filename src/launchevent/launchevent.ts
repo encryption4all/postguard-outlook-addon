@@ -272,13 +272,16 @@ function runEncryptDialog(payload: DialogMessage): Promise<EncryptResult> {
     })();
     log(`pre-dialog diagnostics platform=${platform} host=${host} mbx1.13=${supports113} url=${YIVI_DIALOG_URL}`);
 
+    // displayInIframe and promptBeforeOpen used to be set explicitly here
+    // (false / false). On New Outlook for Mac that combination caused
+    // displayDialogAsync to reject with E_FAIL (-2147467259) before any
+    // navigation attempt. Falling back to defaults — popup window with
+    // the "open another window" prompt — is what Mac WebKit actually
+    // permits from a launchevent runtime. The prompt is harmless on
+    // Web/Windows so we accept it everywhere rather than branching.
     Office.context.ui.displayDialogAsync(
       YIVI_DIALOG_URL,
-      // promptBeforeOpen: false suppresses the "PostGuard is opening
-      // another window" confirmation. Honored because the dialog URL is
-      // on the same origin as the add-in's source location. Requires
-      // Mailbox 1.9 (we require 1.12 in VersionOverridesV1_1).
-      { height: heightPct, width: widthPct, displayInIframe: false, promptBeforeOpen: false },
+      { height: heightPct, width: widthPct },
       (asyncResult) => {
         log(`displayDialogAsync status=${asyncResult.status}`);
         if (asyncResult.status !== Office.AsyncResultStatus.Succeeded) {
