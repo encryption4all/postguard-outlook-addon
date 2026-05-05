@@ -207,19 +207,6 @@ function handlePayload(msg: DialogMessage): void {
 Office.onReady(() => {
   log("Office.onReady fired");
 
-  // Show a one-time hint in Safari pointing at the per-site popup
-  // setting. Match Safari only — not WKWebView (Outlook for Mac), where
-  // no such setting is reachable. Safari's UA includes "Safari/<ver>"
-  // after AppleWebKit; WKWebView omits the Safari token. Chromium
-  // browsers spoof AppleWebKit but include "Chrome" or "Edg".
-  const ua = navigator.userAgent || "";
-  const isSafari =
-    /AppleWebKit/.test(ua) && /Safari\//.test(ua) && !/Chrome|Edg|OPR\//.test(ua);
-  if (isSafari) {
-    const tip = document.getElementById("pg-dlg-safari-tip");
-    if (tip) tip.hidden = false;
-  }
-
   const cancelBtn = document.getElementById("pg-dlg-cancel") as HTMLButtonElement | null;
   if (cancelBtn) {
     cancelBtn.addEventListener("click", () => {

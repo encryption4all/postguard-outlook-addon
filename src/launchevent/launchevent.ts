@@ -279,56 +279,25 @@ async function runEncryptDialog(payload: DialogMessage): Promise<EncryptResult> 
     displayInIframe: false,
   };
 
-  // Outlook for Mac (the native app, not Outlook on the web in Safari)
-  // has no per-site popup-permission UI reachable from a launchevent
-  // runtime. The optimistic-then-retry pattern below always loses its
-  // first attempt there and just adds a wasted round-trip, so go
-  // straight to promptBeforeOpen: true. Safari users on Outlook on the
-  // web still benefit from the optimistic path because they can grant
-  // popup permission once and get a one-click send afterwards.
-  const isOutlookForMac = Office.context.platform === Office.PlatformType.Mac;
-  log(`platform=${Office.context.platform} isOutlookForMac=${isOutlookForMac}`);
+  // promptBeforeOpen branches on rendering engine, not Office's
+  // platform enum. Apple WebKit — Safari and the WKWebView that New
+  // Outlook for Mac runs on — silently blocks popups opened from a
+  // launchevent runtime, so the Office-level "PostGuard is opening
+  // another window" confirmation has to fire there: the user's click
+  // on Allow is the gesture WKWebView needs to release the popup.
+  // Blink (Chrome/Edge) and Gecko (Firefox) handle background popups
+  // without intervention, so we skip the prompt for a one-click send.
+  // Office.context.platform reports "OfficeOnline" for every browser
+  // on the web so we match on UA.
+  const ua = navigator.userAgent || "";
+  const isAppleWebKit = /AppleWebKit/.test(ua) && !/Chrome|Edg|OPR\//.test(ua);
+  log(`platform=${Office.context.platform} isAppleWebKit=${isAppleWebKit}`);
 
-  let dialog: Office.Dialog;
-  if (isOutlookForMac) {
-    log("Outlook for Mac → displayDialogAsync with promptBeforeOpen=true");
-    dialog = await openDialogAsync(YIVI_DIALOG_URL, {
-      ...baseOptions,
-      promptBeforeOpen: true,
-    });
-    log("dialog opened (Mac, prompt)");
-  } else {
-    // Try without Office's "open another window" prompt first.
-    // Browsers that allow popups from the Outlook host (Chrome/Edge/
-    // Firefox by default, and Safari once the user has granted
-    // permission once) get a one-click send. If the attempt fails —
-    // typically Apple WebKit silently blocking the popup — retry with
-    // promptBeforeOpen: true so the Office prompt fires and the user's
-    // click on Allow becomes the gesture that releases the popup. The
-    // dialog itself shows a Safari-only hint pointing at Settings →
-    // Websites → Pop-ups so the user can skip the prompt thereafter.
-    try {
-      log("displayDialogAsync attempt 1: promptBeforeOpen=false");
-      dialog = await openDialogAsync(YIVI_DIALOG_URL, {
-        ...baseOptions,
-        promptBeforeOpen: false,
-      });
-      log("dialog opened (no prompt)");
-    } catch (e1) {
-      const msg1 = (e1 as { message?: string })?.message ?? String(e1);
-      log(`attempt 1 failed (${msg1}); retrying with promptBeforeOpen=true`);
-      try {
-        dialog = await openDialogAsync(YIVI_DIALOG_URL, {
-          ...baseOptions,
-          promptBeforeOpen: true,
-        });
-        log("dialog opened (after prompt)");
-      } catch (e2) {
-        const msg2 = (e2 as { message?: string })?.message ?? String(e2);
-        throw new Error(`displayDialogAsync failed: ${msg2}`);
-      }
-    }
-  }
+  const dialog = await openDialogAsync(YIVI_DIALOG_URL, {
+    ...baseOptions,
+    promptBeforeOpen: isAppleWebKit,
+  });
+  log(`dialog opened (promptBeforeOpen=${isAppleWebKit})`);
 
   return new Promise((resolve, reject) => {
     const inbound = new ChunkAssembler();
