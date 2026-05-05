@@ -286,25 +286,23 @@ async function runEncryptDialog(payload: DialogMessage): Promise<EncryptResult> 
     displayInIframe: false,
   };
 
-  // promptBeforeOpen branches on rendering engine, not Office's
-  // platform enum. Apple WebKit — Safari and the WKWebView that New
-  // Outlook for Mac runs on — silently blocks popups opened from a
-  // launchevent runtime, so the Office-level "PostGuard is opening
-  // another window" confirmation has to fire there: the user's click
-  // on Allow is the gesture WKWebView needs to release the popup.
-  // Blink (Chrome/Edge) and Gecko (Firefox) handle background popups
-  // without intervention, so we skip the prompt for a one-click send.
-  // Office.context.platform reports "OfficeOnline" for every browser
-  // on the web so we match on UA.
+  // Apple WebKit — Safari and the WKWebView that Outlook for Mac runs
+  // on — silently blocks popups from a launchevent runtime, so we need
+  // Office's "open another window" confirmation to fire there. We
+  // *omit* promptBeforeOpen entirely instead of passing true: Office
+  // defaulted-prompt and Office prompt:true sometimes behave
+  // differently on Mac native (the explicit-true path failed with
+  // E_FAIL where the defaulted path opens fine). For Blink/Gecko we
+  // pass false to suppress the prompt and get a one-click send.
   const ua = navigator.userAgent || "";
   const isAppleWebKit = /AppleWebKit/.test(ua) && !/Chrome|Edg|OPR\//.test(ua);
   log(`platform=${Office.context.platform} isAppleWebKit=${isAppleWebKit}`);
 
-  const dialog = await openDialogAsync(YIVI_DIALOG_URL, {
-    ...baseOptions,
-    promptBeforeOpen: isAppleWebKit,
-  });
-  log(`dialog opened (promptBeforeOpen=${isAppleWebKit})`);
+  const opts: Office.DialogOptions = { ...baseOptions };
+  if (!isAppleWebKit) opts.promptBeforeOpen = false;
+
+  const dialog = await openDialogAsync(YIVI_DIALOG_URL, opts);
+  log(`dialog opened (promptBeforeOpen ${isAppleWebKit ? "default" : "false"})`);
 
   return new Promise((resolve, reject) => {
     const inbound = new ChunkAssembler();
