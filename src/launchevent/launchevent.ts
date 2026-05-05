@@ -285,30 +285,10 @@ async function runEncryptDialog(payload: DialogMessage): Promise<EncryptResult> 
   const heightPct = pctOfScreen(YIVI_DIALOG_TARGET_HEIGHT_PX, screenH);
   log(`dialog size: target ${YIVI_DIALOG_TARGET_WIDTH_PX}×${YIVI_DIALOG_TARGET_HEIGHT_PX}px on ${screenW}×${screenH} screen → ${widthPct}%×${heightPct}%`);
 
-  log(`platform=${Office.context.platform}`);
-
-  const opts: Office.DialogOptions = {
+  const dialog = await openDialogAsync(YIVI_DIALOG_URL, {
     height: heightPct,
     width: widthPct,
-    displayInIframe: false,
-    promptBeforeOpen: true,
-  };
-
-  // Keep the diagnostic suffix on rejection so we still see size,
-  // platform, and resolved options in the Smart Alert if anything
-  // unexpected goes wrong with the manifest-runtime change.
-  const diag =
-    `screen=${screenW}×${screenH} dialog=${widthPct}%×${heightPct}% ` +
-    `platform=${Office.context.platform} opts=${JSON.stringify(opts)}`;
-
-  let dialog: Office.Dialog;
-  try {
-    dialog = await openDialogAsync(YIVI_DIALOG_URL, opts);
-    log("dialog opened");
-  } catch (e) {
-    const inner = e instanceof Error ? e.message : String(e);
-    throw new Error(`${inner} | ${diag}`);
-  }
+  });
 
   return new Promise((resolve, reject) => {
     const inbound = new ChunkAssembler();
