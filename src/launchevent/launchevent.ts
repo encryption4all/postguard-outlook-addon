@@ -279,38 +279,25 @@ async function runEncryptDialog(payload: DialogMessage): Promise<EncryptResult> 
     displayInIframe: false,
   };
 
-  // Try to open the dialog without Office's "open another window"
-  // prompt first. Browsers that allow popups from the Outlook host
-  // (Chrome/Edge/Firefox by default, and Safari once the user has
-  // granted permission once) get a one-click send. If that attempt
-  // fails — typically because Apple WebKit blocked the popup with no
-  // surfaced UI — retry with promptBeforeOpen: true so the Office
-  // prompt fires and the user's click on Allow becomes the gesture
-  // that releases the popup. The dialog itself shows a Safari-only
-  // hint pointing at Settings → Websites → Pop-ups so the user can
-  // skip the prompt on subsequent sends.
-  let dialog: Office.Dialog;
-  try {
-    log("displayDialogAsync attempt 1: promptBeforeOpen=false");
-    dialog = await openDialogAsync(YIVI_DIALOG_URL, {
-      ...baseOptions,
-      promptBeforeOpen: false,
-    });
-    log("dialog opened (no prompt)");
-  } catch (e1) {
-    const msg1 = (e1 as { message?: string })?.message ?? String(e1);
-    log(`attempt 1 failed (${msg1}); retrying with promptBeforeOpen=true`);
-    try {
-      dialog = await openDialogAsync(YIVI_DIALOG_URL, {
-        ...baseOptions,
-        promptBeforeOpen: true,
-      });
-      log("dialog opened (after prompt)");
-    } catch (e2) {
-      const msg2 = (e2 as { message?: string })?.message ?? String(e2);
-      throw new Error(`displayDialogAsync failed: ${msg2}`);
-    }
-  }
+  // promptBeforeOpen branches on rendering engine, not Office's
+  // platform enum. Apple WebKit — Safari and the WKWebView that New
+  // Outlook for Mac runs on — silently blocks popups opened from a
+  // launchevent runtime, so the Office-level "PostGuard is opening
+  // another window" confirmation has to fire there: the user's click
+  // on Allow is the gesture WKWebView needs to release the popup.
+  // Blink (Chrome/Edge) and Gecko (Firefox) handle background popups
+  // without intervention, so we skip the prompt for a one-click send.
+  // Office.context.platform reports "OfficeOnline" for every browser
+  // on the web so we match on UA.
+  const ua = navigator.userAgent || "";
+  const isAppleWebKit = /AppleWebKit/.test(ua) && !/Chrome|Edg|OPR\//.test(ua);
+  log(`platform=${Office.context.platform} isAppleWebKit=${isAppleWebKit}`);
+
+  const dialog = await openDialogAsync(YIVI_DIALOG_URL, {
+    ...baseOptions,
+    promptBeforeOpen: isAppleWebKit,
+  });
+  log(`dialog opened (promptBeforeOpen=${isAppleWebKit})`);
 
   return new Promise((resolve, reject) => {
     const inbound = new ChunkAssembler();
