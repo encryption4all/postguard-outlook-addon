@@ -106,3 +106,27 @@ jobs:
             POSTGUARD_WEBSITE_URL=${{ env.POSTGUARD_WEBSITE_URL }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      # Attach the production-built manifest.xml to the GitHub Release so
+      # admins centralizing deployment have a stable, versioned URL to
+      # sideload from instead of pulling the Docker image or relying on
+      # whatever the running addin host is currently serving.
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build manifest with production URL
+        env:
+          ADDIN_PUBLIC_URL: https://${{ env.ADDIN_HOST }}/
+          PKG_URL: ${{ env.PKG_URL }}
+          CRYPTIFY_URL: ${{ env.CRYPTIFY_URL }}
+          POSTGUARD_WEBSITE_URL: ${{ env.POSTGUARD_WEBSITE_URL }}
+        run: npm run build
+
+      - name: Upload manifest.xml to release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${{ needs.release-please.outputs.tag_name }}" dist/manifest.xml --clobber
