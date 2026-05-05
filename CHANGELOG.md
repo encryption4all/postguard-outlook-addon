@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.1.2](https://github.com/encryption4all/postguard-outlook-addon/compare/v0.1.1...v0.1.2) (2026-05-05)
+
+
+### Bug Fixes
+
+* **launchevent:** always prompt on Apple WebKit; drop retry and Safari hint ([7f24d77](https://github.com/encryption4all/postguard-outlook-addon/commit/7f24d7785e84e979542c5b0fd4ab153f713cf008))
+* **launchevent:** always prompt on WebKit, drop retry and Safari hint ([21c76d0](https://github.com/encryption4all/postguard-outlook-addon/commit/21c76d0a7cbc849bf11f5c99d3718e225b19929d))
+* **launchevent:** skip optimistic attempt on Outlook for Mac ([bfc73ce](https://github.com/encryption4all/postguard-outlook-addon/commit/bfc73cec558726a5fb127bda1373b547338650b9))
+
 ## [0.1.1](https://github.com/encryption4all/postguard-outlook-addon/compare/v0.1.0...v0.1.1) (2026-05-05)
 
 
