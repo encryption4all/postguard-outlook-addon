@@ -522,12 +522,13 @@ function onMessageSendHandler(event: Office.AddinCommands.Event): void {
 
       // Outlook for Mac (the native WKWebView app, not Outlook on the
       // web in Safari) rejects displayDialogAsync from the launchevent
-      // runtime with E_FAIL regardless of options or sizing — confirmed
-      // empirically and matched against open issues #3138 / #3085 /
-      // #5681 in OfficeDev/office-js. Until Microsoft restores working
-      // dialog support there, deflect Mac sends to the manual taskpane
-      // "Encrypt & Send" button which doesn't go through the
-      // displayDialogAsync path at all.
+      // runtime with E_FAIL regardless of options or sizing. Tracked
+      // upstream at https://github.com/OfficeDev/office-js/issues/6677;
+      // related closed-as-stale reports are #3138, #3085, and #5681.
+      // Until Microsoft restores working dialog support there, deflect
+      // Mac sends to the manual taskpane "Encrypt & Send" button which
+      // doesn't go through the displayDialogAsync path at all. Remove
+      // this branch when 6677 ships a fix.
       if (Office.context.platform === Office.PlatformType.Mac) {
         log("Outlook for Mac detected; deferring to taskpane flow");
         cancelTimeout();
