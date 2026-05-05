@@ -48,6 +48,11 @@ const STALE_ENCRYPTION_MESSAGE =
   "PostGuard recipients or settings changed since the last encryption. " +
   "Open the PostGuard taskpane and click Re-encrypt & Send before sending.";
 
+const MAC_NOT_SUPPORTED_MESSAGE =
+  "PostGuard's one-click encrypt-on-send is not supported on Outlook for Mac. " +
+  "Open the PostGuard taskpane (PostGuard button in the toolbar) and click " +
+  "Encrypt & Send to encrypt and send this message.";
+
 interface DialogMessage {
   type: string;
   [key: string]: unknown;
@@ -279,25 +284,33 @@ async function runEncryptDialog(payload: DialogMessage): Promise<EncryptResult> 
     displayInIframe: false,
   };
 
-  // promptBeforeOpen branches on rendering engine, not Office's
-  // platform enum. Apple WebKit — Safari and the WKWebView that New
-  // Outlook for Mac runs on — silently blocks popups opened from a
-  // launchevent runtime, so the Office-level "PostGuard is opening
-  // another window" confirmation has to fire there: the user's click
-  // on Allow is the gesture WKWebView needs to release the popup.
-  // Blink (Chrome/Edge) and Gecko (Firefox) handle background popups
-  // without intervention, so we skip the prompt for a one-click send.
-  // Office.context.platform reports "OfficeOnline" for every browser
-  // on the web so we match on UA.
-  const ua = navigator.userAgent || "";
-  const isAppleWebKit = /AppleWebKit/.test(ua) && !/Chrome|Edg|OPR\//.test(ua);
-  log(`platform=${Office.context.platform} isAppleWebKit=${isAppleWebKit}`);
-
-  const dialog = await openDialogAsync(YIVI_DIALOG_URL, {
-    ...baseOptions,
-    promptBeforeOpen: isAppleWebKit,
-  });
-  log(`dialog opened (promptBeforeOpen=${isAppleWebKit})`);
+  // Try to open without Office's "open another window" prompt first.
+  // Browsers that allow popups from the Outlook host (Chrome, Edge,
+  // Firefox by default; Safari once the user has granted popup
+  // permission) get a one-click send. If the optimistic attempt fails
+  // — typically Safari's popup blocker silently denying — retry with
+  // promptBeforeOpen: true so the Office prompt fires and the user's
+  // click on Allow becomes the gesture that releases the popup. The
+  // dialog itself shows a Safari-only inline hint pointing at
+  // Settings → Websites → Pop-ups so the user can opt out of the
+  // recurring prompt by granting permission once.
+  let dialog: Office.Dialog;
+  try {
+    log("displayDialogAsync attempt 1: promptBeforeOpen=false");
+    dialog = await openDialogAsync(YIVI_DIALOG_URL, {
+      ...baseOptions,
+      promptBeforeOpen: false,
+    });
+    log("dialog opened (no prompt)");
+  } catch (e1) {
+    const msg1 = (e1 as { message?: string })?.message ?? String(e1);
+    log(`attempt 1 failed (${msg1}); retrying with promptBeforeOpen=true`);
+    dialog = await openDialogAsync(YIVI_DIALOG_URL, {
+      ...baseOptions,
+      promptBeforeOpen: true,
+    });
+    log("dialog opened (after prompt)");
+  }
 
   return new Promise((resolve, reject) => {
     const inbound = new ChunkAssembler();
@@ -504,6 +517,21 @@ function onMessageSendHandler(event: Office.AddinCommands.Event): void {
       if (!encryptRequested) {
         cancelTimeout();
         event.completed({ allowEvent: true });
+        return;
+      }
+
+      // Outlook for Mac (the native WKWebView app, not Outlook on the
+      // web in Safari) rejects displayDialogAsync from the launchevent
+      // runtime with E_FAIL regardless of options or sizing — confirmed
+      // empirically and matched against open issues #3138 / #3085 /
+      // #5681 in OfficeDev/office-js. Until Microsoft restores working
+      // dialog support there, deflect Mac sends to the manual taskpane
+      // "Encrypt & Send" button which doesn't go through the
+      // displayDialogAsync path at all.
+      if (Office.context.platform === Office.PlatformType.Mac) {
+        log("Outlook for Mac detected; deferring to taskpane flow");
+        cancelTimeout();
+        block(event, MAC_NOT_SUPPORTED_MESSAGE);
         return;
       }
 
