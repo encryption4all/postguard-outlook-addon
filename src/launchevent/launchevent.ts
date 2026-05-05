@@ -285,28 +285,35 @@ async function runEncryptDialog(payload: DialogMessage): Promise<EncryptResult> 
   const heightPct = pctOfScreen(YIVI_DIALOG_TARGET_HEIGHT_PX, screenH);
   log(`dialog size: target ${YIVI_DIALOG_TARGET_WIDTH_PX}×${YIVI_DIALOG_TARGET_HEIGHT_PX}px on ${screenW}×${screenH} screen → ${widthPct}%×${heightPct}%`);
 
-  const baseOptions: Office.DialogOptions = {
+  // Outlook for Mac rejects popup-mode displayDialogAsync from the
+  // launchevent runtime with E_FAIL regardless of size, AppDomains,
+  // or promptBeforeOpen. Last untested lever: displayInIframe. Try
+  // iframe mode on Mac only — popup mode is known-good on
+  // Web/Windows so we don't risk regressing those.
+  const isMac = Office.context.platform === Office.PlatformType.Mac;
+  log(`platform=${Office.context.platform} isMac=${isMac}`);
+
+  const opts: Office.DialogOptions = {
     height: heightPct,
     width: widthPct,
-    displayInIframe: false,
+    displayInIframe: isMac,
+    promptBeforeOpen: true,
   };
 
-  // Apple WebKit — Safari and the WKWebView that Outlook for Mac runs
-  // on — silently blocks popups from a launchevent runtime, so we need
-  // Office's "open another window" confirmation to fire there. We
-  // *omit* promptBeforeOpen entirely instead of passing true: Office
-  // defaulted-prompt and Office prompt:true sometimes behave
-  // differently on Mac native (the explicit-true path failed with
-  // E_FAIL where the defaulted path opens fine). For Blink/Gecko we
-  // pass false to suppress the prompt and get a one-click send.
-  const ua = navigator.userAgent || "";
-  const isAppleWebKit = /AppleWebKit/.test(ua) && !/Chrome|Edg|OPR\//.test(ua);
-  log(`platform=${Office.context.platform} isAppleWebKit=${isAppleWebKit}`);
+  // Diagnostic suffix on the rejection so the Smart Alert tells us
+  // what mode and size were used if iframe also fails.
+  const diag =
+    `screen=${screenW}×${screenH} dialog=${widthPct}%×${heightPct}% ` +
+    `platform=${Office.context.platform} opts=${JSON.stringify(opts)}`;
 
-  const opts: Office.DialogOptions = { ...baseOptions, promptBeforeOpen: true };
-
-  const dialog = await openDialogAsync(YIVI_DIALOG_URL, opts);
-  log("dialog opened (promptBeforeOpen=true)");
+  let dialog: Office.Dialog;
+  try {
+    dialog = await openDialogAsync(YIVI_DIALOG_URL, opts);
+    log(`dialog opened (displayInIframe=${isMac})`);
+  } catch (e) {
+    const inner = e instanceof Error ? e.message : String(e);
+    throw new Error(`${inner} | ${diag}`);
+  }
 
   return new Promise((resolve, reject) => {
     const inbound = new ChunkAssembler();
