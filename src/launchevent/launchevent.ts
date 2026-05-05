@@ -48,11 +48,6 @@ const STALE_ENCRYPTION_MESSAGE =
   "PostGuard recipients or settings changed since the last encryption. " +
   "Open the PostGuard taskpane and click Re-encrypt & Send before sending.";
 
-const MAC_NOT_SUPPORTED_MESSAGE =
-  "Encrypt-on-Send is not supported on Outlook for Mac yet. " +
-  "Open the PostGuard taskpane (PostGuard button in the toolbar) and " +
-  "click Encrypt & Send to encrypt and send this message.";
-
 interface DialogMessage {
   type: string;
   [key: string]: unknown;
@@ -308,11 +303,10 @@ async function runEncryptDialog(payload: DialogMessage): Promise<EncryptResult> 
   const isAppleWebKit = /AppleWebKit/.test(ua) && !/Chrome|Edg|OPR\//.test(ua);
   log(`platform=${Office.context.platform} isAppleWebKit=${isAppleWebKit}`);
 
-  const opts: Office.DialogOptions = { ...baseOptions };
-  if (!isAppleWebKit) opts.promptBeforeOpen = false;
+  const opts: Office.DialogOptions = { ...baseOptions, promptBeforeOpen: true };
 
   const dialog = await openDialogAsync(YIVI_DIALOG_URL, opts);
-  log(`dialog opened (promptBeforeOpen ${isAppleWebKit ? "default" : "false"})`);
+  log("dialog opened (promptBeforeOpen=true)");
 
   return new Promise((resolve, reject) => {
     const inbound = new ChunkAssembler();
@@ -537,21 +531,6 @@ function onMessageSendHandler(event: Office.AddinCommands.Event): void {
       if (!encryptRequested) {
         cancelTimeout();
         event.completed({ allowEvent: true });
-        return;
-      }
-
-      // Outlook for Mac (native, not Outlook on the web in Safari)
-      // rejects displayDialogAsync from the launchevent runtime with
-      // E_FAIL — confirmed empirically across <AppDomains>, dialog-
-      // size, displayInIframe, and promptBeforeOpen variations.
-      // The Yivi widget needs a real popup to render the QR, so until
-      // Microsoft ships working dialog support there, we deflect Mac
-      // sends to the manual taskpane "Encrypt & Send" flow which
-      // doesn't go through displayDialogAsync at all.
-      if (Office.context.platform === Office.PlatformType.Mac) {
-        log("Outlook for Mac detected; deferring to taskpane flow");
-        cancelTimeout();
-        block(event, MAC_NOT_SUPPORTED_MESSAGE);
         return;
       }
 
