@@ -244,7 +244,10 @@ function pctOfScreen(targetPx: number, screenPx: number): number {
 }
 
 // Promise wrapper around displayDialogAsync. Resolves with the dialog
-// handle on success, rejects with the Office error otherwise.
+// handle on success, rejects with a proper Error otherwise. Office's
+// asyncResult.error is a plain {code, name, message} object — without
+// this conversion any rejection here propagates as a non-Error and
+// downstream `String(err)` collapses it to "[object Object]".
 function openDialogAsync(
   url: string,
   options: Office.DialogOptions
@@ -254,7 +257,11 @@ function openDialogAsync(
       if (asyncResult.status === Office.AsyncResultStatus.Succeeded) {
         resolve(asyncResult.value);
       } else {
-        reject(asyncResult.error ?? new Error("displayDialogAsync failed"));
+        const err = asyncResult.error;
+        const detail = err
+          ? `${err.message ?? "(no message)"} (code=${err.code ?? "?"}, name=${err.name ?? "?"})`
+          : "(no error info)";
+        reject(new Error(`displayDialogAsync failed: ${detail}`));
       }
     });
   });
@@ -554,7 +561,25 @@ function onMessageSendHandler(event: Office.AddinCommands.Event): void {
             event.completed({ allowEvent: true });
           } catch (e) {
             cancelTimeout();
-            const msg = e instanceof Error ? e.message : String(e);
+            // Robust stringify: Error → .message; plain string → as-is;
+            // plain object → JSON; otherwise String(). Without this,
+            // non-Error rejections (e.g. Office's plain {code, name,
+            // message} error shape) collapse to "[object Object]".
+            let msg: string;
+            if (e instanceof Error) {
+              msg = e.message;
+            } else if (typeof e === "string") {
+              msg = e;
+            } else if (e && typeof e === "object") {
+              try {
+                msg = JSON.stringify(e);
+              } catch {
+                msg = "(unserializable error)";
+              }
+            } else {
+              msg = String(e);
+            }
+            log(`encryptAndApply threw: ${msg}`);
             block(event, `Encryption failed: ${msg}`);
           }
           return;
