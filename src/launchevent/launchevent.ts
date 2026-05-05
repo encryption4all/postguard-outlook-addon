@@ -236,11 +236,17 @@ const YIVI_DIALOG_TARGET_HEIGHT_PX = 520;
 // always closes itself.
 const DEBUG_KEEP_DIALOG_OPEN = false;
 
+// Floor the dialog percentage at 30%. Office.js docs claim 1–99 is
+// the valid range, but Outlook for Mac rejects displayDialogAsync
+// with E_FAIL (code=-2147467259) when the dialog is too small. On a
+// 3440×1440 ultrawide our 300px target resolves to 9% width, which
+// trips that limit. 30% sits comfortably above whatever the actual
+// host minimum is and still fits a 250–300px QR.
+const MIN_DIALOG_PCT = 30;
+
 function pctOfScreen(targetPx: number, screenPx: number): number {
-  // displayDialogAsync clamps to [1, 99]. Round up so we don't drop
-  // below the QR's minimum useful size on huge monitors.
   const pct = Math.ceil((targetPx / screenPx) * 100);
-  return Math.min(99, Math.max(1, pct));
+  return Math.min(99, Math.max(MIN_DIALOG_PCT, pct));
 }
 
 // Promise wrapper around displayDialogAsync. Resolves with the dialog
