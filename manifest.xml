@@ -134,9 +134,14 @@
       <Hosts>
         <Host xsi:type="MailHost">
           <Runtimes>
-            <Runtime resid="WebViewRuntime.Url">
-              <Override type="javascript" resid="JSRuntime.Url"/>
-            </Runtime>
+            <!-- Force the WebView runtime. The legacy "javascript"
+                 override was routing New Outlook for Mac into the JS-
+                 only runtime, where displayDialogAsync from a
+                 launchevent handler rejects with E_FAIL. Modern hosts
+                 (Outlook on the web, new Outlook on Windows, new
+                 Outlook for Mac 16.84+) all support the WebView
+                 runtime, which is where dialog support is implemented. -->
+            <Runtime resid="WebViewRuntime.Url"/>
           </Runtimes>
           <DesktopFormFactor>
             <FunctionFile resid="Commands.Url"/>

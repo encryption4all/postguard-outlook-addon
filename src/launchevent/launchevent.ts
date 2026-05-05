@@ -285,23 +285,18 @@ async function runEncryptDialog(payload: DialogMessage): Promise<EncryptResult> 
   const heightPct = pctOfScreen(YIVI_DIALOG_TARGET_HEIGHT_PX, screenH);
   log(`dialog size: target ${YIVI_DIALOG_TARGET_WIDTH_PX}×${YIVI_DIALOG_TARGET_HEIGHT_PX}px on ${screenW}×${screenH} screen → ${widthPct}%×${heightPct}%`);
 
-  // Outlook for Mac rejects popup-mode displayDialogAsync from the
-  // launchevent runtime with E_FAIL regardless of size, AppDomains,
-  // or promptBeforeOpen. Last untested lever: displayInIframe. Try
-  // iframe mode on Mac only — popup mode is known-good on
-  // Web/Windows so we don't risk regressing those.
-  const isMac = Office.context.platform === Office.PlatformType.Mac;
-  log(`platform=${Office.context.platform} isMac=${isMac}`);
+  log(`platform=${Office.context.platform}`);
 
   const opts: Office.DialogOptions = {
     height: heightPct,
     width: widthPct,
-    displayInIframe: isMac,
+    displayInIframe: false,
     promptBeforeOpen: true,
   };
 
-  // Diagnostic suffix on the rejection so the Smart Alert tells us
-  // what mode and size were used if iframe also fails.
+  // Keep the diagnostic suffix on rejection so we still see size,
+  // platform, and resolved options in the Smart Alert if anything
+  // unexpected goes wrong with the manifest-runtime change.
   const diag =
     `screen=${screenW}×${screenH} dialog=${widthPct}%×${heightPct}% ` +
     `platform=${Office.context.platform} opts=${JSON.stringify(opts)}`;
@@ -309,7 +304,7 @@ async function runEncryptDialog(payload: DialogMessage): Promise<EncryptResult> 
   let dialog: Office.Dialog;
   try {
     dialog = await openDialogAsync(YIVI_DIALOG_URL, opts);
-    log(`dialog opened (displayInIframe=${isMac})`);
+    log("dialog opened");
   } catch (e) {
     const inner = e instanceof Error ? e.message : String(e);
     throw new Error(`${inner} | ${diag}`);
