@@ -48,6 +48,11 @@ const STALE_ENCRYPTION_MESSAGE =
   "PostGuard recipients or settings changed since the last encryption. " +
   "Open the PostGuard taskpane and click Re-encrypt & Send before sending.";
 
+const MAC_NOT_SUPPORTED_MESSAGE =
+  "Encrypt-on-Send is not supported on Outlook for Mac yet. " +
+  "Open the PostGuard taskpane (PostGuard button in the toolbar) and " +
+  "click Encrypt & Send to encrypt and send this message.";
+
 interface DialogMessage {
   type: string;
   [key: string]: unknown;
@@ -236,13 +241,12 @@ const YIVI_DIALOG_TARGET_HEIGHT_PX = 520;
 // always closes itself.
 const DEBUG_KEEP_DIALOG_OPEN = false;
 
-// Floor the dialog percentage at 40%. Outlook for Mac rejects
-// displayDialogAsync with E_FAIL (code=-2147467259) when the dialog
-// percentage is too small; empirically 30% still trips that on a
-// 3440×1440 ultrawide. 40% still fits comfortably; if Mac rejects
-// even at this size we know the issue isn't size-related and the
-// realistic answer is a Mac-native fallback to the taskpane flow.
-const MIN_DIALOG_PCT = 40;
+// Floor the dialog percentage at 30%. Office.js docs claim 1–99 is
+// the valid range, but some Outlook hosts reject smaller percentages
+// without a useful error. 30% comfortably fits a 250–300px QR while
+// staying above whatever the actual minimum is on screens where our
+// 300×520px target would otherwise compute to a tiny percentage.
+const MIN_DIALOG_PCT = 30;
 
 function pctOfScreen(targetPx: number, screenPx: number): number {
   const pct = Math.ceil((targetPx / screenPx) * 100);
@@ -307,22 +311,8 @@ async function runEncryptDialog(payload: DialogMessage): Promise<EncryptResult> 
   const opts: Office.DialogOptions = { ...baseOptions };
   if (!isAppleWebKit) opts.promptBeforeOpen = false;
 
-  // Diagnostic suffix attached to any displayDialogAsync rejection so
-  // the Smart Alert tells us the size, UA, and resolved options
-  // without needing DevTools.
-  const diag =
-    `screen=${screenW}×${screenH} dialog=${widthPct}%×${heightPct}% ` +
-    `isAppleWebKit=${isAppleWebKit} platform=${Office.context.platform} ` +
-    `opts=${JSON.stringify(opts)}`;
-
-  let dialog: Office.Dialog;
-  try {
-    dialog = await openDialogAsync(YIVI_DIALOG_URL, opts);
-    log(`dialog opened (promptBeforeOpen ${isAppleWebKit ? "default" : "false"})`);
-  } catch (e) {
-    const inner = e instanceof Error ? e.message : String(e);
-    throw new Error(`${inner} | ${diag}`);
-  }
+  const dialog = await openDialogAsync(YIVI_DIALOG_URL, opts);
+  log(`dialog opened (promptBeforeOpen ${isAppleWebKit ? "default" : "false"})`);
 
   return new Promise((resolve, reject) => {
     const inbound = new ChunkAssembler();
@@ -547,6 +537,21 @@ function onMessageSendHandler(event: Office.AddinCommands.Event): void {
       if (!encryptRequested) {
         cancelTimeout();
         event.completed({ allowEvent: true });
+        return;
+      }
+
+      // Outlook for Mac (native, not Outlook on the web in Safari)
+      // rejects displayDialogAsync from the launchevent runtime with
+      // E_FAIL — confirmed empirically across <AppDomains>, dialog-
+      // size, displayInIframe, and promptBeforeOpen variations.
+      // The Yivi widget needs a real popup to render the QR, so until
+      // Microsoft ships working dialog support there, we deflect Mac
+      // sends to the manual taskpane "Encrypt & Send" flow which
+      // doesn't go through displayDialogAsync at all.
+      if (Office.context.platform === Office.PlatformType.Mac) {
+        log("Outlook for Mac detected; deferring to taskpane flow");
+        cancelTimeout();
+        block(event, MAC_NOT_SUPPORTED_MESSAGE);
         return;
       }
 
