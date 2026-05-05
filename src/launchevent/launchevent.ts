@@ -341,7 +341,25 @@ async function runEncryptDialog(payload: DialogMessage): Promise<EncryptResult> 
         case "encrypt-error":
           settle(() => {
             closeDialog();
-            reject(new Error(String(body.message ?? "Encryption failed")));
+            // Don't String(body.message) — if the dialog ever forwards
+            // a non-string (an Error or plain object slipping past
+            // chunked transport), String() collapses it to
+            // "[object Object]". Prefer JSON when we can; the dialog
+            // already does its own stringification for plain objects.
+            const raw = body.message;
+            const msg =
+              typeof raw === "string"
+                ? raw
+                : raw === undefined || raw === null
+                  ? "Encryption failed"
+                  : (() => {
+                      try {
+                        return JSON.stringify(raw);
+                      } catch {
+                        return String(raw);
+                      }
+                    })();
+            reject(new Error(msg));
           });
           break;
         case "cancelled":

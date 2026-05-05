@@ -61,6 +61,22 @@ function log(msg: string): void {
   console.log(`[pg-dialog] ${msg}`);
 }
 
+function stringifyError(err: unknown): string {
+  if (err instanceof Error) {
+    return err.stack ? `${err.message} | ${err.stack}` : err.message;
+  }
+  if (typeof err === "string") return err;
+  if (err && typeof err === "object") {
+    try {
+      const json = JSON.stringify(err);
+      if (json && json !== "{}") return json;
+    } catch {
+      // fall through
+    }
+  }
+  return String(err);
+}
+
 function setSubtitle(text: string): void {
   const el = document.getElementById("pg-dlg-subtitle");
   if (el) el.textContent = text;
@@ -195,7 +211,13 @@ function handlePayload(msg: DialogMessage): void {
       showCompleted("Encrypted and sent. You can close this window.");
     },
     (err) => {
-      const message = err instanceof Error ? err.message : String(err);
+      // String(plainObject) yields "[object Object]" — useless. Walk
+      // the error: prefer .message, then JSON-encode plain objects, then
+      // fall back to String(). Without this Mac WKWebView errors that
+      // are non-Error rejections (e.g. fetch failures shaped as plain
+      // {code, ...} objects) surfaced as the unhelpful "[object Object]"
+      // in the Smart Alert.
+      const message = stringifyError(err);
       log(`encryption failed: ${message}`);
       showError(`Encryption failed: ${message}`);
       postChunkedToParent({ type: "encrypt-error", message });
