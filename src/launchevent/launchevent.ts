@@ -244,19 +244,33 @@ function pctOfScreen(targetPx: number, screenPx: number): number {
 }
 
 // Promise wrapper around displayDialogAsync. Resolves with the dialog
-// handle on success, rejects with the Office error otherwise.
+// handle on success, rejects with a proper Error otherwise. Office's
+// asyncResult.error is a plain {code, name, message} object — without
+// this conversion any rejection here propagates as a non-Error and
+// downstream `String(err)` collapses it to "[object Object]". Options
+// is optional: when omitted we use the 2-arg displayDialogAsync
+// overload, which is the docs' canonical minimal call shape.
 function openDialogAsync(
   url: string,
-  options: Office.DialogOptions
+  options?: Office.DialogOptions
 ): Promise<Office.Dialog> {
   return new Promise((resolve, reject) => {
-    Office.context.ui.displayDialogAsync(url, options, (asyncResult) => {
+    const callback = (asyncResult: Office.AsyncResult<Office.Dialog>): void => {
       if (asyncResult.status === Office.AsyncResultStatus.Succeeded) {
         resolve(asyncResult.value);
       } else {
-        reject(asyncResult.error ?? new Error("displayDialogAsync failed"));
+        const err = asyncResult.error;
+        const detail = err
+          ? `${err.message ?? "(no message)"} (code=${err.code ?? "?"}, name=${err.name ?? "?"})`
+          : "(no error info)";
+        reject(new Error(`displayDialogAsync failed: ${detail}`));
       }
-    });
+    };
+    if (options) {
+      Office.context.ui.displayDialogAsync(url, options, callback);
+    } else {
+      Office.context.ui.displayDialogAsync(url, callback);
+    }
   });
 }
 
@@ -271,33 +285,14 @@ async function runEncryptDialog(payload: DialogMessage): Promise<EncryptResult> 
   const screenH = window.screen?.height || 1080;
   const widthPct = pctOfScreen(YIVI_DIALOG_TARGET_WIDTH_PX, screenW);
   const heightPct = pctOfScreen(YIVI_DIALOG_TARGET_HEIGHT_PX, screenH);
-  log(`dialog size: target ${YIVI_DIALOG_TARGET_WIDTH_PX}×${YIVI_DIALOG_TARGET_HEIGHT_PX}px on ${screenW}×${screenH} screen → ${widthPct}%×${heightPct}%`);
+  log(`dialog size: target ${YIVI_DIALOG_TARGET_WIDTH_PX}×${YIVI_DIALOG_TARGET_HEIGHT_PX}px on ${screenW}×${screenH} screen → ${widthPct}%×${heightPct}% (default 80%×80% used)`);
 
-  const baseOptions: Office.DialogOptions = {
-    height: heightPct,
-    width: widthPct,
-    displayInIframe: false,
-  };
-
-  // promptBeforeOpen branches on rendering engine, not Office's
-  // platform enum. Apple WebKit — Safari and the WKWebView that New
-  // Outlook for Mac runs on — silently blocks popups opened from a
-  // launchevent runtime, so the Office-level "PostGuard is opening
-  // another window" confirmation has to fire there: the user's click
-  // on Allow is the gesture WKWebView needs to release the popup.
-  // Blink (Chrome/Edge) and Gecko (Firefox) handle background popups
-  // without intervention, so we skip the prompt for a one-click send.
-  // Office.context.platform reports "OfficeOnline" for every browser
-  // on the web so we match on UA.
-  const ua = navigator.userAgent || "";
-  const isAppleWebKit = /AppleWebKit/.test(ua) && !/Chrome|Edg|OPR\//.test(ua);
-  log(`platform=${Office.context.platform} isAppleWebKit=${isAppleWebKit}`);
-
-  const dialog = await openDialogAsync(YIVI_DIALOG_URL, {
-    ...baseOptions,
-    promptBeforeOpen: isAppleWebKit,
-  });
-  log(`dialog opened (promptBeforeOpen=${isAppleWebKit})`);
+  // Open with no options at all — the docs' minimal form
+  // (displayDialogAsync(url, callback)). On Mac the option-bag form
+  // returned E_FAIL across every value combination we tried. Defaults
+  // are 80%×80%, popup mode, prompt enabled — which is fine for the QR.
+  const dialog = await openDialogAsync(YIVI_DIALOG_URL);
+  log("dialog opened (no options)");
 
   return new Promise((resolve, reject) => {
     const inbound = new ChunkAssembler();
