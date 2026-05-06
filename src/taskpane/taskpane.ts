@@ -65,13 +65,22 @@ async function bootstrap(): Promise<void> {
   showView("loading");
   setStatus("");
   try {
-    if (isComposeMode()) {
+    const compose = isComposeMode();
+    const subjType = typeof (Office.context.mailbox.item as { subject?: unknown })?.subject;
+    // eslint-disable-next-line no-console
+    console.log(
+      `[pg-taskpane] bootstrap platform=${Office.context.platform} ` +
+        `host=${Office.context.host} compose=${compose} subjectType=${subjType}`
+    );
+    if (compose) {
       await mountComposeView();
     } else {
       await mountReadView();
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : "PostGuard failed to start.";
+    // eslint-disable-next-line no-console
+    console.error(`[pg-taskpane] bootstrap threw: ${message}`, err);
     showError(message);
   }
 }

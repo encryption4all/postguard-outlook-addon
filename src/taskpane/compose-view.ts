@@ -160,6 +160,14 @@ export async function mountComposeView(): Promise<void> {
   signTitle.textContent = t("sign");
   btnEncryptSend.textContent = t("encryptAndSend");
 
+  // The Encrypt & Send button is the Mac-only workaround for the
+  // OnMessageSend launchevent dialog being broken on Outlook for Mac
+  // (office-js#6677). Every other client opens the dialog directly
+  // when the user hits Outlook's native Send, so the button is just
+  // confusing UX there. Hide unless platform is Mac.
+  btnEncryptSend.hidden =
+    Office.context.platform !== Office.PlatformType.Mac;
+
   toggle.addEventListener("change", () => {
     state.encrypt = toggle.checked;
     void persistEncryptOnSend(state.encrypt);

@@ -128,6 +128,26 @@ Fix: list the add-in's own host in `<AppDomains>` (`https://addin.postguard.eu`,
 sideload). It's only the launchevent dialog path that needs this; the taskpane
 keeps working without the explicit entry.
 
+### `displayDialogAsync` from the launchevent runtime is broken on Outlook for Mac
+
+On new Outlook for Mac the same call rejects with `code=-2147467259`
+("An internal error has occurred.") regardless of `<AppDomains>`, dialog
+options (`displayInIframe`, `promptBeforeOpen`, omitted), dialog size (we
+went from 9% up to 40%), runtime declaration (with and without
+`<Override type="javascript">`), and Office.js channel (`/lib/1/` vs
+`/lib/beta/`). Mailbox 1.13 is supported. The same manifest works on
+Outlook on the web and new Outlook on Windows.
+
+We filed [OfficeDev/office-js#6677](https://github.com/OfficeDev/office-js/issues/6677);
+related stale reports are #3138, #3085, and #5681.
+
+Workaround: detect `Office.context.platform === Office.PlatformType.Mac`
+in `onMessageSendHandler` and `block()` the OnSend with a Smart Alert
+pointing the user at the taskpane "Encrypt & Send" button, which uses
+the same dialog API but from the taskpane runtime where it works. The
+branch is in `src/launchevent/launchevent.ts`; remove it once #6677
+ships a fix.
+
 ### `window.location.href` in the launchevent runtime is *not* the add-in origin on every host
 
 On Outlook on Web and new Outlook on Windows, the launchevent runtime loads
