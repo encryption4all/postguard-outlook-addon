@@ -22,11 +22,14 @@ export function getItem(): Office.MessageCompose | Office.MessageRead {
 }
 
 export function isComposeMode(): boolean {
-  const item = getItem() as { itemId?: unknown; subject?: unknown };
-  // Compose items lack a server itemId until first save; the most reliable
-  // signal is the presence of the async setter form on subject.
-  const subject = item.subject as { setAsync?: unknown } | undefined;
-  return typeof subject === "object" && subject !== null && typeof subject.setAsync === "function";
+  const item = getItem() as { subject?: unknown };
+  // In compose mode item.subject is a Subject object (with getAsync/
+  // setAsync). In read mode item.subject is the message subject string.
+  // We previously narrowed by `typeof setAsync === 'function'`, but
+  // Outlook for Mac's Hx-rewrite layer wraps Office.js methods in
+  // proxies that fail that strict check. Compare against `string`
+  // instead — anything non-string is the compose-mode object.
+  return typeof item.subject !== "string";
 }
 
 // --- Compose getters ---
