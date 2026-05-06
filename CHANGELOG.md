@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.1.3](https://github.com/encryption4all/postguard-outlook-addon/compare/v0.1.2...v0.1.3) (2026-05-06)
+
+
+### Bug Fixes
+
+* **launchevent:** Mac fallback to taskpane; retry + Safari hint elsewhere ([21e812a](https://github.com/encryption4all/postguard-outlook-addon/commit/21e812ad42a1a1d1b36455ff0784b1fa0348ea75))
+* **launchevent:** Mac fallback to taskpane; retry pattern + Safari hint ([d114e87](https://github.com/encryption4all/postguard-outlook-addon/commit/d114e8759dee4dd1762c653f15218f8ad46103cd))
+* **launchevent:** only deflect Mac when message isn't already encrypted ([56264bd](https://github.com/encryption4all/postguard-outlook-addon/commit/56264bd5d7f4056ef45963115ac2b81ff32ae0ac))
+* **taskpane:** broaden isComposeMode for Outlook for Mac ([144411a](https://github.com/encryption4all/postguard-outlook-addon/commit/144411a88b47263c1bce1e6182b761b55715cbb1))
+* **taskpane:** drop the hidden attribute on the Encrypt & Send button ([2d83c81](https://github.com/encryption4all/postguard-outlook-addon/commit/2d83c810a49571c5496a86d93c80506c2f6cbf49))
+* **taskpane:** show Encrypt & Send button only on Outlook for Mac ([551446d](https://github.com/encryption4all/postguard-outlook-addon/commit/551446df47c81266319a3e2776c91d382b3c0f7d))
+* **ui:** add focus-visible and active states to interactive elements ([d78c52c](https://github.com/encryption4all/postguard-outlook-addon/commit/d78c52cb753ecfafa54c132752032a01b154c320))
+* **ui:** add focus-visible and active states to interactive elements ([26db5ca](https://github.com/encryption4all/postguard-outlook-addon/commit/26db5ca41d8b84c42aadc90c6e56a57902e4372f))
+
 ## [0.1.2](https://github.com/encryption4all/postguard-outlook-addon/compare/v0.1.1...v0.1.2) (2026-05-05)
 
 
