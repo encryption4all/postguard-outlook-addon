@@ -1,501 +1,597 @@
+// OnMessageSend handler. Runs in a separate WebView runtime from the
+// taskpane, so it cannot read in-memory taskpane state. It uses x-
+// prefixed internet headers set by the taskpane plus the attachment
+// list to decide whether the message is allowed through.
+//
+// Behavior:
+//  - encrypt-on-send not requested            → allow.
+//  - requested + encrypted + recipients match → allow.
+//  - requested + not yet encrypted            → open Yivi dialog, encrypt
+//                                               in-line, apply result,
+//                                               then allow.
+//  - requested + encrypted + recipients drift → block (re-encrypt prompt).
+//
+// v1 of the one-click flow: text-only messages with email-only policy
+// and email-only sign. Attachments and custom policy/sign require the
+// manual taskpane "Encrypt & Send" flow until those are marshalled
+// through to the dialog.
+
 /* global Office */
 
-import type { ISealOptions } from "@e4a/pg-wasm";
 import {
-  PG_ATTACHMENT_NAME,
-  EMAIL_ATTRIBUTE_TYPE,
-  POSTGUARD_SUBJECT,
-  toEmail,
-  retrievePublicKey,
-  retrieveVerificationKey,
-  getUSK,
-  getSigningKeys,
-  checkJwtCache,
-  invalidateJwtCache,
-  PG_CLIENT_HEADER,
-  PKG_URL,
-  secondsTill4AM,
-  buildEncryptedBody,
-  extractArmoredPayload,
-  parseMimeContent,
-} from "../utils";
-import type { AttributeCon, Policy, SealPolicy, ComposeState } from "../types";
+  ChunkAssembler,
+  chunkPayload,
+  isChunkMessage,
+  ChunkMessage,
+} from "../lib/dialog-chunk";
+import { ADDIN_PUBLIC_URL } from "../lib/pkg-client";
 
-const PG_HEADER_NAME = "x-postguard";
-const PG_HEADER_VALUE = "0.1.0";
+const HEADER_ENCRYPT_ON_SEND = "x-pg-encrypt-on-send";
+const HEADER_ENCRYPTED_RECIPIENTS = "x-pg-encrypted-recipients";
+const HEADER_POSTGUARD = "x-postguard";
+const POSTGUARD_VERSION = "0.1.0";
+const POSTGUARD_ENCRYPTED_FILENAME = "postguard.encrypted";
+const COMPOSE_BUTTON_ID = "postGuardComposeButton";
+// Build the dialog URL from the add-in's public origin, injected at
+// build time. window.location.href is unreliable here: New Outlook for
+// Mac runs launchevent.js via the JSRuntime.Url override, where
+// window.location resolves to an Office-internal URL rather than the
+// add-in origin, and displayDialogAsync rejects with "An internal error
+// has occurred."
+const YIVI_DIALOG_URL = `${ADDIN_PUBLIC_URL}yivi-dialog.html`;
 
-Office.onReady(() => {
-  console.log("[PostGuard LaunchEvent] Office.onReady fired");
-});
+const NOT_ENCRYPTED_MESSAGE =
+  "PostGuard is on but this message is not encrypted yet. " +
+  "Open the PostGuard taskpane and click Encrypt & Send.";
 
-// ─── Compose helpers (for OnMessageSend) ───────────────────────────
+const STALE_ENCRYPTION_MESSAGE =
+  "PostGuard recipients or settings changed since the last encryption. " +
+  "Open the PostGuard taskpane and click Re-encrypt & Send before sending.";
 
-function getComposeState(): ComposeState {
-  const saved = sessionStorage.getItem("pg-compose-state");
-  if (!saved) return { encrypt: false };
-  try {
-    return JSON.parse(saved);
-  } catch {
-    return { encrypt: false };
-  }
+const MAC_NOT_SUPPORTED_MESSAGE =
+  "PostGuard's one-click encrypt-on-send is not supported on Outlook for Mac. " +
+  "Open the PostGuard taskpane (PostGuard button in the toolbar) and click " +
+  "Encrypt & Send to encrypt and send this message.";
+
+interface DialogMessage {
+  type: string;
+  [key: string]: unknown;
 }
 
-async function getBody(item: Office.MessageCompose): Promise<{ body: string; isHtml: boolean }> {
-  return new Promise((resolve, reject) => {
-    item.body.getAsync(Office.CoercionType.Html, (result) => {
-      if (result.status === Office.AsyncResultStatus.Succeeded) {
-        resolve({ body: result.value, isHtml: true });
-      } else {
-        item.body.getAsync(Office.CoercionType.Text, (textResult) => {
-          if (textResult.status === Office.AsyncResultStatus.Succeeded) {
-            resolve({ body: textResult.value, isHtml: false });
-          } else {
-            reject(new Error("Failed to get message body"));
-          }
-        });
-      }
-    });
-  });
+interface EncryptResult {
+  subject: string;
+  htmlBody: string;
+  /** null in tier 3 — no local attachment to add (Cryptify-only flow). */
+  attachmentBase64: string | null;
+  tier: "tier1" | "tier2" | "tier3";
+  uploadUuid: string | null;
 }
 
-async function getSubject(item: Office.MessageCompose): Promise<string> {
-  return new Promise((resolve) => {
-    item.subject.getAsync((result) => {
-      resolve(result.status === Office.AsyncResultStatus.Succeeded ? result.value : "");
-    });
-  });
+function log(msg: string): void {
+  // eslint-disable-next-line no-console
+  console.log(`[pg-launchevent] ${msg}`);
 }
 
-async function getRecipients(item: Office.MessageCompose): Promise<string[]> {
-  const toPromise = new Promise<Office.EmailAddressDetails[]>((resolve) => {
-    item.to.getAsync((r) =>
-      resolve(r.status === Office.AsyncResultStatus.Succeeded ? r.value : [])
-    );
-  });
-  const ccPromise = new Promise<Office.EmailAddressDetails[]>((resolve) => {
-    item.cc.getAsync((r) =>
-      resolve(r.status === Office.AsyncResultStatus.Succeeded ? r.value : [])
-    );
-  });
-  const [toList, ccList] = await Promise.all([toPromise, ccPromise]);
-  return [...toList, ...ccList].map((r) => toEmail(r.emailAddress));
-}
-
-async function getSender(item: Office.MessageCompose): Promise<string> {
-  return new Promise((resolve) => {
-    item.from.getAsync((result) => {
-      if (result.status === Office.AsyncResultStatus.Succeeded) {
-        resolve(toEmail(result.value.emailAddress));
-      } else {
-        resolve(Office.context.mailbox.userProfile.emailAddress.toLowerCase());
-      }
-    });
-  });
-}
-
-async function setBody(item: Office.MessageCompose, content: string, isHtml: boolean): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const coercionType = isHtml ? Office.CoercionType.Html : Office.CoercionType.Text;
-    item.body.setAsync(content, { coercionType }, (result) => {
-      if (result.status === Office.AsyncResultStatus.Succeeded) resolve();
-      else reject(new Error("Failed to set body"));
-    });
-  });
-}
-
-async function setSubject(item: Office.MessageCompose, subject: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    item.subject.setAsync(subject, (result) => {
-      if (result.status === Office.AsyncResultStatus.Succeeded) resolve();
-      else reject(new Error("Failed to set subject"));
-    });
-  });
-}
-
-async function addAttachment(
-  item: Office.MessageCompose,
-  base64: string,
-  name: string,
-  type: string
-): Promise<void> {
-  return new Promise((resolve, reject) => {
-    item.addFileAttachmentFromBase64Async(base64, name, { asyncContext: type }, (result) => {
-      if (result.status === Office.AsyncResultStatus.Succeeded) resolve();
-      else reject(new Error("Failed to add attachment"));
-    });
-  });
-}
-
-async function setInternetHeader(
-  item: Office.MessageCompose,
-  name: string,
-  value: string
-): Promise<void> {
-  return new Promise((resolve, reject) => {
-    item.internetHeaders.setAsync({ [name]: value }, (result) => {
-      if (result.status === Office.AsyncResultStatus.Succeeded) resolve();
-      else reject(new Error("Failed to set internet header"));
-    });
-  });
-}
-
-// ─── OnMessageSend handler ─────────────────────────────────────────
-
-async function onMessageSendHandler(event: Office.AddinCommands.Event): Promise<void> {
-  console.log("[PostGuard] onMessageSendHandler triggered");
-
-  const state = getComposeState();
-  console.log("[PostGuard] Compose state:", JSON.stringify(state));
-
-  if (!state.encrypt) {
-    console.log("[PostGuard] Encryption not enabled, allowing send");
-    event.completed({ allowEvent: true });
-    return;
-  }
-
-  try {
-    const item = Office.context.mailbox.item as unknown as Office.MessageCompose;
-    console.log("[PostGuard] Got mailbox item");
-
-    console.log("[PostGuard] Fetching message details...");
-    const [originalSubject, { body, isHtml }, recipients, from] = await Promise.all([
-      getSubject(item),
-      getBody(item),
-      getRecipients(item),
-      getSender(item),
-    ]);
-    console.log("[PostGuard] Subject:", originalSubject);
-    console.log("[PostGuard] Body length:", body.length, "isHtml:", isHtml);
-    console.log("[PostGuard] Recipients:", recipients);
-    console.log("[PostGuard] From:", from);
-
-    if (recipients.length === 0) {
-      console.log("[PostGuard] No recipients, blocking send");
-      item.notificationMessages.replaceAsync("pgError", {
-        type: Office.MailboxEnums.ItemNotificationMessageType.ErrorMessage,
-        message: "PostGuard: No recipients found.",
-      });
-      event.completed({ allowEvent: false });
-      return;
-    }
-
-    console.log("[PostGuard] Loading WASM module and public key...");
-    const [pk, mod] = await Promise.all([retrievePublicKey(), import("@e4a/pg-wasm")]);
-    // Initialize the WASM module (default export is the init function)
-    await mod.default();
-    console.log("[PostGuard] WASM and public key loaded");
-
-    const timestamp = Math.round(Date.now() / 1000);
-    const customPolicies = state.policy;
-
-    const policy: SealPolicy = {};
-    for (const recipientEmail of recipients) {
-      if (customPolicies && customPolicies[recipientEmail] && customPolicies[recipientEmail].length > 0) {
-        policy[recipientEmail] = { ts: timestamp, con: customPolicies[recipientEmail] };
-      } else {
-        policy[recipientEmail] = {
-          ts: timestamp,
-          con: [{ t: EMAIL_ATTRIBUTE_TYPE, v: recipientEmail }],
-        };
-      }
-      policy[recipientEmail].con = policy[recipientEmail].con.map(({ t, v }) => {
-        if (t === EMAIL_ATTRIBUTE_TYPE) return { t, v: (v || "").toLowerCase() };
-        return { t, v };
-      });
-    }
-    console.log("[PostGuard] Policy built:", JSON.stringify(policy));
-
-    const pubSignId: AttributeCon = [{ t: EMAIL_ATTRIBUTE_TYPE, v: from }];
-
-    console.log("[PostGuard] Getting signing JWT...");
-    const jwt = await checkJwtCache(pubSignId).catch((e) => {
-      console.log("[PostGuard] No cached JWT:", e.message);
-      throw new Error("No cached signing JWT. Please configure your signing identity in the compose pane before sending.");
-    });
-    console.log("[PostGuard] Got signing JWT");
-
-    console.log("[PostGuard] Getting signing keys...");
-    const { pubSignKey, privSignKey } = await getSigningKeys(jwt, { pubSignId });
-    console.log("[PostGuard] Got signing keys, pubSignKey:", !!pubSignKey, "privSignKey:", !!privSignKey);
-
-    const sealOptions: ISealOptions = {
-      policy,
-      pubSignKey,
-      ...(privSignKey && { privSignKey }),
-    };
-
-    const date = new Date();
-    const contentType = isHtml ? "text/html; charset=utf-8" : "text/plain; charset=utf-8";
-
-    let innerMime = "";
-    innerMime += `Date: ${date.toUTCString()}\r\n`;
-    innerMime += "MIME-Version: 1.0\r\n";
-    innerMime += `To: ${recipients.join(", ")}\r\n`;
-    innerMime += `From: ${from}\r\n`;
-    innerMime += `Subject: ${originalSubject}\r\n`;
-    innerMime += `Content-Type: ${contentType}\r\n`;
-    innerMime += `X-PostGuard: 0.1\r\n`;
-    innerMime += "\r\n";
-    innerMime += body;
-    console.log("[PostGuard] Inner MIME built, length:", innerMime.length);
-
-    const encoder = new TextEncoder();
-    const readable = new ReadableStream<Uint8Array>({
-      start(controller) {
-        controller.enqueue(encoder.encode(innerMime));
-        controller.close();
-      },
-    });
-
-    let encrypted = new Uint8Array(0);
-    const writable = new WritableStream<Uint8Array>({
-      write(chunk: Uint8Array) {
-        const combined = new Uint8Array(encrypted.length + chunk.length);
-        combined.set(encrypted);
-        combined.set(chunk, encrypted.length);
-        encrypted = combined;
-      },
-    });
-
-    console.log("[PostGuard] Sealing...");
-    const tStart = performance.now();
-    await mod.sealStream(pk, sealOptions, readable, writable);
-    console.log(`[PostGuard] Encryption took ${performance.now() - tStart} ms, size: ${encrypted.length} bytes`);
-
-    let binary = "";
-    for (let i = 0; i < encrypted.length; i++) {
-      binary += String.fromCharCode(encrypted[i]);
-    }
-    const base64Encrypted = btoa(binary);
-    console.log("[PostGuard] Base64 encoded, length:", base64Encrypted.length);
-
-    const encryptedBody = buildEncryptedBody(from, base64Encrypted);
-
-    console.log("[PostGuard] Setting subject...");
-    await setSubject(item, POSTGUARD_SUBJECT);
-    console.log("[PostGuard] Setting body...");
-    await setBody(item, encryptedBody, true);
-
-    console.log("[PostGuard] Adding encrypted attachment (best-effort)...");
+function allowAfterTimeout(event: Office.AddinCommands.Event, ms = 270000): () => void {
+  // 4½ min — gives the user time to find their phone and scan the QR.
+  // Outlook's own Smart Alerts hard-cap is 5 min so we stay just under.
+  const timer = setTimeout(() => {
+    log(`fallback timeout (${ms}ms) reached; allowing the send`);
     try {
-      await addAttachment(item, base64Encrypted, PG_ATTACHMENT_NAME, "application/postguard");
+      event.completed({ allowEvent: true });
     } catch (e) {
-      console.warn("[PostGuard] Attachment failed, body fallback in place:", e);
+      log(`fallback event.completed threw: ${String(e)}`);
     }
-
-    console.log("[PostGuard] Setting internet header...");
-    await setInternetHeader(item, PG_HEADER_NAME, PG_HEADER_VALUE);
-
-    console.log("[PostGuard] All done, allowing send");
-    event.completed({ allowEvent: true });
-  } catch (e: unknown) {
-    console.error("[PostGuard] Encryption error:", e);
-    console.error("[PostGuard] Error stack:", e instanceof Error ? e.stack : "no stack");
-    const item = Office.context.mailbox.item;
-    if (item) {
-      item.notificationMessages.replaceAsync("pgError", {
-        type: Office.MailboxEnums.ItemNotificationMessageType.ErrorMessage,
-        message: `PostGuard encryption failed: ${e instanceof Error ? e.message : "Unknown error"}`,
-      });
-    }
-    event.completed({ allowEvent: false });
-  }
+  }, ms);
+  return () => clearTimeout(timer);
 }
 
-// ─── OnMessageRead handler ─────────────────────────────────────────
+function block(event: Office.AddinCommands.Event, errorMessage: string): void {
+  const opts: Office.SmartAlertsEventCompletedOptions = {
+    allowEvent: false,
+    errorMessage,
+    commandId: COMPOSE_BUTTON_ID,
+  };
+  event.completed(opts);
+}
 
-async function getReadBody(item: Office.MessageRead): Promise<string> {
+function recipientsKey(addresses: Office.EmailAddressDetails[]): string {
+  return addresses
+    .map((a) => (a.emailAddress ?? "").toLowerCase().trim())
+    .filter(Boolean)
+    .sort()
+    .join(",");
+}
+
+function getRecipientsAsync(
+  recipients: Office.Recipients
+): Promise<Office.EmailAddressDetails[]> {
+  return new Promise((resolve) => {
+    recipients.getAsync((res) =>
+      resolve(res.status === Office.AsyncResultStatus.Succeeded ? res.value : [])
+    );
+  });
+}
+
+function getSubjectAsync(item: Office.MessageCompose): Promise<string> {
   return new Promise((resolve, reject) => {
-    item.body.getAsync(Office.CoercionType.Html, (result) => {
-      if (result.status === Office.AsyncResultStatus.Succeeded) resolve(result.value);
-      else reject(new Error("Failed to get body"));
+    item.subject.getAsync((res) => {
+      if (res.status === Office.AsyncResultStatus.Succeeded) resolve(res.value);
+      else reject(res.error);
     });
   });
 }
 
-async function decryptBytes(
-  bytes: Uint8Array,
-  mod: typeof import("@e4a/pg-wasm"),
-  vk: string,
-  event: Office.AddinCommands.Event
+function setSubjectAsync(item: Office.MessageCompose, value: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    item.subject.setAsync(value, (res) => {
+      if (res.status === Office.AsyncResultStatus.Succeeded) resolve();
+      else reject(res.error);
+    });
+  });
+}
+
+function getBodyHtmlAsync(item: Office.MessageCompose): Promise<string> {
+  return new Promise((resolve, reject) => {
+    item.body.getAsync(Office.CoercionType.Html, (res) => {
+      if (res.status === Office.AsyncResultStatus.Succeeded) resolve(res.value);
+      else reject(res.error);
+    });
+  });
+}
+
+function setBodyHtmlAsync(item: Office.MessageCompose, value: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    item.body.setAsync(value, { coercionType: Office.CoercionType.Html }, (res) => {
+      if (res.status === Office.AsyncResultStatus.Succeeded) resolve();
+      else reject(res.error);
+    });
+  });
+}
+
+function addBase64AttachmentAsync(
+  item: Office.MessageCompose,
+  filename: string,
+  base64: string
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    item.addFileAttachmentFromBase64Async(base64, filename, (res) => {
+      if (res.status === Office.AsyncResultStatus.Succeeded)
+        resolve(res.value as unknown as string);
+      else reject(res.error);
+    });
+  });
+}
+
+function getAttachmentContentAsync(
+  item: Office.MessageCompose,
+  attachmentId: string
+): Promise<Office.AttachmentContent> {
+  return new Promise((resolve, reject) => {
+    item.getAttachmentContentAsync(attachmentId, (res) => {
+      if (res.status === Office.AsyncResultStatus.Succeeded) resolve(res.value);
+      else reject(res.error);
+    });
+  });
+}
+
+function removeAttachmentAsync(
+  item: Office.MessageCompose,
+  attachmentId: string
 ): Promise<void> {
-  const createReadable = () =>
-    new ReadableStream<Uint8Array>({
-      start(controller) {
-        controller.enqueue(bytes);
-        controller.close();
-      },
+  return new Promise((resolve, reject) => {
+    item.removeAttachmentAsync(attachmentId, (res) => {
+      if (res.status === Office.AsyncResultStatus.Succeeded) resolve();
+      else reject(res.error);
     });
-
-  // First unsealer: inspect the header to find our recipient entry
-  const unsealer = await mod.StreamUnsealer.new(createReadable(), vk);
-  const userEmail = Office.context.mailbox.userProfile.emailAddress.toLowerCase();
-  const recipients = unsealer.inspect_header();
-  const me = recipients.get(userEmail);
-
-  if (!me) {
-    console.log("[PostGuard] User not in recipients:", userEmail);
-    event.completed({ allowEvent: false });
-    return;
-  }
-
-  const keyRequest = { ...me };
-  let hints: AttributeCon = me.con;
-
-  hints = hints.map(({ t, v }) => {
-    if (t === EMAIL_ATTRIBUTE_TYPE) return { t, v: userEmail };
-    return { t, v };
   });
+}
 
-  keyRequest.con = keyRequest.con.map(({ t, v }: { t: string; v: string }) => {
-    if (t === EMAIL_ATTRIBUTE_TYPE) return { t, v: userEmail };
-    if (v === "" || v?.includes("*")) return { t };
-    return { t, v };
-  });
+function guessContentType(name: string): string {
+  const ext = name.toLowerCase().split(".").pop() ?? "";
+  const map: Record<string, string> = {
+    pdf: "application/pdf",
+    txt: "text/plain",
+    csv: "text/csv",
+    html: "text/html",
+    jpg: "image/jpeg",
+    jpeg: "image/jpeg",
+    png: "image/png",
+    gif: "image/gif",
+    zip: "application/zip",
+    docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  };
+  return map[ext] ?? "application/octet-stream";
+}
 
-  let jwt: string;
-  try {
-    jwt = await checkJwtCache(hints);
-    console.log("[PostGuard] Got cached JWT");
-  } catch {
-    console.log("[PostGuard] No cached JWT, cannot auto-decrypt");
-    event.completed({ allowEvent: false });
-    return;
-  }
-
-  const tryUnseal = async (token: string) => {
-    const usk = await getUSK(token, keyRequest.ts);
-    const unsealer2 = await mod.StreamUnsealer.new(createReadable(), vk);
-
-    let decryptedData = "";
-    const decoder = new TextDecoder();
-    const writableDecrypt = new WritableStream({
-      write(chunk: Uint8Array) {
-        decryptedData += decoder.decode(chunk, { stream: true });
-      },
-      close() {
-        decryptedData += decoder.decode();
-      },
+function setHeadersAsync(
+  item: Office.MessageCompose,
+  headers: Record<string, string>
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    item.internetHeaders.setAsync(headers, (res) => {
+      if (res.status === Office.AsyncResultStatus.Succeeded) resolve();
+      else reject(res.error);
     });
+  });
+}
 
-    await unsealer2.unseal(userEmail, usk, writableDecrypt);
-    return decryptedData;
+function saveItemAsync(item: Office.MessageCompose): Promise<void> {
+  return new Promise((resolve, reject) => {
+    item.saveAsync((res) => {
+      if (res.status === Office.AsyncResultStatus.Succeeded) resolve();
+      else reject(res.error);
+    });
+  });
+}
+
+// Target physical size of the Yivi dialog. Just large enough for the
+// QR widget (~250×280) plus title and Cancel button. We compute a
+// screen-percentage from these at runtime because Office.displayDialog
+// only accepts percentages — picking fixed percentages gives a tiny
+// dialog on ultrawide monitors and an oversized one on laptops.
+const YIVI_DIALOG_TARGET_WIDTH_PX = 300;
+const YIVI_DIALOG_TARGET_HEIGHT_PX = 520;
+
+// Flip to true to keep the Yivi dialog open after a successful encrypt
+// (and after an encryption error) instead of auto-closing. Useful when
+// debugging the dialog runtime — DevTools, log inspection, chunk
+// reassembly, etc. Errors and the cancel path are unaffected; cancel
+// always closes itself.
+const DEBUG_KEEP_DIALOG_OPEN = false;
+
+function pctOfScreen(targetPx: number, screenPx: number): number {
+  // displayDialogAsync clamps to [1, 99]. Round up so we don't drop
+  // below the QR's minimum useful size on huge monitors.
+  const pct = Math.ceil((targetPx / screenPx) * 100);
+  return Math.min(99, Math.max(1, pct));
+}
+
+// Promise wrapper around displayDialogAsync. Resolves with the dialog
+// handle on success, rejects with the Office error otherwise.
+function openDialogAsync(
+  url: string,
+  options: Office.DialogOptions
+): Promise<Office.Dialog> {
+  return new Promise((resolve, reject) => {
+    Office.context.ui.displayDialogAsync(url, options, (asyncResult) => {
+      if (asyncResult.status === Office.AsyncResultStatus.Succeeded) {
+        resolve(asyncResult.value);
+      } else {
+        reject(asyncResult.error ?? new Error("displayDialogAsync failed"));
+      }
+    });
+  });
+}
+
+// Opens the Yivi dialog with an encrypt-request payload and waits for
+// the dialog to post the encrypted result back. Resolves with the
+// envelope; rejects on error or user cancel.
+async function runEncryptDialog(payload: DialogMessage): Promise<EncryptResult> {
+  // window.screen.* is in CSS pixels (matching what Office's percentage
+  // interprets). Falls back to a safe 1920×1080 if the launchevent
+  // runtime ever surfaces an empty screen object.
+  const screenW = window.screen?.width || 1920;
+  const screenH = window.screen?.height || 1080;
+  const widthPct = pctOfScreen(YIVI_DIALOG_TARGET_WIDTH_PX, screenW);
+  const heightPct = pctOfScreen(YIVI_DIALOG_TARGET_HEIGHT_PX, screenH);
+  log(`dialog size: target ${YIVI_DIALOG_TARGET_WIDTH_PX}×${YIVI_DIALOG_TARGET_HEIGHT_PX}px on ${screenW}×${screenH} screen → ${widthPct}%×${heightPct}%`);
+
+  const baseOptions: Office.DialogOptions = {
+    height: heightPct,
+    width: widthPct,
+    displayInIframe: false,
   };
 
-  let decryptedData: string;
+  // Try to open without Office's "open another window" prompt first.
+  // Browsers that allow popups from the Outlook host (Chrome, Edge,
+  // Firefox by default; Safari once the user has granted popup
+  // permission) get a one-click send. If the optimistic attempt fails
+  // — typically Safari's popup blocker silently denying — retry with
+  // promptBeforeOpen: true so the Office prompt fires and the user's
+  // click on Allow becomes the gesture that releases the popup. The
+  // dialog itself shows a Safari-only inline hint pointing at
+  // Settings → Websites → Pop-ups so the user can opt out of the
+  // recurring prompt by granting permission once.
+  let dialog: Office.Dialog;
   try {
-    decryptedData = await tryUnseal(jwt);
-  } catch (e) {
-    // Cached JWT led to a bad key — invalidate so the taskpane can request fresh credentials
-    console.warn("[PostGuard] Cached JWT failed, invalidating cache:", e);
-    await invalidateJwtCache(hints);
-    event.completed({ allowEvent: false });
-    return;
-  }
-  console.log("[PostGuard] Decryption complete, length:", decryptedData.length);
-
-  const { subject, body, isHtml } = parseMimeContent(decryptedData);
-
-  // Prepend the original subject since event.completed() cannot set the subject field.
-  let content: string;
-  if (isHtml) {
-    content = `<h2 style="margin:0 0 12px">${subject}</h2>${body}`;
-  } else {
-    content = `${subject}\n\n${body}`;
+    log("displayDialogAsync attempt 1: promptBeforeOpen=false");
+    dialog = await openDialogAsync(YIVI_DIALOG_URL, {
+      ...baseOptions,
+      promptBeforeOpen: false,
+    });
+    log("dialog opened (no prompt)");
+  } catch (e1) {
+    const msg1 = (e1 as { message?: string })?.message ?? String(e1);
+    log(`attempt 1 failed (${msg1}); retrying with promptBeforeOpen=true`);
+    dialog = await openDialogAsync(YIVI_DIALOG_URL, {
+      ...baseOptions,
+      promptBeforeOpen: true,
+    });
+    log("dialog opened (after prompt)");
   }
 
-  // Use the OnMessageRead event API to replace the displayed message content.
-  // This is a display-only replacement; the launch event re-fires on each open.
-  (event as any).completed({
-    allowEvent: true,
-    emailBody: {
-      coercionType: isHtml ? Office.CoercionType.Html : Office.CoercionType.Text,
-      content,
-    },
-  });
-}
-
-async function onMessageReadHandler(event: Office.AddinCommands.Event): Promise<void> {
-  console.log("[PostGuard] onMessageReadHandler triggered");
-  try {
-    const item = Office.context.mailbox.item;
-    if (!item) {
-      console.log("[PostGuard] No mailbox item");
-      event.completed({ allowEvent: false });
-      return;
-    }
-
-    const [, vk, mod] = await Promise.all([
-      retrievePublicKey(),
-      retrieveVerificationKey(),
-      import("@e4a/pg-wasm"),
-    ]);
-    await mod.default();
-    console.log("[PostGuard] WASM and keys loaded");
-
-    // Try attachment first (item.attachments is a sync property in read mode)
-    const attachmentId = findEncryptedAttachment(item);
-    if (attachmentId) {
-      console.log("[PostGuard] Found encrypted attachment:", attachmentId);
-      const base64Content = await getAttachmentContent(item, attachmentId);
-      const binaryString = atob(base64Content);
-      const bytes = new Uint8Array(binaryString.length);
-      for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
-      }
-      console.log("[PostGuard] Attachment decoded, size:", bytes.length);
-      await decryptBytes(bytes, mod, vk, event);
-      return;
-    }
-
-    // Fallback: extract armored payload from body
-    console.log("[PostGuard] No attachment found, checking body for armor...");
-    const bodyHtml = await getReadBody(item);
-    const armoredBase64 = extractArmoredPayload(bodyHtml);
-    if (armoredBase64) {
-      console.log("[PostGuard] Found armored payload in body, length:", armoredBase64.length);
-      const binaryString = atob(armoredBase64);
-      const bytes = new Uint8Array(binaryString.length);
-      for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
-      }
-      await decryptBytes(bytes, mod, vk, event);
-      return;
-    }
-
-    console.log("[PostGuard] No encrypted content found");
-    event.completed({ allowEvent: true });
-  } catch (e: unknown) {
-    console.error("[PostGuard] OnMessageRead error:", e);
-    event.completed({ allowEvent: false });
-  }
-}
-
-// ─── Read helpers ──────────────────────────────────────────────────
-
-function findEncryptedAttachment(item: Office.MessageRead): string | null {
-  try {
-    const attachments: Office.AttachmentDetails[] = (item as any).attachments ?? [];
-    const pgAttachment = attachments.find((att) => att.name === PG_ATTACHMENT_NAME);
-    return pgAttachment?.id || null;
-  } catch {
-    return null;
-  }
-}
-
-function getAttachmentContent(item: Office.MessageRead, attachmentId: string): Promise<string> {
   return new Promise((resolve, reject) => {
-    item.getAttachmentContentAsync(attachmentId, (result) => {
-      if (result.status !== Office.AsyncResultStatus.Succeeded) {
-        reject(new Error("Failed to get attachment content"));
-        return;
+    const inbound = new ChunkAssembler();
+    let settled = false;
+    // Auto-close on success/error so the user isn't left with a
+    // stale "Encrypted and sent. You can close this window." dialog
+    // after the Send has been released — flip DEBUG_KEEP_DIALOG_OPEN
+    // to opt out when DevTools/log inspection is needed. Cancel
+    // closes itself from the dialog (window.close on the button).
+    const closeDialog = (): void => {
+      if (DEBUG_KEEP_DIALOG_OPEN) return;
+      try {
+        dialog.close();
+      } catch (e) {
+        log(`dialog.close failed: ${String(e)}`);
       }
-      resolve(result.value.content);
+    };
+    const settle = (cb: () => void): void => {
+      if (settled) return;
+      settled = true;
+      cb();
+    };
+
+    const dispatch = (body: DialogMessage): void => {
+      log(`dialog → handler: ${body.type}`);
+      switch (body.type) {
+        case "ready": {
+          const chunks = chunkPayload(payload);
+          log(`sending ${chunks.length} chunk(s) to dialog`);
+          for (const c of chunks) {
+            dialog.messageChild(JSON.stringify(c));
+          }
+          break;
+        }
+        case "encrypt-result":
+          settle(() => {
+            closeDialog();
+            resolve(body as unknown as EncryptResult);
+          });
+          break;
+        case "encrypt-error":
+          settle(() => {
+            closeDialog();
+            reject(new Error(String(body.message ?? "Encryption failed")));
+          });
+          break;
+        case "cancelled":
+          settle(() => reject(new Error("Cancelled in dialog")));
+          break;
+        default:
+          log(`unhandled dialog message: ${body.type}`);
+      }
+    };
+
+    dialog.addEventHandler(
+      Office.EventType.DialogMessageReceived,
+      (arg: { message: string } | { error: number }) => {
+        if ("error" in arg) {
+          log(`dialog message error: ${arg.error}`);
+          settle(() => reject(new Error(`Dialog error ${arg.error}`)));
+          return;
+        }
+        let body: DialogMessage;
+        try {
+          body = JSON.parse(arg.message) as DialogMessage;
+        } catch {
+          log(`could not parse dialog message: ${arg.message}`);
+          return;
+        }
+        if (isChunkMessage(body)) {
+          const reassembled = inbound.ingest(body as ChunkMessage);
+          if (reassembled) dispatch(reassembled as DialogMessage);
+          return;
+        }
+        dispatch(body);
+      }
+    );
+
+    dialog.addEventHandler(Office.EventType.DialogEventReceived, (arg) => {
+      log(`dialog event: ${JSON.stringify(arg)}`);
+      if ("error" in arg && arg.error === 12006) {
+        settle(() => reject(new Error("Dialog closed by user")));
+      }
     });
   });
 }
 
-// ─── Register handlers ─────────────────────────────────────────────
+async function readUserAttachments(
+  item: Office.MessageCompose,
+  attachments: Office.AttachmentDetailsCompose[]
+): Promise<{ name: string; type: string; base64: string }[]> {
+  const out: { name: string; type: string; base64: string }[] = [];
+  for (const a of attachments) {
+    // Skip cloud attachments — Office.js can't read their bytes.
+    if (a.attachmentType === Office.MailboxEnums.AttachmentType.Cloud) {
+      log(`skipping cloud attachment: ${a.name}`);
+      continue;
+    }
+    try {
+      const content = await getAttachmentContentAsync(item, a.id);
+      const base64Len = content.content?.length ?? 0;
+      log(
+        `attachment "${a.name}" format=${content.format} ` +
+          `base64Len=${base64Len} declaredSize=${a.size ?? "?"}`
+      );
+      // Tenant DLP can scrub attachment bytes (e.g. blocked extensions like
+      // .exe) while still reporting metadata. Detect: declared size > 0 but
+      // returned content is empty. We refuse rather than silently encrypt
+      // a 0-byte attachment.
+      if ((a.size ?? 0) > 0 && base64Len === 0) {
+        throw new Error(
+          `Outlook returned no content for attachment "${a.name}" — ` +
+            `your tenant likely blocks this file type. ` +
+            `Remove the attachment or zip it with a different extension.`
+        );
+      }
+      if (content.format === Office.MailboxEnums.AttachmentContentFormat.Base64) {
+        out.push({ name: a.name, type: guessContentType(a.name), base64: content.content });
+      } else {
+        log(`unsupported attachment format for ${a.name}: ${content.format}`);
+      }
+    } catch (e) {
+      log(`failed to read attachment ${a.name}: ${String(e)}`);
+      throw e;
+    }
+  }
+  return out;
+}
 
-Office.actions.associate("onMessageSendHandler", onMessageSendHandler);
-Office.actions.associate("onMessageReadHandler", onMessageReadHandler);
+async function encryptAndApply(
+  event: Office.AddinCommands.Event,
+  item: Office.MessageCompose,
+  to: Office.EmailAddressDetails[],
+  cc: Office.EmailAddressDetails[],
+  userAttachments: Office.AttachmentDetailsCompose[]
+): Promise<void> {
+  const senderEmail = Office.context.mailbox.userProfile.emailAddress.toLowerCase();
+  const subject = await getSubjectAsync(item);
+  const htmlBody = await getBodyHtmlAsync(item);
+  const attachments = await readUserAttachments(item, userAttachments);
+
+  const result = await runEncryptDialog({
+    type: "encrypt-request",
+    senderEmail,
+    to: to.map((r) => r.emailAddress.toLowerCase()),
+    cc: cc.map((r) => r.emailAddress.toLowerCase()),
+    subject,
+    htmlBody,
+    attachments,
+  });
+
+  await setSubjectAsync(item, result.subject);
+  await setBodyHtmlAsync(item, result.htmlBody);
+  // Remove the original plaintext attachments now that they're inside the
+  // encrypted envelope. Best-effort: a cloud attachment we couldn't read
+  // would still be sent in the clear, so we leave it alone.
+  for (const a of userAttachments) {
+    if (a.attachmentType === Office.MailboxEnums.AttachmentType.Cloud) continue;
+    try {
+      await removeAttachmentAsync(item, a.id);
+    } catch (e) {
+      log(`failed to remove original attachment ${a.name}: ${String(e)}`);
+    }
+  }
+  // Tier 1/2: include the encrypted bytes locally as postguard.encrypted.
+  // Tier 3: pg-js gave us no attachment (too large) — recipients use the
+  // Cryptify link in the body to fetch and decrypt.
+  if (result.attachmentBase64) {
+    await addBase64AttachmentAsync(item, POSTGUARD_ENCRYPTED_FILENAME, result.attachmentBase64);
+  } else {
+    log(`tier ${result.tier}: skipping local attachment, recipients fetch via uuid=${result.uploadUuid}`);
+  }
+  await setHeadersAsync(item, {
+    [HEADER_ENCRYPTED_RECIPIENTS]: recipientsKey([...to, ...cc]),
+    [HEADER_POSTGUARD]: POSTGUARD_VERSION,
+  });
+  await saveItemAsync(item);
+}
+
+function onMessageSendHandler(event: Office.AddinCommands.Event): void {
+  log("onMessageSendHandler invoked");
+  const cancelTimeout = allowAfterTimeout(event);
+
+  const item = Office.context.mailbox.item as Office.MessageCompose;
+  if (!item) {
+    log("no mailbox item; allowing");
+    cancelTimeout();
+    event.completed({ allowEvent: true });
+    return;
+  }
+
+  item.internetHeaders.getAsync(
+    [HEADER_ENCRYPT_ON_SEND, HEADER_ENCRYPTED_RECIPIENTS],
+    (hdrRes) => {
+      log(`internetHeaders.getAsync status=${hdrRes.status}`);
+      if (hdrRes.status !== Office.AsyncResultStatus.Succeeded) {
+        cancelTimeout();
+        event.completed({ allowEvent: true });
+        return;
+      }
+
+      const encryptRequested = hdrRes.value[HEADER_ENCRYPT_ON_SEND] === "true";
+      log(`encryptRequested=${encryptRequested}`);
+      if (!encryptRequested) {
+        cancelTimeout();
+        event.completed({ allowEvent: true });
+        return;
+      }
+
+      const stampedRecipients = hdrRes.value[HEADER_ENCRYPTED_RECIPIENTS] ?? "";
+
+      item.getAttachmentsAsync(async (attRes) => {
+        log(`getAttachmentsAsync status=${attRes.status}`);
+        const attachments =
+          attRes.status === Office.AsyncResultStatus.Succeeded ? attRes.value : [];
+        const alreadyEncrypted = attachments.some(
+          (a) => a.name?.toLowerCase() === POSTGUARD_ENCRYPTED_FILENAME
+        );
+        log(`alreadyEncrypted=${alreadyEncrypted} (${attachments.length} attachments)`);
+
+        const [to, cc] = await Promise.all([
+          getRecipientsAsync(item.to),
+          getRecipientsAsync(item.cc),
+        ]);
+
+        if (!alreadyEncrypted) {
+          if (to.length + cc.length === 0) {
+            cancelTimeout();
+            block(event, "Add at least one recipient before sending.");
+            return;
+          }
+
+          // Outlook for Mac (native WKWebView) rejects displayDialogAsync
+          // from the launchevent runtime with E_FAIL regardless of options
+          // or sizing. Tracked upstream at office-js#6677; related stale
+          // reports are #3138, #3085, and #5681. Until Microsoft restores
+          // working dialog support, deflect Mac users to the manual
+          // taskpane "Encrypt & Send" button (which uses the dialog API
+          // from the taskpane runtime, where it works). Note: this only
+          // fires when the message is *not* already encrypted — once the
+          // user has clicked Encrypt & Send in the taskpane and we see
+          // the postguard.encrypted attachment, we fall through to the
+          // standard allow-send path. Remove this branch when 6677 ships.
+          if (Office.context.platform === Office.PlatformType.Mac) {
+            log("Outlook for Mac detected; deferring to taskpane flow");
+            cancelTimeout();
+            block(event, MAC_NOT_SUPPORTED_MESSAGE);
+            return;
+          }
+
+          try {
+            await encryptAndApply(event, item, to, cc, attachments);
+            cancelTimeout();
+            event.completed({ allowEvent: true });
+          } catch (e) {
+            cancelTimeout();
+            const msg = e instanceof Error ? e.message : String(e);
+            block(event, `Encryption failed: ${msg}`);
+          }
+          return;
+        }
+
+        // Verify the encryption matches the message's current To+Cc list.
+        const currentKey = recipientsKey([...to, ...cc]);
+        const stale = stampedRecipients === "" || currentKey !== stampedRecipients;
+        log(`stamped=${stampedRecipients || "<empty>"} current=${currentKey} stale=${stale}`);
+
+        cancelTimeout();
+        if (stale) {
+          block(event, STALE_ENCRYPTION_MESSAGE);
+          return;
+        }
+        event.completed({ allowEvent: true });
+      });
+    }
+  );
+}
+
+log("script loaded");
+Office.onReady((info) => {
+  log(`Office.onReady fired; host=${info?.host} platform=${info?.platform}`);
+  Office.actions.associate("onMessageSendHandler", onMessageSendHandler);
+  log("handler associated");
+});
