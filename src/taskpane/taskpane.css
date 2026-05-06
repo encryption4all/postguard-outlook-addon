@@ -141,6 +141,11 @@ body {
   transform: translateX(16px);
 }
 
+.pg-switch input:focus-visible + .pg-switch-track {
+  outline: 2px solid var(--pg-accent);
+  outline-offset: 2px;
+}
+
 .pg-toggle-label {
   font-weight: 500;
   flex: 1;
@@ -179,6 +184,11 @@ body {
   background: var(--pg-accent-hover);
 }
 
+.pg-btn-primary:active:not(:disabled) {
+  background: var(--pg-accent-hover);
+  transform: translateY(1px);
+}
+
 .pg-btn-secondary {
   background: var(--pg-secondary-bg);
   color: var(--pg-fg);
@@ -187,6 +197,16 @@ body {
 
 .pg-btn-secondary:hover:not(:disabled) {
   background: var(--pg-secondary-hover);
+}
+
+.pg-btn-secondary:active:not(:disabled) {
+  background: var(--pg-secondary-hover);
+  transform: translateY(1px);
+}
+
+.pg-btn:focus-visible {
+  outline: 2px solid var(--pg-accent);
+  outline-offset: 2px;
 }
 
 .pg-button-row {
@@ -295,6 +315,12 @@ body {
   background: white;
 }
 
+.pg-policy-attr-input input:focus-visible {
+  outline: 2px solid var(--pg-accent);
+  outline-offset: 1px;
+  border-color: var(--pg-accent);
+}
+
 .pg-policy-attr-delete {
   width: 32px;
   flex-shrink: 0;
@@ -312,6 +338,11 @@ body {
   background: var(--pg-error-bg);
   color: var(--pg-error-fg);
   border-color: var(--pg-error-fg);
+}
+
+.pg-policy-attr-delete:focus-visible {
+  outline: 2px solid var(--pg-accent);
+  outline-offset: 1px;
 }
 
 .pg-policy-add-row {
@@ -337,6 +368,11 @@ body {
   background: var(--pg-info-bg);
   border-color: var(--pg-accent);
   border-style: solid;
+}
+
+.pg-policy-add-chip:focus-visible {
+  outline: 2px solid var(--pg-accent);
+  outline-offset: 2px;
 }
 
 /* Yivi host - the SDK injects the QR widget here */
