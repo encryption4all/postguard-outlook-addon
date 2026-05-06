@@ -520,22 +520,6 @@ function onMessageSendHandler(event: Office.AddinCommands.Event): void {
         return;
       }
 
-      // Outlook for Mac (the native WKWebView app, not Outlook on the
-      // web in Safari) rejects displayDialogAsync from the launchevent
-      // runtime with E_FAIL regardless of options or sizing. Tracked
-      // upstream at https://github.com/OfficeDev/office-js/issues/6677;
-      // related closed-as-stale reports are #3138, #3085, and #5681.
-      // Until Microsoft restores working dialog support there, deflect
-      // Mac sends to the manual taskpane "Encrypt & Send" button which
-      // doesn't go through the displayDialogAsync path at all. Remove
-      // this branch when 6677 ships a fix.
-      if (Office.context.platform === Office.PlatformType.Mac) {
-        log("Outlook for Mac detected; deferring to taskpane flow");
-        cancelTimeout();
-        block(event, MAC_NOT_SUPPORTED_MESSAGE);
-        return;
-      }
-
       const stampedRecipients = hdrRes.value[HEADER_ENCRYPTED_RECIPIENTS] ?? "";
 
       item.getAttachmentsAsync(async (attRes) => {
@@ -556,6 +540,24 @@ function onMessageSendHandler(event: Office.AddinCommands.Event): void {
           if (to.length + cc.length === 0) {
             cancelTimeout();
             block(event, "Add at least one recipient before sending.");
+            return;
+          }
+
+          // Outlook for Mac (native WKWebView) rejects displayDialogAsync
+          // from the launchevent runtime with E_FAIL regardless of options
+          // or sizing. Tracked upstream at office-js#6677; related stale
+          // reports are #3138, #3085, and #5681. Until Microsoft restores
+          // working dialog support, deflect Mac users to the manual
+          // taskpane "Encrypt & Send" button (which uses the dialog API
+          // from the taskpane runtime, where it works). Note: this only
+          // fires when the message is *not* already encrypted — once the
+          // user has clicked Encrypt & Send in the taskpane and we see
+          // the postguard.encrypted attachment, we fall through to the
+          // standard allow-send path. Remove this branch when 6677 ships.
+          if (Office.context.platform === Office.PlatformType.Mac) {
+            log("Outlook for Mac detected; deferring to taskpane flow");
+            cancelTimeout();
+            block(event, MAC_NOT_SUPPORTED_MESSAGE);
             return;
           }
 
