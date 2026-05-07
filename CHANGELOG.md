@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.4](https://github.com/encryption4all/postguard-outlook-addon/compare/v0.1.3...v0.1.4) (2026-05-07)
+
+
+### Miscellaneous Chores
+
+* release 0.1.4 ([2b8e41a](https://github.com/encryption4all/postguard-outlook-addon/commit/2b8e41a3a10fecb360ee0be5b249324a4733212f))
+
 ## [0.1.3](https://github.com/encryption4all/postguard-outlook-addon/compare/v0.1.2...v0.1.3) (2026-05-06)
 
 
