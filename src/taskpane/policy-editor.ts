@@ -8,11 +8,7 @@
 // a × delete button, and unselected attributes are shown as "+" chips that
 // add a fresh row when clicked.
 
-import {
-  AttributeDescriptor,
-  EMAIL_ATTRIBUTE_TYPE,
-  SUPPORTED_ATTRIBUTES,
-} from "../lib/attributes";
+import { AttributeDescriptor, EMAIL_ATTRIBUTE_TYPE, SUPPORTED_ATTRIBUTES } from "../lib/attributes";
 import { Policy, AttributeRequest } from "../lib/types";
 import { t } from "../lib/i18n";
 
@@ -22,10 +18,7 @@ interface PolicyPanelOptions {
   onChange: (next: Policy) => void;
 }
 
-export function mountPolicyPanel(
-  container: HTMLElement,
-  opts: PolicyPanelOptions
-): void {
+export function mountPolicyPanel(container: HTMLElement, opts: PolicyPanelOptions): void {
   // Working state for this panel — extras only (email is implicit).
   const working = new Map<string, AttributeRequest[]>();
   for (const email of opts.emails) {
@@ -39,9 +32,7 @@ export function mountPolicyPanel(
   const fireChange = () => {
     const result: Policy = {};
     for (const [email, extras] of working.entries()) {
-      const valid = extras
-        .map((a) => ({ t: a.t, v: a.v.trim() }))
-        .filter((a) => a.v.length > 0);
+      const valid = extras.map((a) => ({ t: a.t, v: a.v.trim() })).filter((a) => a.v.length > 0);
       result[email] = [{ t: EMAIL_ATTRIBUTE_TYPE, v: email }, ...valid];
     }
     opts.onChange(result);
@@ -88,10 +79,16 @@ function rerenderRecipient(
     const desc = SUPPORTED_ATTRIBUTES.find((d) => d.type === extras[i].t);
     if (!desc) continue;
     section.appendChild(
-      renderAttrRow(extras, i, desc, () => {
-        rerenderRecipient(working, section, email, fireChange);
-        fireChange();
-      }, fireChange)
+      renderAttrRow(
+        extras,
+        i,
+        desc,
+        () => {
+          rerenderRecipient(working, section, email, fireChange);
+          fireChange();
+        },
+        fireChange
+      )
     );
   }
 
