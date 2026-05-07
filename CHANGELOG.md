@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.5](https://github.com/encryption4all/postguard-outlook-addon/compare/v0.1.4...v0.1.5) (2026-05-07)
+
+
+### Bug Fixes
+
+* **a11y:** WCAG 2.2 AA fixes for taskpane and yivi dialog ([7ee8eee](https://github.com/encryption4all/postguard-outlook-addon/commit/7ee8eee5742ef1d78d9a31fadc523507a472673b))
+
 ## [0.1.4](https://github.com/encryption4all/postguard-outlook-addon/compare/v0.1.3...v0.1.4) (2026-05-07)
 
 
