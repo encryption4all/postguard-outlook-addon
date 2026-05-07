@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.6](https://github.com/encryption4all/postguard-outlook-addon/compare/v0.1.5...v0.1.6) (2026-05-07)
+
+
+### Bug Fixes
+
+* **launchevent,yivi-dialog:** surface real error message instead of "[object Object]" ([498779a](https://github.com/encryption4all/postguard-outlook-addon/commit/498779a133ad2cc2bd158c6d5dfee67b6f3cdee8))
+* **launchevent,yivi-dialog:** surface real error message instead of "[object Object]" ([a875e03](https://github.com/encryption4all/postguard-outlook-addon/commit/a875e03bc399e0ed1b47bed7a66d45bbf5093580))
+
 ## [0.1.5](https://github.com/encryption4all/postguard-outlook-addon/compare/v0.1.4...v0.1.5) (2026-05-07)
 
 
