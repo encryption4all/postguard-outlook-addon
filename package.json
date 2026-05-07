@@ -1,6 +1,6 @@
 {
   "name": "postguard-outlook-addin",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "private": true,
   "description": "PostGuard end-to-end email encryption for Outlook (new Outlook on Windows + macOS).",
   "license": "MIT",
