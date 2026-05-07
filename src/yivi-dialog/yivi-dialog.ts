@@ -12,6 +12,7 @@ import { PostGuard, buildMime } from "@e4a/pg-js";
 import { toBase64, fromBase64 } from "../lib/encoding";
 import { PKG_URL, CRYPTIFY_URL, POSTGUARD_WEBSITE_URL } from "../lib/pkg-client";
 import { ChunkAssembler, chunkPayload, isChunkMessage, ChunkMessage } from "../lib/dialog-chunk";
+import { stringifyError } from "../lib/stringify-error";
 
 const ADDIN_VERSION = "0.1.0";
 
@@ -189,7 +190,7 @@ function handlePayload(msg: DialogMessage): void {
       showCompleted("Encrypted and sent. You can close this window.");
     },
     (err) => {
-      const message = err instanceof Error ? err.message : String(err);
+      const message = stringifyError(err);
       log(`encryption failed: ${message}`);
       showError(`Encryption failed: ${message}`);
       postChunkedToParent({ type: "encrypt-error", message });

@@ -18,6 +18,7 @@
 
 import { ChunkAssembler, chunkPayload, isChunkMessage, ChunkMessage } from "../lib/dialog-chunk";
 import { ADDIN_PUBLIC_URL } from "../lib/pkg-client";
+import { stringifyError } from "../lib/stringify-error";
 
 const HEADER_ENCRYPT_ON_SEND = "x-pg-encrypt-on-send";
 const HEADER_ENCRYPTED_RECIPIENTS = "x-pg-encrypted-recipients";
@@ -239,7 +240,8 @@ function openDialogAsync(url: string, options: Office.DialogOptions): Promise<Of
       if (asyncResult.status === Office.AsyncResultStatus.Succeeded) {
         resolve(asyncResult.value);
       } else {
-        reject(asyncResult.error ?? new Error("displayDialogAsync failed"));
+        const err = asyncResult.error;
+        reject(err ? new Error(stringifyError(err)) : new Error("displayDialogAsync failed"));
       }
     });
   });
@@ -336,7 +338,14 @@ async function runEncryptDialog(payload: DialogMessage): Promise<EncryptResult> 
         case "encrypt-error":
           settle(() => {
             closeDialog();
-            reject(new Error(String(body.message ?? "Encryption failed")));
+            const raw = body.message;
+            const text =
+              typeof raw === "string"
+                ? raw
+                : raw === undefined
+                  ? "Encryption failed"
+                  : stringifyError(raw);
+            reject(new Error(text));
           });
           break;
         case "cancelled":
@@ -548,8 +557,7 @@ function onMessageSendHandler(event: Office.AddinCommands.Event): void {
           event.completed({ allowEvent: true });
         } catch (e) {
           cancelTimeout();
-          const msg = e instanceof Error ? e.message : String(e);
-          block(event, `Encryption failed: ${msg}`);
+          block(event, `Encryption failed: ${stringifyError(e)}`);
         }
         return;
       }
