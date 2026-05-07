@@ -11,14 +11,7 @@
 import { PostGuard, buildMime } from "@e4a/pg-js";
 import { toBase64, fromBase64 } from "../lib/encoding";
 import { PKG_URL, CRYPTIFY_URL, POSTGUARD_WEBSITE_URL } from "../lib/pkg-client";
-import {
-  ChunkAssembler,
-  chunkPayload,
-  isChunkMessage,
-  ChunkMessage,
-} from "../lib/dialog-chunk";
-
-/* global Office */
+import { ChunkAssembler, chunkPayload, isChunkMessage, ChunkMessage } from "../lib/dialog-chunk";
 
 const ADDIN_VERSION = "0.1.0";
 
@@ -57,7 +50,6 @@ interface DialogMessage {
 const inboundChunks = new ChunkAssembler();
 
 function log(msg: string): void {
-  // eslint-disable-next-line no-console
   console.log(`[pg-dialog] ${msg}`);
 }
 
@@ -166,7 +158,9 @@ async function runEncryption(req: EncryptRequest): Promise<EncryptResult> {
     const attBytes = new Uint8Array(await envelope.attachment.arrayBuffer());
     attBase64 = toBase64(attBytes);
   }
-  log(`tier=${envelope.tier} uploadUuid=${envelope.uploadUuid ?? "null"} attLen=${attBase64?.length ?? 0}`);
+  log(
+    `tier=${envelope.tier} uploadUuid=${envelope.uploadUuid ?? "null"} attLen=${attBase64?.length ?? 0}`
+  );
 
   return {
     type: "encrypt-result",
@@ -213,8 +207,7 @@ Office.onReady(() => {
   // after AppleWebKit; WKWebView omits the Safari token. Chromium
   // browsers spoof AppleWebKit but include "Chrome" or "Edg".
   const ua = navigator.userAgent || "";
-  const isSafari =
-    /AppleWebKit/.test(ua) && /Safari\//.test(ua) && !/Chrome|Edg|OPR\//.test(ua);
+  const isSafari = /AppleWebKit/.test(ua) && /Safari\//.test(ua) && !/Chrome|Edg|OPR\//.test(ua);
   if (isSafari) {
     const tip = document.getElementById("pg-dlg-safari-tip");
     if (tip) tip.hidden = false;

@@ -1,11 +1,7 @@
 // Promisified wrappers around the callback-based Office.js mailbox APIs.
 // All helpers reject if Office.js returns a non-succeeded AsyncResult.
 
-/* global Office */
-
-function p<T>(
-  fn: (cb: (r: Office.AsyncResult<T>) => void) => void
-): Promise<T> {
+function p<T>(fn: (cb: (r: Office.AsyncResult<T>) => void) => void): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     fn((res) => {
       if (res.status === Office.AsyncResultStatus.Succeeded) {
@@ -62,9 +58,7 @@ export function getBody(format: Office.CoercionType = Office.CoercionType.Html):
 
 export function setBody(html: string): Promise<void> {
   const item = getItem() as Office.MessageCompose;
-  return p<void>((cb) =>
-    item.body.setAsync(html, { coercionType: Office.CoercionType.Html }, cb)
-  );
+  return p<void>((cb) => item.body.setAsync(html, { coercionType: Office.CoercionType.Html }, cb));
 }
 
 export function getAttachmentsCompose(): Promise<Office.AttachmentDetailsCompose[]> {
@@ -72,11 +66,11 @@ export function getAttachmentsCompose(): Promise<Office.AttachmentDetailsCompose
   return p<Office.AttachmentDetailsCompose[]>((cb) => item.getAttachmentsAsync(cb));
 }
 
-export function getAttachmentContentCompose(attachmentId: string): Promise<Office.AttachmentContent> {
+export function getAttachmentContentCompose(
+  attachmentId: string
+): Promise<Office.AttachmentContent> {
   const item = getItem() as Office.MessageCompose;
-  return p<Office.AttachmentContent>((cb) =>
-    item.getAttachmentContentAsync(attachmentId, cb)
-  );
+  return p<Office.AttachmentContent>((cb) => item.getAttachmentContentAsync(attachmentId, cb));
 }
 
 export function removeAttachment(attachmentId: string): Promise<void> {
@@ -87,9 +81,7 @@ export function removeAttachment(attachmentId: string): Promise<void> {
 // Adds a base64 inline file attachment. Returns the attachment id assigned by Outlook.
 export function addBase64Attachment(filename: string, base64: string): Promise<string> {
   const item = getItem() as Office.MessageCompose;
-  return p<string>((cb) =>
-    item.addFileAttachmentFromBase64Async(base64, filename, cb as never)
-  );
+  return p<string>((cb) => item.addFileAttachmentFromBase64Async(base64, filename, cb as never));
 }
 
 // Commits the current draft (subject, body, attachments) to the server. We need
@@ -130,7 +122,9 @@ export function getReadAttachments(): Office.AttachmentDetails[] {
   return item.attachments ?? [];
 }
 
-export function getReadBody(format: Office.CoercionType = Office.CoercionType.Html): Promise<string> {
+export function getReadBody(
+  format: Office.CoercionType = Office.CoercionType.Html
+): Promise<string> {
   const item = getItem() as Office.MessageRead;
   return p<string>((cb) => item.body.getAsync(format, cb));
 }
@@ -177,9 +171,7 @@ function parseInternetHeaders(raw: string, names: string[]): Record<string, stri
 }
 
 // Reads attachment bytes (compose mode). Returns ArrayBuffer.
-export async function readComposeAttachmentBytes(
-  attachmentId: string
-): Promise<ArrayBuffer> {
+export async function readComposeAttachmentBytes(attachmentId: string): Promise<ArrayBuffer> {
   const content = await getAttachmentContentCompose(attachmentId);
   if (content.format === Office.MailboxEnums.AttachmentContentFormat.Base64) {
     return base64ToArrayBuffer(content.content);
@@ -201,8 +193,14 @@ export function getReadAttachmentContent(attachmentId: string): Promise<Office.A
   const item = getItem() as Office.MessageRead;
   // getAttachmentContentAsync also exists in read mode.
   return p<Office.AttachmentContent>((cb) =>
-    (item as unknown as { getAttachmentContentAsync: (id: string, cb: (r: Office.AsyncResult<Office.AttachmentContent>) => void) => void })
-      .getAttachmentContentAsync(attachmentId, cb)
+    (
+      item as unknown as {
+        getAttachmentContentAsync: (
+          id: string,
+          cb: (r: Office.AsyncResult<Office.AttachmentContent>) => void
+        ) => void;
+      }
+    ).getAttachmentContentAsync(attachmentId, cb)
   );
 }
 

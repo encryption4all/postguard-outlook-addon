@@ -11,8 +11,6 @@
 // To enable: register an Azure AD app, add Mail.ReadWrite + User.Read scopes,
 // add the <WebApplicationInfo> block to manifest.xml and (re)deploy.
 
-/* global OfficeRuntime */
-
 let cached: { token: string; expiresAt: number } | null = null;
 
 export async function getGraphToken(allowPrompt = false): Promise<string | null> {

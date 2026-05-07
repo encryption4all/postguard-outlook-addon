@@ -116,9 +116,7 @@ function collectParts(raw: string, out: ParsedMessage): void {
   const cd = part.headers["content-disposition"] ?? "";
   const cte = (part.headers["content-transfer-encoding"] ?? "7bit").toLowerCase();
   const filename = paramFromHeader(cd, "filename") ?? paramFromHeader(ct, "name");
-  const isAttachment =
-    /attachment/i.test(cd) ||
-    (filename != null && !ctMain.startsWith("text/"));
+  const isAttachment = /attachment/i.test(cd) || (filename != null && !ctMain.startsWith("text/"));
 
   if (isAttachment) {
     out.attachments.push({

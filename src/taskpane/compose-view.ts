@@ -21,17 +21,8 @@ import {
 } from "../lib/office-helpers";
 import { toBase64 } from "../lib/encoding";
 import { EMAIL_ATTRIBUTE_TYPE } from "../lib/attributes";
-import {
-  Policy,
-  AttributeRequest,
-  MimeAttachment,
-} from "../lib/types";
-import {
-  PKG_URL,
-  CRYPTIFY_URL,
-  POSTGUARD_WEBSITE_URL,
-  clientHeaders,
-} from "../lib/pkg-client";
+import { Policy, AttributeRequest, MimeAttachment } from "../lib/types";
+import { PKG_URL, CRYPTIFY_URL, POSTGUARD_WEBSITE_URL, clientHeaders } from "../lib/pkg-client";
 import { POSTGUARD_ENCRYPTED_FILENAME } from "../lib/mime";
 import { t } from "../lib/i18n";
 import { mountPolicyPanel } from "./policy-editor";
@@ -67,10 +58,9 @@ async function persistEncryptOnSend(value: boolean): Promise<void> {
     await saveItem();
     await setItemHeaders({ [HEADER_ENCRYPT_ON_SEND]: value ? "true" : "false" });
     await saveItem();
-    // eslint-disable-next-line no-console
+
     console.log(`[pg] persisted encryptOnSend=${value}`);
   } catch (e) {
-    // eslint-disable-next-line no-console
     console.error(`[pg] failed to persist encryptOnSend:`, e);
   }
 }
@@ -165,8 +155,7 @@ export async function mountComposeView(): Promise<void> {
   // (office-js#6677). Every other client opens the dialog directly
   // when the user hits Outlook's native Send, so the button is just
   // confusing UX there. Hide unless platform is Mac.
-  btnEncryptSend.hidden =
-    Office.context.platform !== Office.PlatformType.Mac;
+  btnEncryptSend.hidden = Office.context.platform !== Office.PlatformType.Mac;
 
   toggle.addEventListener("change", () => {
     state.encrypt = toggle.checked;
@@ -278,10 +267,7 @@ function renderPolicyPanels(): void {
   // Sign editor is conceptually a single-recipient policy where the
   // "recipient" is the sender's own address.
   const signInitial: Policy = {
-    [senderEmail]: [
-      { t: EMAIL_ATTRIBUTE_TYPE, v: senderEmail },
-      ...state.signAttributes,
-    ],
+    [senderEmail]: [{ t: EMAIL_ATTRIBUTE_TYPE, v: senderEmail }, ...state.signAttributes],
   };
   mountPolicyPanel(signContainer, {
     emails: [senderEmail],
@@ -290,9 +276,7 @@ function renderPolicyPanels(): void {
       // signAttributes stores ONLY extras. pg.sign.yivi already takes
       // senderEmail as a top-level field; including email here as well
       // triggers a second email disclosure on the Yivi QR.
-      state.signAttributes = (next[senderEmail] ?? []).filter(
-        (a) => a.t !== EMAIL_ATTRIBUTE_TYPE
-      );
+      state.signAttributes = (next[senderEmail] ?? []).filter((a) => a.t !== EMAIL_ATTRIBUTE_TYPE);
     },
   });
 }
@@ -308,24 +292,17 @@ function renderToggleUI(): void {
     ? t("composeSwitchBarEnabled")
     : t("composeSwitchBarDisabled");
 
-  const hasRecipients =
-    state.recipients.to.length + state.recipients.cc.length > 0;
+  const hasRecipients = state.recipients.to.length + state.recipients.cc.length > 0;
   const bccPresent = state.recipients.bcc.length > 0;
 
   // Re-encrypt mode: after a successful encryption, the button is only
   // useful if recipients/policy/sign attributes have drifted from what's
   // already on the draft. Otherwise re-clicking would just rebuild the
   // exact same envelope.
-  const needsReencrypt =
-    state.encrypted && relevantStateString() !== state.encryptedSnapshot;
-  btnEncryptSend.textContent = state.encrypted
-    ? t("reencryptAndSend")
-    : t("encryptAndSend");
+  const needsReencrypt = state.encrypted && relevantStateString() !== state.encryptedSnapshot;
+  btnEncryptSend.textContent = state.encrypted ? t("reencryptAndSend") : t("encryptAndSend");
   btnEncryptSend.disabled =
-    !state.encrypt ||
-    !hasRecipients ||
-    bccPresent ||
-    (state.encrypted && !needsReencrypt);
+    !state.encrypt || !hasRecipients || bccPresent || (state.encrypted && !needsReencrypt);
 
   // Sync the x-pg-encrypted-recipients header to the current state. It
   // should hold the recipient list when the encryption is current, and be
@@ -416,7 +393,7 @@ async function encryptAndPrepareSend(): Promise<void> {
     const html = await getBody(Office.CoercionType.Html);
     const attachments = await collectComposeAttachments();
 
-    const mime = await buildMime({
+    const mime = (await buildMime({
       from: senderEmail,
       to: state.recipients.to,
       cc: state.recipients.cc,
@@ -428,7 +405,7 @@ async function encryptAndPrepareSend(): Promise<void> {
         type: a.type,
         data: a.data,
       })),
-    } as never) as Uint8Array;
+    } as never)) as Uint8Array;
 
     showView("yivi");
     const yiviTitle = byId<HTMLElement>("pg-yivi-title");
@@ -535,8 +512,9 @@ async function encryptAndPrepareSend(): Promise<void> {
 function buildPgRecipients(pg: PostGuard): unknown[] {
   const all = [...state.recipients.to, ...state.recipients.cc];
   return all.map((email) => {
-    const builder = (pg as never as { recipient: { email: (e: string) => RecipientBuilder } })
-      .recipient.email(email);
+    const builder = (
+      pg as never as { recipient: { email: (e: string) => RecipientBuilder } }
+    ).recipient.email(email);
     const policy = state.policy[email];
     if (policy) {
       for (const attr of policy) {
@@ -553,9 +531,7 @@ interface RecipientBuilder {
   extraAttribute(t: string, v: string): RecipientBuilder;
 }
 
-async function collectComposeAttachments(): Promise<
-  (MimeAttachment & { id: string })[]
-> {
+async function collectComposeAttachments(): Promise<(MimeAttachment & { id: string })[]> {
   const list = await getAttachmentsCompose();
   const out: (MimeAttachment & { id: string })[] = [];
   for (const a of list) {

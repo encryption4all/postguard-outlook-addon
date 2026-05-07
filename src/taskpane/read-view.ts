@@ -19,7 +19,6 @@ import {
 import { fromBase64, bytesToUtf8 } from "../lib/encoding";
 import {
   POSTGUARD_ENCRYPTED_FILENAME,
-  POSTGUARD_HEADER,
   extractArmoredCiphertext,
   looksLikePostGuard,
   parseDecryptedMime,
@@ -52,11 +51,10 @@ export async function mountReadView(): Promise<void> {
   if (ciphertext) {
     state.ciphertext = ciphertext;
     showEncryptedView();
-    await showNotification(
-      "postguard-encrypted-banner",
-      t("displayScriptDecryptBar"),
-      { type: "informational", persistent: true }
-    );
+    await showNotification("postguard-encrypted-banner", t("displayScriptDecryptBar"), {
+      type: "informational",
+      persistent: true,
+    });
     return;
   }
 
@@ -92,9 +90,7 @@ function showEncryptedView(): void {
 async function tryFindCiphertext(): Promise<Uint8Array | null> {
   // Path 1: postguard.encrypted attachment.
   const attachments = getReadAttachments();
-  const enc = attachments.find(
-    (a) => a.name?.toLowerCase() === POSTGUARD_ENCRYPTED_FILENAME
-  );
+  const enc = attachments.find((a) => a.name?.toLowerCase() === POSTGUARD_ENCRYPTED_FILENAME);
   if (enc) {
     try {
       const buf = await readReadAttachmentBytes(enc.id);
@@ -173,9 +169,11 @@ async function runDecryption(): Promise<void> {
       headers: clientHeaders(ADDIN_VERSION),
     } as never);
 
-    const opened = (pg as never as {
-      open: (input: { data: Uint8Array }) => OpenedMessage;
-    }).open({ data: state.ciphertext });
+    const opened = (
+      pg as never as {
+        open: (input: { data: Uint8Array }) => OpenedMessage;
+      }
+    ).open({ data: state.ciphertext });
 
     const result = await opened.decrypt({
       element: "#yivi-web-form",
@@ -234,8 +232,7 @@ function renderDecrypted(plaintext: Uint8Array, sender: FriendlySender | null): 
   }
 
   const parsed = parseDecryptedMime(mime);
-  const bodyText =
-    parsed.htmlBody ?? parsed.plainBody ?? "";
+  const bodyText = parsed.htmlBody ?? parsed.plainBody ?? "";
   const isHtml = parsed.htmlBody != null;
 
   const iframe = byId<HTMLIFrameElement>("pg-decrypted-body");
