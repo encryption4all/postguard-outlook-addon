@@ -17,20 +17,22 @@
     <main class="pg-main">
       <!-- Loading view -->
       <section id="view-loading" class="pg-view">
-        <div class="pg-spinner" aria-label="Loading"></div>
+        <div class="pg-spinner" role="status" aria-live="polite">
+          <span class="pg-sr-only">Loading</span>
+        </div>
       </section>
 
       <!-- Compose view -->
       <section id="view-compose" class="pg-view" hidden>
         <div class="pg-toggle-row">
           <label class="pg-switch">
-            <input type="checkbox" id="pg-toggle-encrypt" />
-            <span class="pg-switch-track"></span>
+            <input type="checkbox" id="pg-toggle-encrypt" aria-labelledby="pg-toggle-label" />
+            <span class="pg-switch-track" aria-hidden="true"></span>
           </label>
           <span id="pg-toggle-label" class="pg-toggle-label"></span>
         </div>
 
-        <div id="pg-bcc-warning" class="pg-warning" hidden></div>
+        <div id="pg-bcc-warning" class="pg-warning" role="alert" hidden></div>
 
         <div id="pg-manage-section" class="pg-policy-section">
           <h3 id="pg-manage-title" class="pg-section-title"></h3>
@@ -76,6 +78,7 @@
         <iframe
           id="pg-decrypted-body"
           class="pg-decrypted-body"
+          title="Decrypted message body"
           sandbox="allow-same-origin"
           referrerpolicy="no-referrer"
         ></iframe>

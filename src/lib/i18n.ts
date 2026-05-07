@@ -46,6 +46,11 @@ const en: Bundle = {
   policyEditorTitleSign: "PostGuard — Sign",
   policyEditorSave: "Save",
   policyEditorCancel: "Cancel",
+  errorRetry: "Retry",
+  dialogClose: "Close",
+  decryptedAttachmentsHeading: "Attachments",
+  removeRecipient: "Remove",
+  loading: "Loading",
 
   notificationHeaderBadgesLabel: "This message was sent by",
   notificationComposeBadgesLabel: "Recipients will know you as",

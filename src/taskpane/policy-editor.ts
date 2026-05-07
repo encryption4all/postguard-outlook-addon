@@ -129,14 +129,18 @@ function renderAttrRow(
   const row = document.createElement("div");
   row.className = "pg-policy-attr";
 
+  const inputId = `pg-attr-${desc.type}-${index}-${Math.random().toString(36).slice(2, 8)}`;
+
   const label = document.createElement("label");
   label.textContent = t(desc.type, desc.defaultLabel);
+  label.htmlFor = inputId;
   row.appendChild(label);
 
   const inputRow = document.createElement("div");
   inputRow.className = "pg-policy-attr-input";
 
   const input = document.createElement("input");
+  input.id = inputId;
 
   if (desc.type === "pbdf.gemeente.personalData.dateofbirth") {
     // Yivi stores DOB as DD-MM-YYYY but <input type="date"> uses YYYY-MM-DD.
@@ -173,7 +177,10 @@ function renderAttrRow(
   const deleteBtn = document.createElement("button");
   deleteBtn.type = "button";
   deleteBtn.className = "pg-policy-attr-delete";
-  deleteBtn.setAttribute("aria-label", `Remove ${desc.defaultLabel}`);
+  deleteBtn.setAttribute(
+    "aria-label",
+    `${t("removeRecipient", "Remove")} ${t(desc.type, desc.defaultLabel)}`
+  );
   deleteBtn.textContent = "×";
   deleteBtn.addEventListener("click", () => {
     extras.splice(index, 1);

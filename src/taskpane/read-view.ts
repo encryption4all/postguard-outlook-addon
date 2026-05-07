@@ -261,9 +261,9 @@ function renderAttachments(attachments: ParsedAttachment[]): void {
   }
   host.hidden = false;
 
-  const heading = document.createElement("div");
-  heading.className = "pg-meta";
-  heading.textContent = `Attachments (${attachments.length}):`;
+  const heading = document.createElement("h4");
+  heading.className = "pg-meta pg-attachments-heading";
+  heading.textContent = `${t("decryptedAttachmentsHeading", "Attachments")} (${attachments.length})`;
   host.appendChild(heading);
 
   const list = document.createElement("ul");
