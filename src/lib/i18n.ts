@@ -51,6 +51,10 @@ const en: Bundle = {
   decryptedAttachmentsHeading: "Attachments",
   removeRecipient: "Remove",
   loading: "Loading",
+  metaFrom: "From",
+  metaDate: "Date",
+  readNoopMessage: "This message is not encrypted with PostGuard.",
+  yiviCancel: "Cancel",
 
   notificationHeaderBadgesLabel: "This message was sent by",
   notificationComposeBadgesLabel: "Recipients will know you as",
@@ -71,7 +75,80 @@ const en: Bundle = {
   "pbdf.gemeente.personalData.dateofbirth": "Date of birth",
 };
 
-const bundles: Record<string, Bundle> = { en };
+const nl: Bundle = {
+  appName: "PostGuard",
+  appDescription: "End-to-end e-mailversleuteling met identiteitsgebaseerde encryptie en Yivi",
+  composeActionTitle: "PostGuard-versleuteling",
+
+  encryptionEnabled: "PostGuard-versleuteling staat aan",
+  encryptionDisabled: "Klik om PostGuard-versleuteling in te schakelen",
+
+  composeSwitchBarEnabled: "PostGuard-versleuteling staat aan",
+  composeSwitchBarDisabled: "PostGuard-versleuteling staat uit. Gevoelige inhoud? Schakel het in.",
+  manageAccess: "Toegang beheren",
+  sign: "Ondertekenen",
+  encryptAndSend: "Versleutelen en verzenden",
+  reencryptAndSend: "Opnieuw versleutelen en verzenden",
+  encrypting: "Bezig met versleutelen…",
+
+  composeBccWarning: "PostGuard ondersteunt geen BCC. Verwijder BCC of schakel PostGuard uit.",
+  composeNoRecipients: "Voeg ten minste één ontvanger toe voordat je versleutelt.",
+  composeNoSenderEmail: "Het e-mailadres van de afzender kon niet worden bepaald.",
+
+  decryptButton: "Ontsleutelen",
+  decryptingButton: "Bezig met ontsleutelen…",
+
+  displayScriptDecryptBar: "Deze e-mail is versleuteld met PostGuard.",
+  displayScriptWasEncryptedBar: "Deze e-mail was oorspronkelijk versleuteld met PostGuard.",
+
+  displayMessageTitle: "Je hebt een met PostGuard versleutelde e-mail ontvangen van",
+  displayMessageHeading: "Je moet bewijzen wie je bent om deze e-mail te ontsleutelen en te lezen.",
+  displayMessageQrPrefix: "Scan de QR-code met de Yivi-app om je e-mailadres te onthullen.",
+  displayMessageTitleSign: "Onderteken de e-mail",
+  displayMessageHeadingSign: "Je moet bewijzen wie je bent om deze e-mail te ondertekenen.",
+
+  displayMessageYiviHelpHeader: "Wat is de Yivi-app?",
+  displayMessageYiviHelpBody:
+    "De Yivi-app is een aparte privacyvriendelijke authenticatie-app (die ook voor andere authenticatiedoeleinden wordt gebruikt).",
+  displayMessageYiviHelpLinkText: "Meer informatie over Yivi",
+  displayMessageYiviHelpDownloadHeader: "Download de gratis Yivi-app",
+
+  policyEditorTitle: "PostGuard — Toegang beheren",
+  policyEditorTitleSign: "PostGuard — Ondertekenen",
+  policyEditorSave: "Opslaan",
+  policyEditorCancel: "Annuleren",
+  errorRetry: "Opnieuw proberen",
+  dialogClose: "Sluiten",
+  decryptedAttachmentsHeading: "Bijlagen",
+  removeRecipient: "Verwijderen",
+  loading: "Bezig met laden",
+  metaFrom: "Van",
+  metaDate: "Datum",
+  readNoopMessage: "Dit bericht is niet versleuteld met PostGuard.",
+  yiviCancel: "Annuleren",
+
+  notificationHeaderBadgesLabel: "Dit bericht is verzonden door",
+  notificationComposeBadgesLabel: "Ontvangers herkennen je als",
+
+  decryptionFailed:
+    "Ontsleutelen mislukt: de onthulde attributen kwamen niet overeen. Controleer of je in de Yivi-app het juiste e-mailadres gebruikt.",
+  decryptionError: "Ontsleutelen mislukt. Probeer het opnieuw.",
+  encryptionError: "Versleutelen mislukt. Probeer het opnieuw.",
+  networkError:
+    "Kan geen verbinding maken met de PostGuard-server. Controleer je netwerkverbinding.",
+  startupError:
+    "PostGuard kon niet worden geïnitialiseerd. Versleutelen en ontsleutelen werken niet totdat dit is opgelost.",
+  sentCopyError: "Kon de verzonden kopie van je versleutelde bericht niet opslaan.",
+  recipientUnknown:
+    "Dit bericht is niet versleuteld voor het e-mailaccount waarop het is ontvangen.",
+
+  "pbdf.sidn-pbdf.email.email": "E-mailadres",
+  "pbdf.sidn-pbdf.mobilenumber.mobilenumber": "Mobiel nummer",
+  "pbdf.gemeente.personalData.surname": "Achternaam",
+  "pbdf.gemeente.personalData.dateofbirth": "Geboortedatum",
+};
+
+const bundles: Record<string, Bundle> = { en, nl };
 
 export function t(key: string, fallback?: string): string {
   const locale = (Office?.context?.displayLanguage ?? "en").slice(0, 2).toLowerCase();

@@ -1,6 +1,7 @@
 // Entry point for the PostGuard taskpane. Detects whether we are in compose
 // or read mode and dispatches to the corresponding view.
 
+import { t } from "../lib/i18n";
 import { isComposeMode } from "../lib/office-helpers";
 import { mountComposeView } from "./compose-view";
 import { mountReadView } from "./read-view";
@@ -54,7 +55,16 @@ Office.onReady((info) => {
   }
 
   const retry = byId("pg-error-retry") as HTMLButtonElement | null;
-  if (retry) retry.addEventListener("click", () => bootstrap());
+  if (retry) {
+    retry.textContent = t("errorRetry");
+    retry.addEventListener("click", () => bootstrap());
+  }
+
+  const yiviCancel = byId("pg-btn-yivi-cancel") as HTMLButtonElement | null;
+  if (yiviCancel) yiviCancel.textContent = t("yiviCancel");
+
+  const noopText = byId("pg-read-noop-text");
+  if (noopText) noopText.textContent = t("readNoopMessage");
 
   bootstrap();
 });
