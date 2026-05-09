@@ -211,7 +211,7 @@ function renderDecrypted(plaintext: Uint8Array, sender: FriendlySender | null): 
   subjectEl.textContent = subject;
 
   const metaEl = byId<HTMLElement>("pg-decrypted-meta");
-  metaEl.textContent = [from && `From: ${from}`, date && `Date: ${date}`]
+  metaEl.textContent = [from && `${t("metaFrom")}: ${from}`, date && `${t("metaDate")}: ${date}`]
     .filter(Boolean)
     .join("  •  ");
 
