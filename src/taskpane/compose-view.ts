@@ -37,6 +37,11 @@ const HEADER_ENCRYPT_ON_SEND = "x-pg-encrypt-on-send";
 // time. The handler compares this against the message's current recipients
 // to refuse sending an encrypted blob to anyone who wasn't in the policy.
 const HEADER_ENCRYPTED_RECIPIENTS = "x-pg-encrypted-recipients";
+// JSON-encoded array of { t, optional: true } sign-attribute selections
+// captured from the taskpane. The launchevent runs in a separate WebView
+// and has no access to taskpane in-memory state, so the optional Yivi
+// disclosure list has to travel through an internet header.
+const HEADER_SIGN_ATTRIBUTES = "x-pg-sign-attributes";
 // PostGuard interop marker, written to outbound encrypted messages. The
 // Thunderbird addon writes the same header (background.ts:485) and uses it
 // as the OnMessageRead filter for the Outlook add-in. Detection on the
@@ -77,6 +82,20 @@ async function persistEncryptedRecipients(value: string | null): Promise<void> {
   } catch (_e) {
     // Best-effort. The handler also re-derives the current recipient list
     // and compares; a missing or stale header just biases toward blocking.
+  }
+}
+
+async function persistSignAttributes(value: AttributeRequest[]): Promise<void> {
+  try {
+    await saveItem();
+    if (value.length > 0) {
+      await setItemHeaders({ [HEADER_SIGN_ATTRIBUTES]: JSON.stringify(value) });
+    } else {
+      await removeItemHeaders([HEADER_SIGN_ATTRIBUTES]);
+    }
+    await saveItem();
+  } catch (e) {
+    console.error(`[pg] failed to persist signAttributes:`, e);
   }
 }
 
@@ -191,7 +210,7 @@ export async function mountComposeView(): Promise<void> {
   //             and persist "true" so the OnMessageSend handler sees the
   //             same intent the toggle visually shows.
   try {
-    const headers = await getItemHeaders([HEADER_ENCRYPT_ON_SEND]);
+    const headers = await getItemHeaders([HEADER_ENCRYPT_ON_SEND, HEADER_SIGN_ATTRIBUTES]);
     const v = headers[HEADER_ENCRYPT_ON_SEND];
     if (v === "true") {
       state.encrypt = true;
@@ -200,6 +219,19 @@ export async function mountComposeView(): Promise<void> {
     } else {
       state.encrypt = true;
       void persistEncryptOnSend(true);
+    }
+    const rawSign = headers[HEADER_SIGN_ATTRIBUTES];
+    if (rawSign) {
+      try {
+        const parsed = JSON.parse(rawSign) as AttributeRequest[];
+        if (Array.isArray(parsed)) {
+          state.signAttributes = parsed
+            .filter((a) => a && typeof a.t === "string")
+            .map((a) => ({ t: a.t, optional: true }));
+        }
+      } catch (_e) {
+        // Corrupt header — treat as empty.
+      }
     }
   } catch (_e) {
     // Header read failed — leave the default-on state alone.
@@ -280,6 +312,7 @@ function renderPolicyPanels(): void {
       state.signAttributes = (next[senderEmail] ?? [])
         .filter((a) => a.t !== EMAIL_ATTRIBUTE_TYPE)
         .map((a) => ({ t: a.t, optional: true }));
+      void persistSignAttributes(state.signAttributes);
     },
   });
 }

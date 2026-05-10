@@ -30,6 +30,10 @@ interface EncryptRequest {
   subject: string;
   htmlBody: string;
   attachments: AttachmentPayload[];
+  // Optional sign attributes the user selected in the compose taskpane.
+  // Forwarded as { t, optional: true } so the Yivi app prompts for them
+  // (the user can still skip any single one).
+  signAttributes?: { t: string; optional?: boolean }[];
 }
 
 interface EncryptResult {
@@ -130,10 +134,15 @@ async function runEncryption(req: EncryptRequest): Promise<EncryptResult> {
     (pg as never as { recipient: { email: (e: string) => unknown } }).recipient.email(email)
   );
 
+  const signAttrs = (req.signAttributes ?? []).map((a) => ({ t: a.t, optional: true }));
+  log(`sign attributes: ${signAttrs.map((a) => a.t).join(", ") || "<none>"}`);
+
   const sealed = pg.encrypt({
     sign: pg.sign.yivi({
       element: "#yivi-web-form",
       senderEmail: req.senderEmail,
+      includeSender: true,
+      attributes: signAttrs.length ? signAttrs : undefined,
     } as never),
     recipients,
     data: mime,
