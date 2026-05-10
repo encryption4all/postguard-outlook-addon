@@ -78,6 +78,9 @@ const en: Bundle = {
   settingsAllowOptimisticDialogHelp:
     "Off by default — Outlook shows a “PostGuard wants to open a dialog” prompt before each send. Turn this on only if you have already allowed pop-ups for this add-in in your browser’s site settings. Safari: Settings → Websites → Pop-ups → Allow for this site.",
   settingsBack: "Back",
+  settingsSave: "Save",
+  settingsSaved: "Saved.",
+  settingsSaveError: "Could not save settings. Try again.",
   settingsOpen: "Settings",
 
   "pbdf.sidn-pbdf.email.email": "Email address",
@@ -163,6 +166,9 @@ const nl: Bundle = {
   settingsAllowOptimisticDialogHelp:
     "Standaard uit — Outlook toont vóór elke verzending een melding “PostGuard wil een dialoogvenster openen”. Schakel dit alleen in als je pop-ups voor deze add-in al hebt toegestaan in de site-instellingen van je browser. Safari: Instellingen → Websites → Pop-upvensters → Toestaan voor deze site.",
   settingsBack: "Terug",
+  settingsSave: "Opslaan",
+  settingsSaved: "Opgeslagen.",
+  settingsSaveError: "Instellingen konden niet worden opgeslagen. Probeer het opnieuw.",
   settingsOpen: "Instellingen",
 
   "pbdf.sidn-pbdf.email.email": "E-mailadres",

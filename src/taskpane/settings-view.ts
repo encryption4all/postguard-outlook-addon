@@ -2,6 +2,10 @@
 // for fullname / DOB / mobile) and the advanced "skip the open-a-dialog
 // confirmation" toggle. All values are persisted to roamingSettings so
 // the OnMessageSend launchevent runtime can read them too.
+//
+// Prefills require an explicit Save click — auto-saving on `change` (blur)
+// lost data when the user clicked Back without blurring the field first.
+// The toggle still saves immediately because it's a single discrete click.
 
 import {
   SIGN_PREFILL_FULLNAME,
@@ -17,9 +21,7 @@ import { t } from "../lib/i18n";
 import { showView, setStatus, ViewName } from "./taskpane";
 
 export function mountSettingsView(returnTo: ViewName): void {
-  const title = byId<HTMLElement>("pg-settings-title");
-  title.textContent = t("settingsTitle");
-
+  byId<HTMLElement>("pg-settings-title").textContent = t("settingsTitle");
   byId<HTMLElement>("pg-settings-prefill-title").textContent = t("settingsPrefillTitle");
   byId<HTMLElement>("pg-settings-prefill-help").textContent = t("settingsPrefillHelp");
   byId<HTMLElement>("pg-settings-advanced-title").textContent = t("settingsAdvancedTitle");
@@ -29,7 +31,6 @@ export function mountSettingsView(returnTo: ViewName): void {
   byId<HTMLElement>("pg-settings-optimistic-help").textContent = t(
     "settingsAllowOptimisticDialogHelp"
   );
-
   byId<HTMLElement>("pg-prefill-fullname-label").textContent = t(SIGN_PREFILL_FULLNAME);
   byId<HTMLElement>("pg-prefill-dateofbirth-label").textContent = t(SIGN_PREFILL_DATEOFBIRTH);
   byId<HTMLElement>("pg-prefill-mobile-label").textContent = t(SIGN_PREFILL_MOBILE);
@@ -45,40 +46,40 @@ export function mountSettingsView(returnTo: ViewName): void {
   );
   const mobile = freshInput("pg-prefill-mobile", prefills[SIGN_PREFILL_MOBILE] ?? "");
 
-  const save = async (key: SignPrefillType, value: string): Promise<void> => {
-    const merged = { ...getSignPrefills(), [key]: value };
-    try {
-      await setSignPrefills(merged);
-    } catch (err) {
-      console.error("[pg-settings] failed to persist prefill", key, err);
-      setStatus("Could not save setting. Try again.", "error");
-    }
-  };
-
-  // Persist on `change` (blur) rather than `input` (every keystroke).
-  // roamingSettings.saveAsync intermittently fails with code 9019
-  // ("GenericSettingsError") when fired rapidly in succession; debouncing
-  // at the source removes the churn entirely.
-  fullname.addEventListener("change", () => void save(SIGN_PREFILL_FULLNAME, fullname.value));
-  dob.addEventListener(
-    "change",
-    () => void save(SIGN_PREFILL_DATEOFBIRTH, htmlToDdmmyyyy(dob.value))
-  );
-  mobile.addEventListener("change", () => void save(SIGN_PREFILL_MOBILE, mobile.value));
-
+  // The advanced toggle is a single discrete click; persisting immediately
+  // keeps the UX simple and the value won't be lost on Back.
   const toggle = freshCheckbox("pg-toggle-allow-optimistic-dialog", getAllowOptimisticDialog());
   toggle.addEventListener("change", () => {
     void setAllowOptimisticDialog(toggle.checked).catch((err) => {
       console.error("[pg-settings] failed to persist toggle", err);
-      setStatus("Could not save setting. Try again.", "error");
+      setStatus(t("settingsSaveError"), "error");
     });
   });
 
-  const back = byId<HTMLButtonElement>("pg-settings-back");
-  back.textContent = t("settingsBack");
-  const freshBack = back.cloneNode(true) as HTMLButtonElement;
-  back.replaceWith(freshBack);
-  freshBack.addEventListener("click", () => {
+  const save = freshButton("pg-settings-save", t("settingsSave"));
+  save.addEventListener("click", () => {
+    save.disabled = true;
+    const next: Partial<Record<SignPrefillType, string>> = {
+      [SIGN_PREFILL_FULLNAME]: fullname.value,
+      [SIGN_PREFILL_DATEOFBIRTH]: htmlToDdmmyyyy(dob.value),
+      [SIGN_PREFILL_MOBILE]: mobile.value,
+    };
+    setSignPrefills(next)
+      .then(() => {
+        setStatus(t("settingsSaved"));
+        setTimeout(() => setStatus(""), 2000);
+      })
+      .catch((err) => {
+        console.error("[pg-settings] failed to persist prefills", err);
+        setStatus(t("settingsSaveError"), "error");
+      })
+      .finally(() => {
+        save.disabled = false;
+      });
+  });
+
+  const back = freshButton("pg-settings-back", t("settingsBack"));
+  back.addEventListener("click", () => {
     setStatus("");
     showView(returnTo);
   });
@@ -92,9 +93,9 @@ function byId<T extends HTMLElement>(id: string): T {
   return el as T;
 }
 
-// Clone-replace the input so any listeners attached during a previous
-// mountSettingsView call are dropped before we add new ones — the view
-// is re-mountable from the gear button at any time.
+// Clone-replace so listeners attached during a previous mountSettingsView
+// call are dropped before we add new ones — the view is re-mountable from
+// the footer Settings button at any time.
 function freshInput(id: string, value: string): HTMLInputElement {
   const stale = byId<HTMLInputElement>(id);
   const fresh = stale.cloneNode(true) as HTMLInputElement;
@@ -107,6 +108,15 @@ function freshCheckbox(id: string, checked: boolean): HTMLInputElement {
   const stale = byId<HTMLInputElement>(id);
   const fresh = stale.cloneNode(true) as HTMLInputElement;
   fresh.checked = checked;
+  stale.replaceWith(fresh);
+  return fresh;
+}
+
+function freshButton(id: string, label: string): HTMLButtonElement {
+  const stale = byId<HTMLButtonElement>(id);
+  const fresh = stale.cloneNode(true) as HTMLButtonElement;
+  fresh.textContent = label;
+  fresh.disabled = false;
   stale.replaceWith(fresh);
   return fresh;
 }
