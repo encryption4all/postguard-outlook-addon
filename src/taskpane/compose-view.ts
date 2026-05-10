@@ -21,9 +21,10 @@ import {
 } from "../lib/office-helpers";
 import { toBase64 } from "../lib/encoding";
 import { EMAIL_ATTRIBUTE_TYPE } from "../lib/attributes";
-import { Policy, AttributeRequest, MimeAttachment } from "../lib/types";
+import { Policy, MimeAttachment } from "../lib/types";
 import { PKG_URL, CRYPTIFY_URL, POSTGUARD_WEBSITE_URL, clientHeaders } from "../lib/pkg-client";
 import { POSTGUARD_ENCRYPTED_FILENAME } from "../lib/mime";
+import { buildSignAttributes } from "../lib/settings";
 import { t } from "../lib/i18n";
 import { mountPolicyPanel } from "./policy-editor";
 import { showView, setStatus, showError } from "./taskpane";
@@ -37,11 +38,6 @@ const HEADER_ENCRYPT_ON_SEND = "x-pg-encrypt-on-send";
 // time. The handler compares this against the message's current recipients
 // to refuse sending an encrypted blob to anyone who wasn't in the policy.
 const HEADER_ENCRYPTED_RECIPIENTS = "x-pg-encrypted-recipients";
-// JSON-encoded array of { t, optional: true } sign-attribute selections
-// captured from the taskpane. The launchevent runs in a separate WebView
-// and has no access to taskpane in-memory state, so the optional Yivi
-// disclosure list has to travel through an internet header.
-const HEADER_SIGN_ATTRIBUTES = "x-pg-sign-attributes";
 // PostGuard interop marker, written to outbound encrypted messages. The
 // Thunderbird addon writes the same header (background.ts:485) and uses it
 // as the OnMessageRead filter for the Outlook add-in. Detection on the
@@ -85,20 +81,6 @@ async function persistEncryptedRecipients(value: string | null): Promise<void> {
   }
 }
 
-async function persistSignAttributes(value: AttributeRequest[]): Promise<void> {
-  try {
-    await saveItem();
-    if (value.length > 0) {
-      await setItemHeaders({ [HEADER_SIGN_ATTRIBUTES]: JSON.stringify(value) });
-    } else {
-      await removeItemHeaders([HEADER_SIGN_ATTRIBUTES]);
-    }
-    await saveItem();
-  } catch (e) {
-    console.error(`[pg] failed to persist signAttributes:`, e);
-  }
-}
-
 function recipientsKey(): string {
   return [...state.recipients.to, ...state.recipients.cc]
     .map((e) => e.toLowerCase().trim())
@@ -110,7 +92,6 @@ function recipientsKey(): string {
 interface ComposeState {
   encrypt: boolean;
   policy: Policy;
-  signAttributes: AttributeRequest[];
   recipients: { to: string[]; cc: string[]; bcc: string[] };
   busy: boolean;
   // Set after a successful encrypt run; used to label the action button
@@ -134,7 +115,6 @@ interface ComposeState {
 const state: ComposeState = {
   encrypt: true,
   policy: {},
-  signAttributes: [],
   recipients: { to: [], cc: [], bcc: [] },
   busy: false,
   encrypted: false,
@@ -146,13 +126,14 @@ const state: ComposeState = {
 
 // Stringified form of everything that affects the encrypted output. If this
 // changes after a successful encrypt, the message no longer matches the
-// current intent and Re-encrypt should be enabled.
+// current intent and Re-encrypt should be enabled. Sender attributes are
+// configured in Settings (roaming) and don't participate here — changing a
+// prefill doesn't invalidate the already-sealed message.
 function relevantStateString(): string {
   return JSON.stringify({
     to: [...state.recipients.to].sort(),
     cc: [...state.recipients.cc].sort(),
     policy: state.policy,
-    sign: state.signAttributes,
   });
 }
 
@@ -162,11 +143,9 @@ export async function mountComposeView(): Promise<void> {
   const toggle = byId<HTMLInputElement>("pg-toggle-encrypt");
   const bccWarning = byId<HTMLElement>("pg-bcc-warning");
   const manageTitle = byId<HTMLElement>("pg-manage-title");
-  const signTitle = byId<HTMLElement>("pg-sign-title");
   const btnEncryptSend = byId<HTMLButtonElement>("pg-btn-encrypt-send");
 
   manageTitle.textContent = t("manageAccess");
-  signTitle.textContent = t("sign");
   btnEncryptSend.textContent = t("encryptAndSend");
 
   // The Encrypt & Send button is the Mac-only workaround for the
@@ -210,7 +189,7 @@ export async function mountComposeView(): Promise<void> {
   //             and persist "true" so the OnMessageSend handler sees the
   //             same intent the toggle visually shows.
   try {
-    const headers = await getItemHeaders([HEADER_ENCRYPT_ON_SEND, HEADER_SIGN_ATTRIBUTES]);
+    const headers = await getItemHeaders([HEADER_ENCRYPT_ON_SEND]);
     const v = headers[HEADER_ENCRYPT_ON_SEND];
     if (v === "true") {
       state.encrypt = true;
@@ -219,19 +198,6 @@ export async function mountComposeView(): Promise<void> {
     } else {
       state.encrypt = true;
       void persistEncryptOnSend(true);
-    }
-    const rawSign = headers[HEADER_SIGN_ATTRIBUTES];
-    if (rawSign) {
-      try {
-        const parsed = JSON.parse(rawSign) as AttributeRequest[];
-        if (Array.isArray(parsed)) {
-          state.signAttributes = parsed
-            .filter((a) => a && typeof a.t === "string")
-            .map((a) => ({ t: a.t, optional: true }));
-        }
-      } catch (_e) {
-        // Corrupt header — treat as empty.
-      }
     }
   } catch (_e) {
     // Header read failed — leave the default-on state alone.
@@ -258,61 +224,33 @@ export async function mountComposeView(): Promise<void> {
 
 function renderPolicyPanels(): void {
   const manageSection = byId<HTMLElement>("pg-manage-section");
-  const signSection = byId<HTMLElement>("pg-sign-section");
   const manageContainer = byId<HTMLElement>("pg-manage-panel");
-  const signContainer = byId<HTMLElement>("pg-sign-panel");
 
-  // When encryption is off, the policies don't apply — collapse both
-  // sections so the compose view stays uncluttered.
+  // When encryption is off the recipient policy doesn't apply — collapse
+  // the section so the compose view stays uncluttered. Sender attributes
+  // are configured in Settings now, not here.
   if (!state.encrypt) {
     manageSection.hidden = true;
-    signSection.hidden = true;
     return;
   }
   manageSection.hidden = false;
-  signSection.hidden = false;
 
   const recipients = [...state.recipients.to, ...state.recipients.cc];
   if (recipients.length === 0) {
     manageContainer.innerHTML = `<p class="pg-subtitle">${t("composeNoRecipients")}</p>`;
-  } else {
-    mountPolicyPanel(manageContainer, {
-      emails: recipients,
-      initialPolicy: state.policy,
-      onChange: (next) => {
-        state.policy = next;
-        // Ensure email is always populated even if the user managed to clear it.
-        for (const [email, attrs] of Object.entries(state.policy)) {
-          if (!attrs.some((a) => a.t === EMAIL_ATTRIBUTE_TYPE)) {
-            attrs.unshift({ t: EMAIL_ATTRIBUTE_TYPE, v: email });
-          }
-        }
-      },
-    });
-  }
-
-  const senderEmail = getSenderEmail();
-  if (!senderEmail) {
-    signContainer.innerHTML = "";
     return;
   }
-  // Sign editor is conceptually a single-recipient policy where the
-  // "recipient" is the sender's own address.
-  const signInitial: Policy = {
-    [senderEmail]: [{ t: EMAIL_ATTRIBUTE_TYPE, v: senderEmail }, ...state.signAttributes],
-  };
-  mountPolicyPanel(signContainer, {
-    emails: [senderEmail],
-    initialPolicy: signInitial,
-    mode: "sign",
+  mountPolicyPanel(manageContainer, {
+    emails: recipients,
+    initialPolicy: state.policy,
     onChange: (next) => {
-      // signAttributes stores ONLY extras as optional disclosures. pg.sign.yivi
-      // already takes senderEmail as a top-level field; including email here
-      // as well triggers a second email disclosure on the Yivi QR.
-      state.signAttributes = (next[senderEmail] ?? [])
-        .filter((a) => a.t !== EMAIL_ATTRIBUTE_TYPE)
-        .map((a) => ({ t: a.t, optional: true }));
-      void persistSignAttributes(state.signAttributes);
+      state.policy = next;
+      // Ensure email is always populated even if the user managed to clear it.
+      for (const [email, attrs] of Object.entries(state.policy)) {
+        if (!attrs.some((a) => a.t === EMAIL_ATTRIBUTE_TYPE)) {
+          attrs.unshift({ t: EMAIL_ATTRIBUTE_TYPE, v: email });
+        }
+      }
     },
   });
 }
@@ -459,16 +397,18 @@ async function encryptAndPrepareSend(): Promise<void> {
 
     const recipients = buildPgRecipients(pg);
 
+    // Sign attributes come from Settings (per-mailbox roaming setting),
+    // not per-draft state. Prefilled values become { t, v } (mandatory);
+    // blank prefills become { t, optional: true } so the user can decide
+    // inside the Yivi app at session time. Fixes #49 / #56.
+    const signAttributes = buildSignAttributes();
+
     const sealed = pg.encrypt({
       sign: pg.sign.yivi({
         element: "#yivi-web-form",
         senderEmail,
         includeSender: true,
-        // Match the postguard-website pattern: each entry is { t, optional: true }
-        // so the user discloses values inside the Yivi app at session time. No
-        // pre-typed values means signing no longer fails when the user's Yivi
-        // credentials don't match a guessed string (#49, #56).
-        attributes: state.signAttributes.length ? state.signAttributes : undefined,
+        attributes: signAttributes,
       } as never),
       recipients,
       data: mime,

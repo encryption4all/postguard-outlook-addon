@@ -18,13 +18,12 @@
 
 import { ChunkAssembler, chunkPayload, isChunkMessage, ChunkMessage } from "../lib/dialog-chunk";
 import { ADDIN_PUBLIC_URL } from "../lib/pkg-client";
-import { getAllowOptimisticDialog } from "../lib/settings";
+import { buildSignAttributes, getAllowOptimisticDialog } from "../lib/settings";
 import { stringifyError } from "../lib/stringify-error";
 
 const HEADER_ENCRYPT_ON_SEND = "x-pg-encrypt-on-send";
 const HEADER_ENCRYPTED_RECIPIENTS = "x-pg-encrypted-recipients";
 const HEADER_POSTGUARD = "x-postguard";
-const HEADER_SIGN_ATTRIBUTES = "x-pg-sign-attributes";
 const POSTGUARD_VERSION = "0.1.0";
 const POSTGUARD_ENCRYPTED_FILENAME = "postguard.encrypted";
 const COMPOSE_BUTTON_ID = "postGuardComposeButton";
@@ -440,13 +439,20 @@ async function encryptAndApply(
   item: Office.MessageCompose,
   to: Office.EmailAddressDetails[],
   cc: Office.EmailAddressDetails[],
-  userAttachments: Office.AttachmentDetailsCompose[],
-  signAttributes: { t: string; optional?: boolean }[]
+  userAttachments: Office.AttachmentDetailsCompose[]
 ): Promise<void> {
   const senderEmail = Office.context.mailbox.userProfile.emailAddress.toLowerCase();
   const subject = await getSubjectAsync(item);
   const htmlBody = await getBodyHtmlAsync(item);
   const attachments = await readUserAttachments(item, userAttachments);
+
+  // Sender attributes come from per-mailbox roaming settings (configured
+  // in the taskpane Settings view). Roaming settings are available in the
+  // launchevent runtime, so we don't need a per-draft internet header.
+  const signAttributes = buildSignAttributes();
+  log(
+    `signAttributes=${signAttributes.map((a) => `${a.t}${a.v ? "=set" : ":optional"}`).join(",")}`
+  );
 
   const result = await runEncryptDialog({
     type: "encrypt-request",
@@ -501,110 +507,86 @@ function onMessageSendHandler(event: Office.AddinCommands.Event): void {
     return;
   }
 
-  item.internetHeaders.getAsync(
-    [HEADER_ENCRYPT_ON_SEND, HEADER_ENCRYPTED_RECIPIENTS, HEADER_SIGN_ATTRIBUTES],
-    (hdrRes) => {
-      log(`internetHeaders.getAsync status=${hdrRes.status}`);
-      if (hdrRes.status !== Office.AsyncResultStatus.Succeeded) {
-        cancelTimeout();
-        event.completed({ allowEvent: true });
-        return;
-      }
-
-      const encryptRequested = hdrRes.value[HEADER_ENCRYPT_ON_SEND] === "true";
-      log(`encryptRequested=${encryptRequested}`);
-      if (!encryptRequested) {
-        cancelTimeout();
-        event.completed({ allowEvent: true });
-        return;
-      }
-
-      const stampedRecipients = hdrRes.value[HEADER_ENCRYPTED_RECIPIENTS] ?? "";
-      const rawSignAttrs = hdrRes.value[HEADER_SIGN_ATTRIBUTES] ?? "";
-      let signAttributes: { t: string; optional?: boolean }[] = [];
-      if (rawSignAttrs) {
-        try {
-          const parsed = JSON.parse(rawSignAttrs) as unknown;
-          if (Array.isArray(parsed)) {
-            signAttributes = parsed
-              .filter(
-                (a): a is { t: string } =>
-                  typeof a === "object" &&
-                  a !== null &&
-                  typeof (a as { t?: unknown }).t === "string"
-              )
-              .map((a) => ({ t: a.t, optional: true }));
-          }
-        } catch (e) {
-          log(`failed to parse ${HEADER_SIGN_ATTRIBUTES}: ${String(e)}`);
-        }
-      }
-      log(`signAttributes count=${signAttributes.length}`);
-
-      item.getAttachmentsAsync(async (attRes) => {
-        log(`getAttachmentsAsync status=${attRes.status}`);
-        const attachments =
-          attRes.status === Office.AsyncResultStatus.Succeeded ? attRes.value : [];
-        const alreadyEncrypted = attachments.some(
-          (a) => a.name?.toLowerCase() === POSTGUARD_ENCRYPTED_FILENAME
-        );
-        log(`alreadyEncrypted=${alreadyEncrypted} (${attachments.length} attachments)`);
-
-        const [to, cc] = await Promise.all([
-          getRecipientsAsync(item.to),
-          getRecipientsAsync(item.cc),
-        ]);
-
-        if (!alreadyEncrypted) {
-          if (to.length + cc.length === 0) {
-            cancelTimeout();
-            block(event, "Add at least one recipient before sending.");
-            return;
-          }
-
-          // Outlook for Mac (native WKWebView) rejects displayDialogAsync
-          // from the launchevent runtime with E_FAIL regardless of options
-          // or sizing. Tracked upstream at office-js#6677; related stale
-          // reports are #3138, #3085, and #5681. Until Microsoft restores
-          // working dialog support, deflect Mac users to the manual
-          // taskpane "Encrypt & Send" button (which uses the dialog API
-          // from the taskpane runtime, where it works). Note: this only
-          // fires when the message is *not* already encrypted — once the
-          // user has clicked Encrypt & Send in the taskpane and we see
-          // the postguard.encrypted attachment, we fall through to the
-          // standard allow-send path. Remove this branch when 6677 ships.
-          if (Office.context.platform === Office.PlatformType.Mac) {
-            log("Outlook for Mac detected; deferring to taskpane flow");
-            cancelTimeout();
-            block(event, MAC_NOT_SUPPORTED_MESSAGE);
-            return;
-          }
-
-          try {
-            await encryptAndApply(event, item, to, cc, attachments, signAttributes);
-            cancelTimeout();
-            event.completed({ allowEvent: true });
-          } catch (e) {
-            cancelTimeout();
-            block(event, `Encryption failed: ${stringifyError(e)}`);
-          }
-          return;
-        }
-
-        // Verify the encryption matches the message's current To+Cc list.
-        const currentKey = recipientsKey([...to, ...cc]);
-        const stale = stampedRecipients === "" || currentKey !== stampedRecipients;
-        log(`stamped=${stampedRecipients || "<empty>"} current=${currentKey} stale=${stale}`);
-
-        cancelTimeout();
-        if (stale) {
-          block(event, STALE_ENCRYPTION_MESSAGE);
-          return;
-        }
-        event.completed({ allowEvent: true });
-      });
+  item.internetHeaders.getAsync([HEADER_ENCRYPT_ON_SEND, HEADER_ENCRYPTED_RECIPIENTS], (hdrRes) => {
+    log(`internetHeaders.getAsync status=${hdrRes.status}`);
+    if (hdrRes.status !== Office.AsyncResultStatus.Succeeded) {
+      cancelTimeout();
+      event.completed({ allowEvent: true });
+      return;
     }
-  );
+
+    const encryptRequested = hdrRes.value[HEADER_ENCRYPT_ON_SEND] === "true";
+    log(`encryptRequested=${encryptRequested}`);
+    if (!encryptRequested) {
+      cancelTimeout();
+      event.completed({ allowEvent: true });
+      return;
+    }
+
+    const stampedRecipients = hdrRes.value[HEADER_ENCRYPTED_RECIPIENTS] ?? "";
+
+    item.getAttachmentsAsync(async (attRes) => {
+      log(`getAttachmentsAsync status=${attRes.status}`);
+      const attachments = attRes.status === Office.AsyncResultStatus.Succeeded ? attRes.value : [];
+      const alreadyEncrypted = attachments.some(
+        (a) => a.name?.toLowerCase() === POSTGUARD_ENCRYPTED_FILENAME
+      );
+      log(`alreadyEncrypted=${alreadyEncrypted} (${attachments.length} attachments)`);
+
+      const [to, cc] = await Promise.all([
+        getRecipientsAsync(item.to),
+        getRecipientsAsync(item.cc),
+      ]);
+
+      if (!alreadyEncrypted) {
+        if (to.length + cc.length === 0) {
+          cancelTimeout();
+          block(event, "Add at least one recipient before sending.");
+          return;
+        }
+
+        // Outlook for Mac (native WKWebView) rejects displayDialogAsync
+        // from the launchevent runtime with E_FAIL regardless of options
+        // or sizing. Tracked upstream at office-js#6677; related stale
+        // reports are #3138, #3085, and #5681. Until Microsoft restores
+        // working dialog support, deflect Mac users to the manual
+        // taskpane "Encrypt & Send" button (which uses the dialog API
+        // from the taskpane runtime, where it works). Note: this only
+        // fires when the message is *not* already encrypted — once the
+        // user has clicked Encrypt & Send in the taskpane and we see
+        // the postguard.encrypted attachment, we fall through to the
+        // standard allow-send path. Remove this branch when 6677 ships.
+        if (Office.context.platform === Office.PlatformType.Mac) {
+          log("Outlook for Mac detected; deferring to taskpane flow");
+          cancelTimeout();
+          block(event, MAC_NOT_SUPPORTED_MESSAGE);
+          return;
+        }
+
+        try {
+          await encryptAndApply(event, item, to, cc, attachments);
+          cancelTimeout();
+          event.completed({ allowEvent: true });
+        } catch (e) {
+          cancelTimeout();
+          block(event, `Encryption failed: ${stringifyError(e)}`);
+        }
+        return;
+      }
+
+      // Verify the encryption matches the message's current To+Cc list.
+      const currentKey = recipientsKey([...to, ...cc]);
+      const stale = stampedRecipients === "" || currentKey !== stampedRecipients;
+      log(`stamped=${stampedRecipients || "<empty>"} current=${currentKey} stale=${stale}`);
+
+      cancelTimeout();
+      if (stale) {
+        block(event, STALE_ENCRYPTION_MESSAGE);
+        return;
+      }
+      event.completed({ allowEvent: true });
+    });
+  });
 }
 
 log("script loaded");

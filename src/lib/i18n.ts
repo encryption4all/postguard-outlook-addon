@@ -70,6 +70,10 @@ const en: Bundle = {
   recipientUnknown: "This message was not encrypted for the mail account it was received on.",
 
   settingsTitle: "PostGuard Settings",
+  settingsPrefillTitle: "Sender attributes",
+  settingsPrefillHelp:
+    "These attributes are always offered when you sign a message. Fill in a value to make the disclosure mandatory (the Yivi app must match it). Leave blank to keep the attribute optional — you decide in the Yivi app at signing time.",
+  settingsAdvancedTitle: "Advanced",
   settingsAllowOptimisticDialogLabel: "Skip the “open a dialog” confirmation",
   settingsAllowOptimisticDialogHelp:
     "Off by default — Outlook shows a “PostGuard wants to open a dialog” prompt before each send. Turn this on only if you have already allowed pop-ups for this add-in in your browser’s site settings. Safari: Settings → Websites → Pop-ups → Allow for this site.",
@@ -79,6 +83,7 @@ const en: Bundle = {
   "pbdf.sidn-pbdf.email.email": "Email address",
   "pbdf.sidn-pbdf.mobilenumber.mobilenumber": "Mobile number",
   "pbdf.gemeente.personalData.surname": "Surname",
+  "pbdf.gemeente.personalData.fullname": "Name",
   "pbdf.gemeente.personalData.dateofbirth": "Date of birth",
 };
 
@@ -150,6 +155,10 @@ const nl: Bundle = {
     "Dit bericht is niet versleuteld voor het e-mailaccount waarop het is ontvangen.",
 
   settingsTitle: "PostGuard-instellingen",
+  settingsPrefillTitle: "Afzenderattributen",
+  settingsPrefillHelp:
+    "Deze attributen worden altijd aangeboden wanneer je een bericht ondertekent. Vul een waarde in om de onthulling verplicht te maken (de Yivi-app moet exact deze waarde tonen). Laat leeg om het attribuut optioneel te houden — dan beslis je in de Yivi-app of je het onthult.",
+  settingsAdvancedTitle: "Geavanceerd",
   settingsAllowOptimisticDialogLabel: "Sla de bevestiging “dialoogvenster openen” over",
   settingsAllowOptimisticDialogHelp:
     "Standaard uit — Outlook toont vóór elke verzending een melding “PostGuard wil een dialoogvenster openen”. Schakel dit alleen in als je pop-ups voor deze add-in al hebt toegestaan in de site-instellingen van je browser. Safari: Instellingen → Websites → Pop-upvensters → Toestaan voor deze site.",
@@ -159,6 +168,7 @@ const nl: Bundle = {
   "pbdf.sidn-pbdf.email.email": "E-mailadres",
   "pbdf.sidn-pbdf.mobilenumber.mobilenumber": "Mobiel nummer",
   "pbdf.gemeente.personalData.surname": "Achternaam",
+  "pbdf.gemeente.personalData.fullname": "Naam",
   "pbdf.gemeente.personalData.dateofbirth": "Geboortedatum",
 };
 

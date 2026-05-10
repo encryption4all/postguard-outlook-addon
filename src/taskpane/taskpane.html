@@ -35,11 +35,6 @@
 
         <div id="pg-bcc-warning" class="pg-warning" role="alert" hidden></div>
 
-        <div id="pg-sign-section" class="pg-policy-section">
-          <h3 id="pg-sign-title" class="pg-section-title"></h3>
-          <div id="pg-sign-panel"></div>
-        </div>
-
         <div id="pg-manage-section" class="pg-policy-section">
           <h3 id="pg-manage-title" class="pg-section-title"></h3>
           <div id="pg-manage-panel"></div>
@@ -100,6 +95,29 @@
       <!-- Settings view -->
       <section id="view-settings" class="pg-view" hidden>
         <h2 id="pg-settings-title" class="pg-section-title"></h2>
+
+        <h3 id="pg-settings-prefill-title" class="pg-section-title pg-section-subtitle"></h3>
+        <p id="pg-settings-prefill-help" class="pg-subtitle"></p>
+        <div class="pg-policy-attr">
+          <label for="pg-prefill-fullname" id="pg-prefill-fullname-label"></label>
+          <div class="pg-policy-attr-input">
+            <input id="pg-prefill-fullname" type="text" autocomplete="name" />
+          </div>
+        </div>
+        <div class="pg-policy-attr">
+          <label for="pg-prefill-dateofbirth" id="pg-prefill-dateofbirth-label"></label>
+          <div class="pg-policy-attr-input">
+            <input id="pg-prefill-dateofbirth" type="date" />
+          </div>
+        </div>
+        <div class="pg-policy-attr">
+          <label for="pg-prefill-mobile" id="pg-prefill-mobile-label"></label>
+          <div class="pg-policy-attr-input">
+            <input id="pg-prefill-mobile" type="tel" placeholder="+31612345678" autocomplete="tel" />
+          </div>
+        </div>
+
+        <h3 id="pg-settings-advanced-title" class="pg-section-title pg-section-subtitle"></h3>
         <div class="pg-toggle-row">
           <label class="pg-switch">
             <input
@@ -112,6 +130,7 @@
           <span id="pg-settings-optimistic-label" class="pg-toggle-label"></span>
         </div>
         <p id="pg-settings-optimistic-help" class="pg-subtitle"></p>
+
         <div class="pg-button-row pg-button-row-end">
           <button id="pg-settings-back" class="pg-btn pg-btn-secondary" type="button"></button>
         </div>
