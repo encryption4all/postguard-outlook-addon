@@ -1,5 +1,34 @@
 # Changelog
 
+## [0.2.0](https://github.com/encryption4all/postguard-outlook-addon/compare/v0.1.6...v0.2.0) (2026-05-10)
+
+
+### Features
+
+* **sign:** prefill sender attributes in Settings; sign with optional fallback ([e56f75f](https://github.com/encryption4all/postguard-outlook-addon/commit/e56f75f98d15d5d276fd93755dedbe91588f4627))
+* **taskpane:** add Dutch (nl) translations and reorder Sign above Manage Access ([d35d281](https://github.com/encryption4all/postguard-outlook-addon/commit/d35d28165e1411162253d5662b64c9013104befa))
+* **taskpane:** Dutch i18n + reorder Sign above Manage Access ([#51](https://github.com/encryption4all/postguard-outlook-addon/issues/51), [#52](https://github.com/encryption4all/postguard-outlook-addon/issues/52)) ([1604d7e](https://github.com/encryption4all/postguard-outlook-addon/commit/1604d7e0c674fab73b2dcde3696107645d8e0023))
+
+
+### Bug Fixes
+
+* **compose:** narrow attr.v before calling extraAttribute ([a700f28](https://github.com/encryption4all/postguard-outlook-addon/commit/a700f28c5cacfe6d67f1c4e8013ba4bc51df7cbe))
+* **compose:** narrow attr.v before extraAttribute call ([d69e083](https://github.com/encryption4all/postguard-outlook-addon/commit/d69e083ef97a9a7f87fade46e54d3bf17a744502))
+* **compose:** use optional sign attributes via Yivi ([#49](https://github.com/encryption4all/postguard-outlook-addon/issues/49), [#56](https://github.com/encryption4all/postguard-outlook-addon/issues/56)) ([c750895](https://github.com/encryption4all/postguard-outlook-addon/commit/c750895f841ed2adc488199585c8da1854ef1352))
+* **launchevent,dialog:** forward optional sign attrs through send pipeline ([fccf152](https://github.com/encryption4all/postguard-outlook-addon/commit/fccf152cf041643a61805131570dee4bc6314764))
+* **launchevent,yivi:** enlarge dialog and center QR widget ([02bf2d8](https://github.com/encryption4all/postguard-outlook-addon/commit/02bf2d8abef614acc4dbd308b434828fdad8f23a))
+* **launchevent:** prompt before opening Yivi dialog by default ([#48](https://github.com/encryption4all/postguard-outlook-addon/issues/48)) ([202ea22](https://github.com/encryption4all/postguard-outlook-addon/commit/202ea229ac5c78d7b72b71d4568f22f73feb80b0))
+* **launchevent:** prompt before opening Yivi dialog by default ([#48](https://github.com/encryption4all/postguard-outlook-addon/issues/48)) ([bf27cbe](https://github.com/encryption4all/postguard-outlook-addon/commit/bf27cbeaf78243d53d626fbdc0a8cb39f4dae403))
+* **settings:** cache prefills in module-level state to dodge stale get ([2843a57](https://github.com/encryption4all/postguard-outlook-addon/commit/2843a578294883f4166feaa5055b4c4e1e0f546a))
+* **settings:** explicit Save button for sender-attribute prefills ([7503625](https://github.com/encryption4all/postguard-outlook-addon/commit/7503625aab87c2cdcfe01988b39bcde3912c242d))
+* **settings:** persist prefills on change, serialize+retry saveAsync ([c25889b](https://github.com/encryption4all/postguard-outlook-addon/commit/c25889bb10d9c28949baa1c8b3bee8864161b87e))
+* **settings:** Save returns to the prior view after persisting ([a69309b](https://github.com/encryption4all/postguard-outlook-addon/commit/a69309b0158fe8da5b3bf831537be4b2a2202eae))
+* **settings:** wire listeners once, refresh values directly without cloning ([a38cf20](https://github.com/encryption4all/postguard-outlook-addon/commit/a38cf20b6b57c2299dd3813f2913975dca240b4c))
+* **taskpane:** move Settings entry to a labeled footer button ([d8e777d](https://github.com/encryption4all/postguard-outlook-addon/commit/d8e777d72cacc1802b004db411869b71bec49354))
+* **yivi-dialog:** forward sign-attribute values to pg.sign.yivi ([8a9d936](https://github.com/encryption4all/postguard-outlook-addon/commit/8a9d9363dd6798732b6357d5d5432580370ae3e4))
+* **yivi,deps:** use @privacybydesign/yivi-css for Yivi widget styling ([fe33bee](https://github.com/encryption4all/postguard-outlook-addon/commit/fe33bee40bb3b9e71b149f17ad2b28ceaa4fe412))
+* **yivi:** center QR inside Yivi host by styling SDK classes ([8d2c0c5](https://github.com/encryption4all/postguard-outlook-addon/commit/8d2c0c53a62cf54a84a1eef9ae4dbcbedea62a7e))
+
 ## [0.1.6](https://github.com/encryption4all/postguard-outlook-addon/compare/v0.1.5...v0.1.6) (2026-05-07)
 
 
