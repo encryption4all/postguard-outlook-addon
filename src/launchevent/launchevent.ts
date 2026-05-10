@@ -451,7 +451,9 @@ async function encryptAndApply(
   // launchevent runtime, so we don't need a per-draft internet header.
   const signAttributes = buildSignAttributes();
   log(
-    `signAttributes=${signAttributes.map((a) => `${a.t}${a.v ? "=set" : ":optional"}`).join(",")}`
+    `signAttributes=${signAttributes
+      .map((a) => `${a.t}${a.v ? `=${a.v}` : a.optional ? ":optional" : ""}`)
+      .join(", ")}`
   );
 
   const result = await runEncryptDialog({
