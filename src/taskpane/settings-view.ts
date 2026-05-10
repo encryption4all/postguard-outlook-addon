@@ -3,9 +3,10 @@
 // confirmation" toggle. All values are persisted to roamingSettings so
 // the OnMessageSend launchevent runtime can read them too.
 //
-// Prefills require an explicit Save click — auto-saving on `change` (blur)
-// lost data when the user clicked Back without blurring the field first.
-// The toggle still saves immediately because it's a single discrete click.
+// Listeners are attached exactly once on first mount (tracked via the
+// `wired` flag). Subsequent mounts only refresh the input values from
+// roamingSettings — no DOM cloning, which avoids the browser-specific
+// cloneNode-with-input.value quirks the previous implementation hit.
 
 import {
   SIGN_PREFILL_FULLNAME,
@@ -20,7 +21,21 @@ import {
 import { t } from "../lib/i18n";
 import { showView, setStatus, ViewName } from "./taskpane";
 
+let wired = false;
+let returnView: ViewName = "compose";
+
 export function mountSettingsView(returnTo: ViewName): void {
+  returnView = returnTo;
+  refreshLabels();
+  refreshValues();
+  if (!wired) {
+    wireListeners();
+    wired = true;
+  }
+  showView("settings");
+}
+
+function refreshLabels(): void {
   byId<HTMLElement>("pg-settings-title").textContent = t("settingsTitle");
   byId<HTMLElement>("pg-settings-prefill-title").textContent = t("settingsPrefillTitle");
   byId<HTMLElement>("pg-settings-prefill-help").textContent = t("settingsPrefillHelp");
@@ -34,43 +49,47 @@ export function mountSettingsView(returnTo: ViewName): void {
   byId<HTMLElement>("pg-prefill-fullname-label").textContent = t(SIGN_PREFILL_FULLNAME);
   byId<HTMLElement>("pg-prefill-dateofbirth-label").textContent = t(SIGN_PREFILL_DATEOFBIRTH);
   byId<HTMLElement>("pg-prefill-mobile-label").textContent = t(SIGN_PREFILL_MOBILE);
+  byId<HTMLButtonElement>("pg-settings-save").textContent = t("settingsSave");
+  byId<HTMLButtonElement>("pg-settings-back").textContent = t("settingsBack");
+}
 
+function refreshValues(): void {
   const prefills = getSignPrefills();
-  // DOB is stored as DD-MM-YYYY (Yivi's format); <input type="date"> uses
-  // YYYY-MM-DD. Round-trip through the same helpers the policy editor
-  // uses for the Manage Access date input.
-  const fullname = freshInput("pg-prefill-fullname", prefills[SIGN_PREFILL_FULLNAME] ?? "");
-  const dob = freshInput(
-    "pg-prefill-dateofbirth",
-    ddmmyyyyToHtml(prefills[SIGN_PREFILL_DATEOFBIRTH] ?? "")
+  byId<HTMLInputElement>("pg-prefill-fullname").value = prefills[SIGN_PREFILL_FULLNAME] ?? "";
+  byId<HTMLInputElement>("pg-prefill-dateofbirth").value = ddmmyyyyToHtml(
+    prefills[SIGN_PREFILL_DATEOFBIRTH] ?? ""
   );
-  const mobile = freshInput("pg-prefill-mobile", prefills[SIGN_PREFILL_MOBILE] ?? "");
+  byId<HTMLInputElement>("pg-prefill-mobile").value = prefills[SIGN_PREFILL_MOBILE] ?? "";
+  byId<HTMLInputElement>("pg-toggle-allow-optimistic-dialog").checked = getAllowOptimisticDialog();
+  byId<HTMLButtonElement>("pg-settings-save").disabled = false;
+}
 
-  // The advanced toggle is a single discrete click; persisting immediately
-  // keeps the UX simple and the value won't be lost on Back.
-  const toggle = freshCheckbox("pg-toggle-allow-optimistic-dialog", getAllowOptimisticDialog());
-  toggle.addEventListener("change", () => {
-    void setAllowOptimisticDialog(toggle.checked).catch((err) => {
+function wireListeners(): void {
+  byId<HTMLInputElement>("pg-toggle-allow-optimistic-dialog").addEventListener("change", () => {
+    const checked = byId<HTMLInputElement>("pg-toggle-allow-optimistic-dialog").checked;
+    void setAllowOptimisticDialog(checked).catch((err) => {
       console.error("[pg-settings] failed to persist toggle", err);
       setStatus(t("settingsSaveError"), "error");
     });
   });
 
-  const save = freshButton("pg-settings-save", t("settingsSave"));
-  save.addEventListener("click", () => {
+  byId<HTMLButtonElement>("pg-settings-save").addEventListener("click", () => {
+    const save = byId<HTMLButtonElement>("pg-settings-save");
     save.disabled = true;
     const next: Partial<Record<SignPrefillType, string>> = {
-      [SIGN_PREFILL_FULLNAME]: fullname.value,
-      [SIGN_PREFILL_DATEOFBIRTH]: htmlToDdmmyyyy(dob.value),
-      [SIGN_PREFILL_MOBILE]: mobile.value,
+      [SIGN_PREFILL_FULLNAME]: byId<HTMLInputElement>("pg-prefill-fullname").value,
+      [SIGN_PREFILL_DATEOFBIRTH]: htmlToDdmmyyyy(
+        byId<HTMLInputElement>("pg-prefill-dateofbirth").value
+      ),
+      [SIGN_PREFILL_MOBILE]: byId<HTMLInputElement>("pg-prefill-mobile").value,
     };
+    console.log("[pg-settings] saving prefills:", next);
     setSignPrefills(next)
       .then(() => {
-        // Status banner lives outside the view sections so the user sees
-        // "Saved." on whichever view we return to.
+        console.log("[pg-settings] persisted; readback:", getSignPrefills());
         setStatus(t("settingsSaved"));
         setTimeout(() => setStatus(""), 2000);
-        showView(returnTo);
+        showView(returnView);
       })
       .catch((err) => {
         console.error("[pg-settings] failed to persist prefills", err);
@@ -79,47 +98,16 @@ export function mountSettingsView(returnTo: ViewName): void {
       });
   });
 
-  const back = freshButton("pg-settings-back", t("settingsBack"));
-  back.addEventListener("click", () => {
+  byId<HTMLButtonElement>("pg-settings-back").addEventListener("click", () => {
     setStatus("");
-    showView(returnTo);
+    showView(returnView);
   });
-
-  showView("settings");
 }
 
 function byId<T extends HTMLElement>(id: string): T {
   const el = document.getElementById(id);
   if (!el) throw new Error(`Missing element #${id}`);
   return el as T;
-}
-
-// Clone-replace so listeners attached during a previous mountSettingsView
-// call are dropped before we add new ones — the view is re-mountable from
-// the footer Settings button at any time.
-function freshInput(id: string, value: string): HTMLInputElement {
-  const stale = byId<HTMLInputElement>(id);
-  const fresh = stale.cloneNode(true) as HTMLInputElement;
-  fresh.value = value;
-  stale.replaceWith(fresh);
-  return fresh;
-}
-
-function freshCheckbox(id: string, checked: boolean): HTMLInputElement {
-  const stale = byId<HTMLInputElement>(id);
-  const fresh = stale.cloneNode(true) as HTMLInputElement;
-  fresh.checked = checked;
-  stale.replaceWith(fresh);
-  return fresh;
-}
-
-function freshButton(id: string, label: string): HTMLButtonElement {
-  const stale = byId<HTMLButtonElement>(id);
-  const fresh = stale.cloneNode(true) as HTMLButtonElement;
-  fresh.textContent = label;
-  fresh.disabled = false;
-  stale.replaceWith(fresh);
-  return fresh;
 }
 
 function ddmmyyyyToHtml(ddmmyyyy: string): string {
