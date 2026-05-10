@@ -149,6 +149,13 @@ const nl: Bundle = {
   recipientUnknown:
     "Dit bericht is niet versleuteld voor het e-mailaccount waarop het is ontvangen.",
 
+  settingsTitle: "PostGuard-instellingen",
+  settingsAllowOptimisticDialogLabel: "Sla de bevestiging “dialoogvenster openen” over",
+  settingsAllowOptimisticDialogHelp:
+    "Standaard uit — Outlook toont vóór elke verzending een melding “PostGuard wil een dialoogvenster openen”. Schakel dit alleen in als je pop-ups voor deze add-in al hebt toegestaan in de site-instellingen van je browser. Safari: Instellingen → Websites → Pop-upvensters → Toestaan voor deze site.",
+  settingsBack: "Terug",
+  settingsOpen: "Instellingen",
+
   "pbdf.sidn-pbdf.email.email": "E-mailadres",
   "pbdf.sidn-pbdf.mobilenumber.mobilenumber": "Mobiel nummer",
   "pbdf.gemeente.personalData.surname": "Achternaam",

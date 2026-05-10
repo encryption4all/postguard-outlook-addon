@@ -94,38 +94,33 @@ body {
   display: none;
 }
 
-/* Floating Settings (gear) button, anchored top-right. Visible only
-   from the stable entry views — taskpane.ts toggles [hidden] on
-   transient views (loading/yivi/error/settings itself). */
-.pg-settings-button {
-  position: fixed;
-  top: 8px;
-  right: 8px;
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  border: 1px solid transparent;
-  border-radius: var(--pg-radius);
-  background: transparent;
-  color: var(--pg-muted);
-  font-size: 18px;
-  line-height: 1;
-  cursor: pointer;
-  z-index: 10;
+/* Settings entry: a labeled "⚙ Settings" button pinned at the bottom
+   of the taskpane. Visible only from the stable entry views —
+   taskpane.ts toggles the footer's [hidden] attribute on transient
+   views (loading/yivi/error/settings itself). */
+.pg-footer {
+  padding: 8px 16px;
+  border-top: 1px solid var(--pg-border);
+  background: var(--pg-bg);
+  display: flex;
+  justify-content: center;
 }
 
-.pg-settings-button:hover {
-  background: var(--pg-secondary-bg);
-  color: inherit;
-}
-
-.pg-settings-button:focus-visible {
-  outline: 2px solid var(--pg-info-fg);
-  outline-offset: 2px;
-}
-
-.pg-settings-button[hidden] {
+.pg-footer[hidden] {
   display: none;
+}
+
+.pg-footer-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  justify-content: center;
+}
+
+.pg-footer-btn-icon {
+  font-size: 16px;
+  line-height: 1;
 }
 
 .pg-section-title {

@@ -15,17 +15,6 @@
   <body class="pg-app">
     <div id="pg-status" class="pg-status pg-status-hidden" role="status"></div>
 
-    <button
-      id="pg-open-settings"
-      class="pg-settings-button"
-      type="button"
-      aria-label="PostGuard Settings"
-      title="PostGuard Settings"
-      hidden
-    >
-      <span aria-hidden="true">⚙</span>
-    </button>
-
     <main class="pg-main">
       <!-- Loading view -->
       <section id="view-loading" class="pg-view">
@@ -128,5 +117,12 @@
         </div>
       </section>
     </main>
+
+    <footer class="pg-footer" hidden id="pg-footer">
+      <button id="pg-open-settings" class="pg-btn pg-btn-secondary pg-footer-btn" type="button">
+        <span class="pg-footer-btn-icon" aria-hidden="true">⚙</span>
+        <span id="pg-open-settings-label" class="pg-footer-btn-label"></span>
+      </button>
+    </footer>
   </body>
 </html>
