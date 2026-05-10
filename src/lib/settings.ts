@@ -40,11 +40,21 @@ export type SignPrefillType = (typeof SIGN_PREFILL_TYPES)[number];
 
 const SIGN_PREFILLS_KEY = "pg.signPrefills";
 
+// Module-level cache. Office's roamingSettings.get sometimes returns a stale
+// value inside the same runtime session even after a synchronous .set —
+// observed in WebView2 on new Outlook (save persists across page refresh
+// but get inside the same session reads the pre-set value). The cache is
+// populated on first read and overwritten synchronously by setSignPrefills,
+// so subsequent reads in the same session always reflect the latest write.
+let cachedPrefills: Partial<Record<SignPrefillType, string>> | null = null;
+
 export function getSignPrefills(): Partial<Record<SignPrefillType, string>> {
-  const raw = getSetting<Partial<Record<SignPrefillType, string>>>(SIGN_PREFILLS_KEY, {});
-  // Defensive copy — roamingSettings returns the live object on subsequent
-  // reads and callers shouldn't mutate persisted state by accident.
-  return { ...raw };
+  if (cachedPrefills === null) {
+    cachedPrefills = {
+      ...getSetting<Partial<Record<SignPrefillType, string>>>(SIGN_PREFILLS_KEY, {}),
+    };
+  }
+  return { ...cachedPrefills };
 }
 
 export function setSignPrefills(values: Partial<Record<SignPrefillType, string>>): Promise<void> {
@@ -55,6 +65,7 @@ export function setSignPrefills(values: Partial<Record<SignPrefillType, string>>
     const v = (values[k] ?? "").trim();
     if (v) cleaned[k] = v;
   }
+  cachedPrefills = { ...cleaned };
   return setSetting(SIGN_PREFILLS_KEY, cleaned);
 }
 
