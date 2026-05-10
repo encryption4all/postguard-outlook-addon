@@ -14,6 +14,17 @@
   <body class="pg-app">
     <div id="pg-status" class="pg-status pg-status-hidden" role="status"></div>
 
+    <button
+      id="pg-open-settings"
+      class="pg-settings-button"
+      type="button"
+      aria-label="PostGuard Settings"
+      title="PostGuard Settings"
+      hidden
+    >
+      <span aria-hidden="true">⚙</span>
+    </button>
+
     <main class="pg-main">
       <!-- Loading view -->
       <section id="view-loading" class="pg-view">
@@ -94,6 +105,26 @@
       <section id="view-error" class="pg-view" hidden>
         <div class="pg-error" id="pg-error-text"></div>
         <button id="pg-error-retry" class="pg-btn pg-btn-secondary" type="button">Retry</button>
+      </section>
+
+      <!-- Settings view -->
+      <section id="view-settings" class="pg-view" hidden>
+        <h2 id="pg-settings-title" class="pg-section-title"></h2>
+        <div class="pg-toggle-row">
+          <label class="pg-switch">
+            <input
+              type="checkbox"
+              id="pg-toggle-allow-optimistic-dialog"
+              aria-labelledby="pg-settings-optimistic-label"
+            />
+            <span class="pg-switch-track" aria-hidden="true"></span>
+          </label>
+          <span id="pg-settings-optimistic-label" class="pg-toggle-label"></span>
+        </div>
+        <p id="pg-settings-optimistic-help" class="pg-subtitle"></p>
+        <div class="pg-button-row pg-button-row-end">
+          <button id="pg-settings-back" class="pg-btn pg-btn-secondary" type="button"></button>
+        </div>
       </section>
     </main>
   </body>

@@ -65,6 +65,13 @@ const en: Bundle = {
   sentCopyError: "Failed to save the sent copy of your encrypted message.",
   recipientUnknown: "This message was not encrypted for the mail account it was received on.",
 
+  settingsTitle: "PostGuard Settings",
+  settingsAllowOptimisticDialogLabel: "Skip the “open a dialog” confirmation",
+  settingsAllowOptimisticDialogHelp:
+    "Off by default — Outlook shows a “PostGuard wants to open a dialog” prompt before each send. Turn this on only if you have already allowed pop-ups for this add-in in your browser’s site settings. Safari: Settings → Websites → Pop-ups → Allow for this site.",
+  settingsBack: "Back",
+  settingsOpen: "Settings",
+
   "pbdf.sidn-pbdf.email.email": "Email address",
   "pbdf.sidn-pbdf.mobilenumber.mobilenumber": "Mobile number",
   "pbdf.gemeente.personalData.surname": "Surname",

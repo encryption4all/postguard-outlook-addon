@@ -4,6 +4,7 @@
 import { isComposeMode } from "../lib/office-helpers";
 import { mountComposeView } from "./compose-view";
 import { mountReadView } from "./read-view";
+import { mountSettingsView } from "./settings-view";
 
 const views = {
   loading: byId("view-loading"),
@@ -14,14 +15,32 @@ const views = {
   decrypted: byId("view-decrypted"),
   yivi: byId("view-yivi"),
   error: byId("view-error"),
+  settings: byId("view-settings"),
 };
 
 export type ViewName = keyof typeof views;
+
+// Views from which the floating gear is visible. Transient views
+// (loading/yivi/error) and the settings view itself stay clean.
+const SETTINGS_ENTRY_VIEWS: ReadonlySet<ViewName> = new Set<ViewName>([
+  "compose",
+  "read_encrypted",
+  "read_was_encrypted",
+  "read_noop",
+  "decrypted",
+]);
+
+let lastSettingsEntryView: ViewName = "compose";
 
 export function showView(name: ViewName): void {
   for (const [k, el] of Object.entries(views)) {
     if (el) el.hidden = k !== name;
   }
+  if (SETTINGS_ENTRY_VIEWS.has(name)) {
+    lastSettingsEntryView = name;
+  }
+  const gear = byId("pg-open-settings");
+  if (gear) gear.hidden = !SETTINGS_ENTRY_VIEWS.has(name);
 }
 
 export function showError(message: string): void {
@@ -55,6 +74,9 @@ Office.onReady((info) => {
 
   const retry = byId("pg-error-retry") as HTMLButtonElement | null;
   if (retry) retry.addEventListener("click", () => bootstrap());
+
+  const gear = byId("pg-open-settings") as HTMLButtonElement | null;
+  if (gear) gear.addEventListener("click", () => mountSettingsView(lastSettingsEntryView));
 
   bootstrap();
 });

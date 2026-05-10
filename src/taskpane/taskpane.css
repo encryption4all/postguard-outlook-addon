@@ -94,6 +94,40 @@ body {
   display: none;
 }
 
+/* Floating Settings (gear) button, anchored top-right. Visible only
+   from the stable entry views — taskpane.ts toggles [hidden] on
+   transient views (loading/yivi/error/settings itself). */
+.pg-settings-button {
+  position: fixed;
+  top: 8px;
+  right: 8px;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--pg-radius);
+  background: transparent;
+  color: var(--pg-muted);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  z-index: 10;
+}
+
+.pg-settings-button:hover {
+  background: var(--pg-secondary-bg);
+  color: inherit;
+}
+
+.pg-settings-button:focus-visible {
+  outline: 2px solid var(--pg-info-fg);
+  outline-offset: 2px;
+}
+
+.pg-settings-button[hidden] {
+  display: none;
+}
+
 .pg-section-title {
   margin: 0 0 12px;
   font-size: 16px;
