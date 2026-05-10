@@ -18,6 +18,7 @@
 
 import { ChunkAssembler, chunkPayload, isChunkMessage, ChunkMessage } from "../lib/dialog-chunk";
 import { ADDIN_PUBLIC_URL } from "../lib/pkg-client";
+import { buildSignAttributes, getAllowOptimisticDialog } from "../lib/settings";
 import { stringifyError } from "../lib/stringify-error";
 
 const HEADER_ENCRYPT_ON_SEND = "x-pg-encrypt-on-send";
@@ -210,13 +211,14 @@ function saveItemAsync(item: Office.MessageCompose): Promise<void> {
   });
 }
 
-// Target physical size of the Yivi dialog. Just large enough for the
-// QR widget (~250×280) plus title and Cancel button. We compute a
-// screen-percentage from these at runtime because Office.displayDialog
-// only accepts percentages — picking fixed percentages gives a tiny
-// dialog on ultrawide monitors and an oversized one on laptops.
-const YIVI_DIALOG_TARGET_WIDTH_PX = 300;
-const YIVI_DIALOG_TARGET_HEIGHT_PX = 520;
+// Target physical size of the Yivi dialog. Sized to fit the QR widget
+// (~290px wide) with comfortable margins, plus title, optional Safari
+// hint and Cancel button. We compute a screen-percentage from these at
+// runtime because Office.displayDialog only accepts percentages —
+// picking fixed percentages gives a tiny dialog on ultrawide monitors
+// and an oversized one on laptops.
+const YIVI_DIALOG_TARGET_WIDTH_PX = 460;
+const YIVI_DIALOG_TARGET_HEIGHT_PX = 640;
 
 // Flip to true to keep the Yivi dialog open after a successful encrypt
 // (and after an encryption error) instead of auto-closing. Useful when
@@ -268,32 +270,33 @@ async function runEncryptDialog(payload: DialogMessage): Promise<EncryptResult> 
     displayInIframe: false,
   };
 
-  // Try to open without Office's "open another window" prompt first.
-  // Browsers that allow popups from the Outlook host (Chrome, Edge,
-  // Firefox by default; Safari once the user has granted popup
-  // permission) get a one-click send. If the optimistic attempt fails
-  // — typically Safari's popup blocker silently denying — retry with
-  // promptBeforeOpen: true so the Office prompt fires and the user's
-  // click on Allow becomes the gesture that releases the popup. The
-  // dialog itself shows a Safari-only inline hint pointing at
-  // Settings → Websites → Pop-ups so the user can opt out of the
-  // recurring prompt by granting permission once.
+  // Default: open with Office's "PostGuard wants to open a dialog"
+  // confirmation. The user's click on Allow is itself a fresh user
+  // gesture, so the popup opens reliably on every host (including
+  // Safari without site-level popup permission). Power users who have
+  // permanently allowed pop-ups for the add-in's origin can flip the
+  // Settings toggle (taskpane → gear → Skip the "open a dialog"
+  // confirmation) to opt into a single-attempt optimistic open. If
+  // that attempt is still blocked we recover by re-trying with the
+  // prompt so the send isn't lost.
+  const allowOptimistic = getAllowOptimisticDialog();
+  log(`displayDialogAsync: promptBeforeOpen=${!allowOptimistic} (optimistic=${allowOptimistic})`);
   let dialog: Office.Dialog;
   try {
-    log("displayDialogAsync attempt 1: promptBeforeOpen=false");
     dialog = await openDialogAsync(YIVI_DIALOG_URL, {
       ...baseOptions,
-      promptBeforeOpen: false,
+      promptBeforeOpen: !allowOptimistic,
     });
-    log("dialog opened (no prompt)");
-  } catch (e1) {
-    const msg1 = (e1 as { message?: string })?.message ?? String(e1);
-    log(`attempt 1 failed (${msg1}); retrying with promptBeforeOpen=true`);
+    log(allowOptimistic ? "dialog opened (no prompt)" : "dialog opened (after prompt)");
+  } catch (e) {
+    if (!allowOptimistic) throw e;
+    const msg = (e as { message?: string })?.message ?? String(e);
+    log(`optimistic attempt failed (${msg}); retrying with promptBeforeOpen=true`);
     dialog = await openDialogAsync(YIVI_DIALOG_URL, {
       ...baseOptions,
       promptBeforeOpen: true,
     });
-    log("dialog opened (after prompt)");
+    log("dialog opened (after prompt fallback)");
   }
 
   return new Promise((resolve, reject) => {
@@ -443,6 +446,16 @@ async function encryptAndApply(
   const htmlBody = await getBodyHtmlAsync(item);
   const attachments = await readUserAttachments(item, userAttachments);
 
+  // Sender attributes come from per-mailbox roaming settings (configured
+  // in the taskpane Settings view). Roaming settings are available in the
+  // launchevent runtime, so we don't need a per-draft internet header.
+  const signAttributes = buildSignAttributes();
+  log(
+    `signAttributes=${signAttributes
+      .map((a) => `${a.t}${a.v ? `=${a.v}` : a.optional ? ":optional" : ""}`)
+      .join(", ")}`
+  );
+
   const result = await runEncryptDialog({
     type: "encrypt-request",
     senderEmail,
@@ -451,6 +464,7 @@ async function encryptAndApply(
     subject,
     htmlBody,
     attachments,
+    signAttributes,
   });
 
   await setSubjectAsync(item, result.subject);

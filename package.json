@@ -25,6 +25,7 @@
   },
   "dependencies": {
     "@e4a/pg-js": "^1.6.0",
+    "@privacybydesign/yivi-css": "^1.0.0-beta.7",
     "core-js": "^3.49.0",
     "regenerator-runtime": "^0.14.1"
   },

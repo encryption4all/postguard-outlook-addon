@@ -9,6 +9,7 @@
       type="text/javascript"
       src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"
     ></script>
+    <link href="yivi.min.css" rel="stylesheet" type="text/css" />
     <link href="taskpane.css" rel="stylesheet" type="text/css" />
   </head>
   <body class="pg-app">
@@ -33,11 +34,6 @@
         </div>
 
         <div id="pg-bcc-warning" class="pg-warning" role="alert" hidden></div>
-
-        <div id="pg-sign-section" class="pg-policy-section">
-          <h3 id="pg-sign-title" class="pg-section-title"></h3>
-          <div id="pg-sign-panel"></div>
-        </div>
 
         <div id="pg-manage-section" class="pg-policy-section">
           <h3 id="pg-manage-title" class="pg-section-title"></h3>
@@ -95,6 +91,58 @@
         <div class="pg-error" id="pg-error-text"></div>
         <button id="pg-error-retry" class="pg-btn pg-btn-secondary" type="button"></button>
       </section>
+
+      <!-- Settings view -->
+      <section id="view-settings" class="pg-view" hidden>
+        <h2 id="pg-settings-title" class="pg-section-title"></h2>
+
+        <h3 id="pg-settings-prefill-title" class="pg-section-title pg-section-subtitle"></h3>
+        <p id="pg-settings-prefill-help" class="pg-subtitle"></p>
+        <div class="pg-policy-attr">
+          <label for="pg-prefill-fullname" id="pg-prefill-fullname-label"></label>
+          <div class="pg-policy-attr-input">
+            <input id="pg-prefill-fullname" type="text" autocomplete="name" />
+          </div>
+        </div>
+        <div class="pg-policy-attr">
+          <label for="pg-prefill-dateofbirth" id="pg-prefill-dateofbirth-label"></label>
+          <div class="pg-policy-attr-input">
+            <input id="pg-prefill-dateofbirth" type="date" />
+          </div>
+        </div>
+        <div class="pg-policy-attr">
+          <label for="pg-prefill-mobile" id="pg-prefill-mobile-label"></label>
+          <div class="pg-policy-attr-input">
+            <input id="pg-prefill-mobile" type="tel" placeholder="+31612345678" autocomplete="tel" />
+          </div>
+        </div>
+
+        <h3 id="pg-settings-advanced-title" class="pg-section-title pg-section-subtitle"></h3>
+        <div class="pg-toggle-row">
+          <label class="pg-switch">
+            <input
+              type="checkbox"
+              id="pg-toggle-allow-optimistic-dialog"
+              aria-labelledby="pg-settings-optimistic-label"
+            />
+            <span class="pg-switch-track" aria-hidden="true"></span>
+          </label>
+          <span id="pg-settings-optimistic-label" class="pg-toggle-label"></span>
+        </div>
+        <p id="pg-settings-optimistic-help" class="pg-subtitle"></p>
+
+        <div class="pg-button-row pg-button-row-end">
+          <button id="pg-settings-back" class="pg-btn pg-btn-secondary" type="button"></button>
+          <button id="pg-settings-save" class="pg-btn pg-btn-primary" type="button"></button>
+        </div>
+      </section>
     </main>
+
+    <footer class="pg-footer" hidden id="pg-footer">
+      <button id="pg-open-settings" class="pg-btn pg-btn-secondary pg-footer-btn" type="button">
+        <span class="pg-footer-btn-icon" aria-hidden="true">⚙</span>
+        <span id="pg-open-settings-label" class="pg-footer-btn-label"></span>
+      </button>
+    </footer>
   </body>
 </html>

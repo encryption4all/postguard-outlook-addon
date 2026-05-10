@@ -30,6 +30,11 @@ interface EncryptRequest {
   subject: string;
   htmlBody: string;
   attachments: AttachmentPayload[];
+  // Sender sign attributes built from the user's Settings prefills. Each
+  // entry is either { t, v } (mandatory disclosure match — Yivi must
+  // present a credential whose attribute equals `v`) or { t, optional: true }
+  // (the Yivi app prompts, the user can skip).
+  signAttributes?: { t: string; v?: string; optional?: boolean }[];
 }
 
 interface EncryptResult {
@@ -130,10 +135,28 @@ async function runEncryption(req: EncryptRequest): Promise<EncryptResult> {
     (pg as never as { recipient: { email: (e: string) => unknown } }).recipient.email(email)
   );
 
+  // Forward the launchevent-built list verbatim — each entry is already
+  // either { t, v } (mandatory match, from a Settings prefill) or
+  // { t, optional: true } (no prefill). The previous code stripped `v`
+  // and forced every entry back to optional, defeating the prefill flow.
+  const signAttrs = (req.signAttributes ?? []).map((a) => ({
+    t: a.t,
+    ...(a.v !== undefined ? { v: a.v } : {}),
+    ...(a.optional ? { optional: true } : {}),
+  }));
+  log(
+    `sign attributes: ${
+      signAttrs.map((a) => `${a.t}${a.v ? `=${a.v}` : a.optional ? ":optional" : ""}`).join(", ") ||
+      "<none>"
+    }`
+  );
+
   const sealed = pg.encrypt({
     sign: pg.sign.yivi({
       element: "#yivi-web-form",
       senderEmail: req.senderEmail,
+      includeSender: true,
+      attributes: signAttrs.length ? signAttrs : undefined,
     } as never),
     recipients,
     data: mime,

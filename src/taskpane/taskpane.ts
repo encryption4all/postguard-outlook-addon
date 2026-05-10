@@ -5,6 +5,7 @@ import { t } from "../lib/i18n";
 import { isComposeMode } from "../lib/office-helpers";
 import { mountComposeView } from "./compose-view";
 import { mountReadView } from "./read-view";
+import { mountSettingsView } from "./settings-view";
 
 const views = {
   loading: byId("view-loading"),
@@ -15,14 +16,32 @@ const views = {
   decrypted: byId("view-decrypted"),
   yivi: byId("view-yivi"),
   error: byId("view-error"),
+  settings: byId("view-settings"),
 };
 
 export type ViewName = keyof typeof views;
+
+// Views from which the Settings footer button is visible. Transient
+// views (loading/yivi/error) and the settings view itself stay clean.
+const SETTINGS_ENTRY_VIEWS: ReadonlySet<ViewName> = new Set<ViewName>([
+  "compose",
+  "read_encrypted",
+  "read_was_encrypted",
+  "read_noop",
+  "decrypted",
+]);
+
+let lastSettingsEntryView: ViewName = "compose";
 
 export function showView(name: ViewName): void {
   for (const [k, el] of Object.entries(views)) {
     if (el) el.hidden = k !== name;
   }
+  if (SETTINGS_ENTRY_VIEWS.has(name)) {
+    lastSettingsEntryView = name;
+  }
+  const footer = byId("pg-footer");
+  if (footer) footer.hidden = !SETTINGS_ENTRY_VIEWS.has(name);
 }
 
 export function showError(message: string): void {
@@ -65,6 +84,16 @@ Office.onReady((info) => {
 
   const noopText = byId("pg-read-noop-text");
   if (noopText) noopText.textContent = t("readNoopMessage");
+
+  const settingsLabel = byId("pg-open-settings-label");
+  if (settingsLabel) settingsLabel.textContent = t("settingsOpen");
+
+  const settingsBtn = byId("pg-open-settings") as HTMLButtonElement | null;
+  if (settingsBtn) {
+    settingsBtn.setAttribute("aria-label", t("settingsOpen"));
+    settingsBtn.title = t("settingsOpen");
+    settingsBtn.addEventListener("click", () => mountSettingsView(lastSettingsEntryView));
+  }
 
   bootstrap();
 });

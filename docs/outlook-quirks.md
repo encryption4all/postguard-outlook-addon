@@ -338,6 +338,29 @@ element found") to the console. The parse failure is internal to OWA's probe
 logic — the actual taskpane mount uses the response normally and your `Office.onReady`
 code runs fine after this error. Safe to ignore.
 
+### `displayDialogAsync` defaults to `promptBeforeOpen: true` (#48)
+
+The `OnMessageSend` launchevent opens the Yivi dialog via
+`Office.context.ui.displayDialogAsync`. The `promptBeforeOpen` option governs
+whether Office shows its "PostGuard wants to open a dialog → Allow"
+confirmation before the popup. Default in this add-in is `true`, because:
+
+- The Allow click is itself a fresh user gesture, so the popup opens reliably
+  on every host — including Safari without site-level popup permission.
+- The previous "optimistic" path (`promptBeforeOpen: false` first, retry with
+  the prompt on failure) tripped Safari's popup blocker before any retry could
+  attach a real gesture, surfacing a confusing security error to the user.
+
+Power users who have already granted permanent popup permission to the add-in's
+origin can flip *Skip the "open a dialog" confirmation* in the taskpane's
+Settings view (roaming-setting key `pg.allowOptimisticDialog`). That switches
+to `promptBeforeOpen: false`; on the rare host where it's still blocked we
+recover with a single prompted retry so the send isn't lost.
+
+`runEncryptDialog` in `src/launchevent/launchevent.ts` reads the setting via
+`getAllowOptimisticDialog()`; `roamingSettings` is available in the launchevent
+runtime so no extra plumbing is required.
+
 ---
 
 ## Things we still don't fully understand
