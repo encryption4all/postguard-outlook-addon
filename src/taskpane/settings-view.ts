@@ -66,14 +66,15 @@ export function mountSettingsView(returnTo: ViewName): void {
     };
     setSignPrefills(next)
       .then(() => {
+        // Status banner lives outside the view sections so the user sees
+        // "Saved." on whichever view we return to.
         setStatus(t("settingsSaved"));
         setTimeout(() => setStatus(""), 2000);
+        showView(returnTo);
       })
       .catch((err) => {
         console.error("[pg-settings] failed to persist prefills", err);
         setStatus(t("settingsSaveError"), "error");
-      })
-      .finally(() => {
         save.disabled = false;
       });
   });
