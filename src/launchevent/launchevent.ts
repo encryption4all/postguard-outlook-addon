@@ -211,13 +211,14 @@ function saveItemAsync(item: Office.MessageCompose): Promise<void> {
   });
 }
 
-// Target physical size of the Yivi dialog. Just large enough for the
-// QR widget (~250×280) plus title and Cancel button. We compute a
-// screen-percentage from these at runtime because Office.displayDialog
-// only accepts percentages — picking fixed percentages gives a tiny
-// dialog on ultrawide monitors and an oversized one on laptops.
-const YIVI_DIALOG_TARGET_WIDTH_PX = 300;
-const YIVI_DIALOG_TARGET_HEIGHT_PX = 520;
+// Target physical size of the Yivi dialog. Sized to fit the QR widget
+// (~290px wide) with comfortable margins, plus title, optional Safari
+// hint and Cancel button. We compute a screen-percentage from these at
+// runtime because Office.displayDialog only accepts percentages —
+// picking fixed percentages gives a tiny dialog on ultrawide monitors
+// and an oversized one on laptops.
+const YIVI_DIALOG_TARGET_WIDTH_PX = 460;
+const YIVI_DIALOG_TARGET_HEIGHT_PX = 640;
 
 // Flip to true to keep the Yivi dialog open after a successful encrypt
 // (and after an encryption error) instead of auto-closing. Useful when

@@ -428,13 +428,22 @@ body {
   outline-offset: 2px;
 }
 
-/* Yivi host - the SDK injects the QR widget here */
+/* Yivi host - the SDK injects the QR widget here. Use a column flex
+   so the SDK's stacked elements (auth tabs, QR, helper links) all
+   sit centered horizontally. */
 
 .pg-yivi-host {
-  min-height: 320px;
+  min-height: 360px;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  width: 100%;
+}
+
+.pg-yivi-host > * {
+  margin-left: auto;
+  margin-right: auto;
 }
 
 /* Decrypted view */
