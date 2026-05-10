@@ -55,12 +55,16 @@ export function mountSettingsView(returnTo: ViewName): void {
     }
   };
 
-  fullname.addEventListener("input", () => void save(SIGN_PREFILL_FULLNAME, fullname.value));
+  // Persist on `change` (blur) rather than `input` (every keystroke).
+  // roamingSettings.saveAsync intermittently fails with code 9019
+  // ("GenericSettingsError") when fired rapidly in succession; debouncing
+  // at the source removes the churn entirely.
+  fullname.addEventListener("change", () => void save(SIGN_PREFILL_FULLNAME, fullname.value));
   dob.addEventListener(
-    "input",
+    "change",
     () => void save(SIGN_PREFILL_DATEOFBIRTH, htmlToDdmmyyyy(dob.value))
   );
-  mobile.addEventListener("input", () => void save(SIGN_PREFILL_MOBILE, mobile.value));
+  mobile.addEventListener("change", () => void save(SIGN_PREFILL_MOBILE, mobile.value));
 
   const toggle = freshCheckbox("pg-toggle-allow-optimistic-dialog", getAllowOptimisticDialog());
   toggle.addEventListener("change", () => {
