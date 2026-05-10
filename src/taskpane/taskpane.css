@@ -428,47 +428,13 @@ body {
   outline-offset: 2px;
 }
 
-/* Yivi host - the SDK injects the QR widget here.
-   yivi-web ships no stylesheet, so .yivi-web-header / .yivi-web-content /
-   .yivi-web-centered / .yivi-web-qr-code render as plain block elements
-   unless we style them. Force a column flex layout all the way down so
-   the QR (and helper links / loaders / buttons) end up horizontally
-   centered. */
+/* Yivi host - the SDK injects the QR widget here. The official
+   @privacybydesign/yivi-css stylesheet (loaded ahead of this file)
+   handles the internal layout; we only set the outer container's
+   min-height. */
 
 .pg-yivi-host {
   min-height: 360px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-}
-
-.pg-yivi-host .yivi-web-header,
-.pg-yivi-host .yivi-web-content,
-.pg-yivi-host .yivi-web-centered {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  width: 100%;
-}
-
-.pg-yivi-host .yivi-web-qr-code {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  max-width: 280px;
-  margin: 0 auto;
-}
-
-.pg-yivi-host .yivi-web-qr-code svg,
-.pg-yivi-host .yivi-web-qr-code img {
-  display: block;
-  width: 100%;
-  max-width: 240px;
-  height: auto;
-  margin: 0 auto;
 }
 
 /* Decrypted view */

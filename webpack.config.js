@@ -56,7 +56,18 @@ module.exports = async (env, options) => {
         {
           test: /\.html$/,
           exclude: /node_modules/,
-          use: "html-loader",
+          use: {
+            loader: "html-loader",
+            options: {
+              // yivi.min.css is copied into dist/ by CopyWebpackPlugin
+              // below — leave the <link href> untouched so the browser
+              // resolves it at runtime from the same directory as the
+              // HTML page.
+              sources: {
+                urlFilter: (_attribute, value) => !/(^|\/)yivi\.min\.css$/.test(value),
+              },
+            },
+          },
         },
         {
           test: /\.(png|jpg|jpeg|gif|ico|svg)$/,
@@ -105,6 +116,10 @@ module.exports = async (env, options) => {
       new CopyWebpackPlugin({
         patterns: [
           { from: "assets/*", to: "assets/[name][ext][query]" },
+          {
+            from: "node_modules/@privacybydesign/yivi-css/dist/yivi.min.css",
+            to: "yivi.min.css",
+          },
           {
             from: "manifest*.xml",
             to: "[name][ext]",
