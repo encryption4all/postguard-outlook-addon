@@ -2,7 +2,11 @@
 
 export interface AttributeRequest {
   t: string;
-  v: string;
+  // Required disclosure value (Manage Access / recipient policies). Omit
+  // together with `optional: true` for sign-side attributes that the user
+  // may disclose at session time without a pre-specified value.
+  v?: string;
+  optional?: boolean;
 }
 
 export type AttributeCon = AttributeRequest[];

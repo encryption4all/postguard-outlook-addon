@@ -423,6 +423,47 @@ body {
   outline-offset: 2px;
 }
 
+/* Selected optional sign attribute — filled chip with × delete. */
+.pg-policy-selected-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 24px;
+  padding: 4px 4px 4px 12px;
+  border: 1px solid var(--pg-accent);
+  border-radius: 999px;
+  background: var(--pg-info-bg);
+  color: var(--pg-accent);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.pg-policy-selected-chip-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.pg-policy-selected-chip-remove:hover {
+  background: var(--pg-accent);
+  color: var(--pg-accent-fg);
+}
+
+.pg-policy-selected-chip-remove:focus-visible {
+  outline: 2px solid var(--pg-accent);
+  outline-offset: 2px;
+}
+
 /* Yivi host - the SDK injects the QR widget here. The official
    @privacybydesign/yivi-css stylesheet (loaded ahead of this file)
    handles the internal layout; we only set the outer container's

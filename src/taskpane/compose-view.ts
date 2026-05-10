@@ -272,11 +272,14 @@ function renderPolicyPanels(): void {
   mountPolicyPanel(signContainer, {
     emails: [senderEmail],
     initialPolicy: signInitial,
+    mode: "sign",
     onChange: (next) => {
-      // signAttributes stores ONLY extras. pg.sign.yivi already takes
-      // senderEmail as a top-level field; including email here as well
-      // triggers a second email disclosure on the Yivi QR.
-      state.signAttributes = (next[senderEmail] ?? []).filter((a) => a.t !== EMAIL_ATTRIBUTE_TYPE);
+      // signAttributes stores ONLY extras as optional disclosures. pg.sign.yivi
+      // already takes senderEmail as a top-level field; including email here
+      // as well triggers a second email disclosure on the Yivi QR.
+      state.signAttributes = (next[senderEmail] ?? [])
+        .filter((a) => a.t !== EMAIL_ATTRIBUTE_TYPE)
+        .map((a) => ({ t: a.t, optional: true }));
     },
   });
 }
@@ -427,6 +430,11 @@ async function encryptAndPrepareSend(): Promise<void> {
       sign: pg.sign.yivi({
         element: "#yivi-web-form",
         senderEmail,
+        includeSender: true,
+        // Match the postguard-website pattern: each entry is { t, optional: true }
+        // so the user discloses values inside the Yivi app at session time. No
+        // pre-typed values means signing no longer fails when the user's Yivi
+        // credentials don't match a guessed string (#49, #56).
         attributes: state.signAttributes.length ? state.signAttributes : undefined,
       } as never),
       recipients,
@@ -436,11 +444,15 @@ async function encryptAndPrepareSend(): Promise<void> {
     // pg-js 1.2.0+: the Cryptify upload is silent by default, so we
     // can let it run for tier 2/3 — the recipient sees a download link
     // in the body but no duplicate mail from Cryptify.
+    //
+    // senderAttributes is a display-only hint for the envelope template.
+    // With optional sign attributes we don't know the disclosed values
+    // until after the Yivi session, so we leave it unset — the SDK falls
+    // back to whatever the signed envelope itself carries.
     const envelope = await pg.email.createEnvelope({
       sealed,
       from: senderEmail,
       websiteUrl: POSTGUARD_WEBSITE_URL,
-      senderAttributes: state.signAttributes.map((a) => a.v),
     } as never);
 
     await setSubject(envelope.subject);
