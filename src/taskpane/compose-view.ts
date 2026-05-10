@@ -503,9 +503,13 @@ function buildPgRecipients(pg: PostGuard): unknown[] {
     const policy = state.policy[email];
     if (policy) {
       for (const attr of policy) {
-        if (attr.t !== EMAIL_ATTRIBUTE_TYPE) {
-          builder.extraAttribute(attr.t, attr.v.toLowerCase());
-        }
+        if (attr.t === EMAIL_ATTRIBUTE_TYPE) continue;
+        // Manage Access entries always carry a value (the policy editor
+        // filters out empty rows before storing them on state.policy),
+        // but AttributeRequest.v is typed as optional now that sign-side
+        // entries omit it — narrow defensively for the typechecker.
+        if (!attr.v) continue;
+        builder.extraAttribute(attr.t, attr.v.toLowerCase());
       }
     }
     return builder;
