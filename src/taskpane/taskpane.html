@@ -46,14 +46,14 @@
 
         <div id="pg-bcc-warning" class="pg-warning" role="alert" hidden></div>
 
-        <div id="pg-manage-section" class="pg-policy-section">
-          <h3 id="pg-manage-title" class="pg-section-title"></h3>
-          <div id="pg-manage-panel"></div>
-        </div>
-
         <div id="pg-sign-section" class="pg-policy-section">
           <h3 id="pg-sign-title" class="pg-section-title"></h3>
           <div id="pg-sign-panel"></div>
+        </div>
+
+        <div id="pg-manage-section" class="pg-policy-section">
+          <h3 id="pg-manage-title" class="pg-section-title"></h3>
+          <div id="pg-manage-panel"></div>
         </div>
 
         <button id="pg-btn-encrypt-send" class="pg-btn pg-btn-primary" type="button"></button>
@@ -65,7 +65,7 @@
         <p id="pg-yivi-subtitle" class="pg-subtitle"></p>
         <div id="yivi-web-form" class="pg-yivi-host"></div>
         <div class="pg-button-row pg-button-row-end">
-          <button id="pg-btn-yivi-cancel" class="pg-btn pg-btn-secondary" type="button">Cancel</button>
+          <button id="pg-btn-yivi-cancel" class="pg-btn pg-btn-secondary" type="button"></button>
         </div>
       </section>
 
@@ -99,13 +99,13 @@
 
       <!-- Not-applicable (read mode but no PostGuard content) -->
       <section id="view-read-noop" class="pg-view" hidden>
-        <p class="pg-subtitle">This message is not encrypted with PostGuard.</p>
+        <p id="pg-read-noop-text" class="pg-subtitle"></p>
       </section>
 
       <!-- Error view -->
       <section id="view-error" class="pg-view" hidden>
         <div class="pg-error" id="pg-error-text"></div>
-        <button id="pg-error-retry" class="pg-btn pg-btn-secondary" type="button">Retry</button>
+        <button id="pg-error-retry" class="pg-btn pg-btn-secondary" type="button"></button>
       </section>
 
       <!-- Settings view -->
