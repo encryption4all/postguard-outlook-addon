@@ -244,3 +244,11 @@ export function showNotification(
   };
   return p<void>((cb) => item.notificationMessages.replaceAsync(key, details, cb));
 }
+
+export function removeNotification(key: string): Promise<void> {
+  const item = Office.context.mailbox.item;
+  if (!item || !item.notificationMessages) return Promise.resolve();
+  return new Promise<void>((resolve) => {
+    item.notificationMessages.removeAsync(key, () => resolve());
+  });
+}

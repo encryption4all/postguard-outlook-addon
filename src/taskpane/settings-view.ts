@@ -14,8 +14,10 @@ import {
   SIGN_PREFILL_MOBILE,
   SignPrefillType,
   getAllowOptimisticDialog,
+  getEncryptionEnabled,
   getSignPrefills,
   setAllowOptimisticDialog,
+  setEncryptionEnabled,
   setSignPrefills,
 } from "../lib/settings";
 import { t } from "../lib/i18n";
@@ -37,6 +39,13 @@ export function mountSettingsView(returnTo: ViewName): void {
 
 function refreshLabels(): void {
   byId<HTMLElement>("pg-settings-title").textContent = t("settingsTitle");
+  byId<HTMLElement>("pg-settings-encryption-title").textContent = t("settingsEncryptionTitle");
+  byId<HTMLElement>("pg-settings-encryption-default-label").textContent = t(
+    "settingsEncryptionDefaultLabel"
+  );
+  byId<HTMLElement>("pg-settings-encryption-default-help").textContent = t(
+    "settingsEncryptionDefaultHelp"
+  );
   byId<HTMLElement>("pg-settings-prefill-title").textContent = t("settingsPrefillTitle");
   byId<HTMLElement>("pg-settings-prefill-help").textContent = t("settingsPrefillHelp");
   byId<HTMLElement>("pg-settings-advanced-title").textContent = t("settingsAdvancedTitle");
@@ -55,6 +64,7 @@ function refreshLabels(): void {
 
 function refreshValues(): void {
   const prefills = getSignPrefills();
+  byId<HTMLInputElement>("pg-toggle-encryption-default").checked = getEncryptionEnabled();
   byId<HTMLInputElement>("pg-prefill-fullname").value = prefills[SIGN_PREFILL_FULLNAME] ?? "";
   byId<HTMLInputElement>("pg-prefill-dateofbirth").value = ddmmyyyyToHtml(
     prefills[SIGN_PREFILL_DATEOFBIRTH] ?? ""
@@ -65,6 +75,14 @@ function refreshValues(): void {
 }
 
 function wireListeners(): void {
+  byId<HTMLInputElement>("pg-toggle-encryption-default").addEventListener("change", () => {
+    const checked = byId<HTMLInputElement>("pg-toggle-encryption-default").checked;
+    void setEncryptionEnabled(checked).catch((err) => {
+      console.error("[pg-settings] failed to persist encryption default", err);
+      setStatus(t("settingsSaveError"), "error");
+    });
+  });
+
   byId<HTMLInputElement>("pg-toggle-allow-optimistic-dialog").addEventListener("change", () => {
     const checked = byId<HTMLInputElement>("pg-toggle-allow-optimistic-dialog").checked;
     void setAllowOptimisticDialog(checked).catch((err) => {

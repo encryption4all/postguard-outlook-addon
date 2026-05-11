@@ -24,7 +24,11 @@ import { EMAIL_ATTRIBUTE_TYPE } from "../lib/attributes";
 import { Policy, MimeAttachment } from "../lib/types";
 import { PKG_URL, CRYPTIFY_URL, POSTGUARD_WEBSITE_URL, clientHeaders } from "../lib/pkg-client";
 import { POSTGUARD_ENCRYPTED_FILENAME } from "../lib/mime";
-import { buildSignAttributes } from "../lib/settings";
+import {
+  buildSignAttributes,
+  getEncryptionEnabled,
+  setEncryptionEnabled,
+} from "../lib/settings";
 import { t } from "../lib/i18n";
 import { mountPolicyPanel } from "./policy-editor";
 import { showView, setStatus, showError } from "./taskpane";
@@ -113,7 +117,7 @@ interface ComposeState {
 }
 
 const state: ComposeState = {
-  encrypt: true,
+  encrypt: false,
   policy: {},
   recipients: { to: [], cc: [], bcc: [] },
   busy: false,
@@ -123,6 +127,26 @@ const state: ComposeState = {
   encryptedSnapshot: null,
   encryptedRecipientsHeader: null,
 };
+
+// Single notification key for the encryption-status banner. Reusing the
+// same key means replaceAsync swaps the message in place instead of
+// stacking two banners.
+const ENCRYPTION_STATUS_NOTIFICATION_KEY = "postguard-encryption-status";
+
+// Show the persistent in-message banner that mirrors the toggle. The
+// taskpane is not always open while the user composes, so this banner is
+// the user-visible "PostGuard is on/off" indicator on the message itself.
+// Best-effort — a notificationMessages failure shouldn't break compose.
+async function syncEncryptionBanner(): Promise<void> {
+  try {
+    const message = state.encrypt
+      ? t("composeEncryptionOnBanner")
+      : t("composeEncryptionOffBanner");
+    await showNotification(ENCRYPTION_STATUS_NOTIFICATION_KEY, message, { persistent: true });
+  } catch (_e) {
+    // ignore
+  }
+}
 
 // Stringified form of everything that affects the encrypted output. If this
 // changes after a successful encrypt, the message no longer matches the
@@ -157,7 +181,14 @@ export async function mountComposeView(): Promise<void> {
 
   toggle.addEventListener("change", () => {
     state.encrypt = toggle.checked;
+    // The toggle is the global control: write the per-draft header so the
+    // OnMessageSend handler agrees with what the user sees, AND write the
+    // mailbox-wide default so future new drafts open in the same state.
     void persistEncryptOnSend(state.encrypt);
+    void setEncryptionEnabled(state.encrypt).catch((err) => {
+      console.error("[pg-compose] failed to persist global encryption setting:", err);
+    });
+    void syncEncryptionBanner();
     renderToggleUI();
     renderPolicyPanels();
   });
@@ -183,11 +214,12 @@ export async function mountComposeView(): Promise<void> {
   // Restore the toggle state from the per-draft header so a soft-block
   // round trip or a taskpane reopen doesn't lose the user's choice.
   // The header has three states:
-  //   "true"  → user explicitly enabled
-  //   "false" → user explicitly disabled
-  //   absent  → never interacted; fall back to the default-on behaviour
-  //             and persist "true" so the OnMessageSend handler sees the
-  //             same intent the toggle visually shows.
+  //   "true"  → user explicitly enabled on this draft
+  //   "false" → user explicitly disabled on this draft
+  //   absent  → never interacted; fall back to the mailbox-wide default
+  //             (off unless the user enabled it globally). Persist the
+  //             current intent so the OnMessageSend handler sees the
+  //             same state the toggle visually shows.
   try {
     const headers = await getItemHeaders([HEADER_ENCRYPT_ON_SEND]);
     const v = headers[HEADER_ENCRYPT_ON_SEND];
@@ -196,16 +228,18 @@ export async function mountComposeView(): Promise<void> {
     } else if (v === "false") {
       state.encrypt = false;
     } else {
-      state.encrypt = true;
-      void persistEncryptOnSend(true);
+      state.encrypt = getEncryptionEnabled();
+      void persistEncryptOnSend(state.encrypt);
     }
   } catch (_e) {
-    // Header read failed — leave the default-on state alone.
+    // Header read failed — fall back to the mailbox-wide default.
+    state.encrypt = getEncryptionEnabled();
   }
 
   await refreshRecipients();
   renderToggleUI();
   renderPolicyPanels();
+  void syncEncryptionBanner();
   bccWarning.hidden = state.recipients.bcc.length === 0 || !state.encrypt;
 
   // Live recipient updates (Mailbox 1.7+). Without this the toggle UI is

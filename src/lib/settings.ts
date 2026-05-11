@@ -22,6 +22,22 @@ export function setAllowOptimisticDialog(value: boolean): Promise<void> {
   return setSetting<boolean>(ALLOW_OPTIMISTIC_DIALOG_KEY, value);
 }
 
+// Mailbox-wide "encrypt on send" default. Off by default — the user must
+// explicitly opt in either from the compose toggle or the Settings view.
+// Both the compose taskpane and the OnMessageSend launchevent runtime read
+// this; the launchevent only falls back to it when the per-draft
+// x-pg-encrypt-on-send header is absent, so a draft the user explicitly
+// toggled keeps its choice even if the global default changes later.
+export const ENCRYPTION_ENABLED_KEY = "pg.encryptionEnabled";
+
+export function getEncryptionEnabled(): boolean {
+  return getSetting<boolean>(ENCRYPTION_ENABLED_KEY, false);
+}
+
+export function setEncryptionEnabled(value: boolean): Promise<void> {
+  return setSetting<boolean>(ENCRYPTION_ENABLED_KEY, value);
+}
+
 // Sign-attribute prefills. The three Yivi attribute types listed below are
 // always offered for disclosure when the user signs a message. If the user
 // has filled in a value in Settings, it is sent as a mandatory disclosure

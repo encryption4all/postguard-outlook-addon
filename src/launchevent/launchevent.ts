@@ -18,7 +18,11 @@
 
 import { ChunkAssembler, chunkPayload, isChunkMessage, ChunkMessage } from "../lib/dialog-chunk";
 import { ADDIN_PUBLIC_URL } from "../lib/pkg-client";
-import { buildSignAttributes, getAllowOptimisticDialog } from "../lib/settings";
+import {
+  buildSignAttributes,
+  getAllowOptimisticDialog,
+  getEncryptionEnabled,
+} from "../lib/settings";
 import { stringifyError } from "../lib/stringify-error";
 
 const HEADER_ENCRYPT_ON_SEND = "x-pg-encrypt-on-send";
@@ -517,8 +521,20 @@ function onMessageSendHandler(event: Office.AddinCommands.Event): void {
       return;
     }
 
-    const encryptRequested = hdrRes.value[HEADER_ENCRYPT_ON_SEND] === "true";
-    log(`encryptRequested=${encryptRequested}`);
+    // Per-draft header overrides the mailbox-wide default. "true"/"false"
+    // both mean the user toggled this specific draft explicitly; only when
+    // the header is absent do we fall back to the global setting (which
+    // defaults to off — see settings.ts).
+    const headerVal = hdrRes.value[HEADER_ENCRYPT_ON_SEND];
+    let encryptRequested: boolean;
+    if (headerVal === "true") {
+      encryptRequested = true;
+    } else if (headerVal === "false") {
+      encryptRequested = false;
+    } else {
+      encryptRequested = getEncryptionEnabled();
+    }
+    log(`encryptRequested=${encryptRequested} (header=${headerVal ?? "<absent>"})`);
     if (!encryptRequested) {
       cancelTimeout();
       event.completed({ allowEvent: true });
