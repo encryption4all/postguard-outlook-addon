@@ -18,13 +18,14 @@ import {
   getItemHeaders,
   getSenderEmail,
   showNotification,
+  removeNotification,
 } from "../lib/office-helpers";
 import { toBase64 } from "../lib/encoding";
 import { EMAIL_ATTRIBUTE_TYPE } from "../lib/attributes";
 import { Policy, MimeAttachment } from "../lib/types";
 import { PKG_URL, CRYPTIFY_URL, POSTGUARD_WEBSITE_URL, clientHeaders } from "../lib/pkg-client";
 import { POSTGUARD_ENCRYPTED_FILENAME } from "../lib/mime";
-import { buildSignAttributes } from "../lib/settings";
+import { buildSignAttributes, getEncryptionEnabled } from "../lib/settings";
 import { t } from "../lib/i18n";
 import { mountPolicyPanel } from "./policy-editor";
 import { showView, setStatus, showError } from "./taskpane";
@@ -33,6 +34,12 @@ const ADDIN_VERSION = "0.1.0";
 
 // Internet-header keys shared with the OnMessageSend handler. Custom header
 // names must be x-prefixed.
+//
+// Per-draft "encrypt this message on send" flag. This header is the
+// single source of truth at send time — the OnMessageSend handler only
+// runs the encryption flow when it reads "true" here, so the user's
+// global Encryption setting only acts as the default that
+// OnNewMessageCompose seeds onto each new draft.
 const HEADER_ENCRYPT_ON_SEND = "x-pg-encrypt-on-send";
 // Comma-joined sorted list of lowercase To+Cc emails captured at encrypt
 // time. The handler compares this against the message's current recipients
@@ -49,17 +56,14 @@ const POSTGUARD_VERSION = "0.1.0";
 
 async function persistEncryptOnSend(value: boolean): Promise<void> {
   try {
-    // saveItem() before and after the header write: the first ensures the
-    // draft has an itemId, the second flushes the header change to the
-    // server so the OnMessageSend handler sees it.
-    //
-    // Always write an explicit "true" or "false" — if we removed the
-    // header for the off state, a draft the user explicitly toggled off
-    // would reopen as default-on (since "absent" means "no choice yet").
+    // saveItem() before and after the header write: the first ensures
+    // the draft has an itemId, the second flushes the header change to
+    // the server so the OnMessageSend handler sees it. The header is
+    // always set to an explicit "true" or "false" so the send-side
+    // handler never has to fall back to anything else.
     await saveItem();
     await setItemHeaders({ [HEADER_ENCRYPT_ON_SEND]: value ? "true" : "false" });
     await saveItem();
-
     console.log(`[pg] persisted encryptOnSend=${value}`);
   } catch (e) {
     console.error(`[pg] failed to persist encryptOnSend:`, e);
@@ -113,7 +117,7 @@ interface ComposeState {
 }
 
 const state: ComposeState = {
-  encrypt: true,
+  encrypt: false,
   policy: {},
   recipients: { to: [], cc: [], bcc: [] },
   busy: false,
@@ -123,6 +127,31 @@ const state: ComposeState = {
   encryptedSnapshot: null,
   encryptedRecipientsHeader: null,
 };
+
+// Single notification key for the encryption-status banner.
+const ENCRYPTION_STATUS_NOTIFICATION_KEY = "postguard-encryption-status";
+
+// Show the persistent in-message banner that mirrors the toggle. The
+// taskpane is not always open while the user composes, so this banner is
+// the user-visible "PostGuard is on/off" indicator on the message itself.
+//
+// Implementation note: new Outlook's notificationMessages.replaceAsync
+// silently no-ops in compose mode when called with the same key — the
+// callback reports success but the visible banner text doesn't change.
+// Remove the existing entry first and then add the new one so the
+// renderer actually re-paints. Best-effort throughout; a
+// notificationMessages failure shouldn't break compose.
+async function syncEncryptionBanner(): Promise<void> {
+  try {
+    const message = state.encrypt
+      ? t("composeEncryptionOnBanner")
+      : t("composeEncryptionOffBanner");
+    await removeNotification(ENCRYPTION_STATUS_NOTIFICATION_KEY);
+    await showNotification(ENCRYPTION_STATUS_NOTIFICATION_KEY, message, { persistent: true });
+  } catch (_e) {
+    // ignore
+  }
+}
 
 // Stringified form of everything that affects the encrypted output. If this
 // changes after a successful encrypt, the message no longer matches the
@@ -157,7 +186,13 @@ export async function mountComposeView(): Promise<void> {
 
   toggle.addEventListener("change", () => {
     state.encrypt = toggle.checked;
+    // Write the per-draft header. The OnMessageSend handler reads only
+    // this header — never the global setting — so a PostGuard outage
+    // can never block an unencrypted send. The global Encryption
+    // setting in the Settings view changes only the default for new
+    // drafts (seeded by OnNewMessageCompose).
     void persistEncryptOnSend(state.encrypt);
+    void syncEncryptionBanner();
     renderToggleUI();
     renderPolicyPanels();
   });
@@ -180,14 +215,10 @@ export async function mountComposeView(): Promise<void> {
     showView("compose");
   });
 
-  // Restore the toggle state from the per-draft header so a soft-block
-  // round trip or a taskpane reopen doesn't lose the user's choice.
-  // The header has three states:
-  //   "true"  → user explicitly enabled
-  //   "false" → user explicitly disabled
-  //   absent  → never interacted; fall back to the default-on behaviour
-  //             and persist "true" so the OnMessageSend handler sees the
-  //             same intent the toggle visually shows.
+  // The per-draft header is authoritative. OnNewMessageCompose seeds
+  // it from the mailbox-wide default on compose open, but the user may
+  // have opened the taskpane before OnNewMessageCompose ran (or on a
+  // draft that predates it), so seed here too if missing.
   try {
     const headers = await getItemHeaders([HEADER_ENCRYPT_ON_SEND]);
     const v = headers[HEADER_ENCRYPT_ON_SEND];
@@ -196,16 +227,19 @@ export async function mountComposeView(): Promise<void> {
     } else if (v === "false") {
       state.encrypt = false;
     } else {
-      state.encrypt = true;
-      void persistEncryptOnSend(true);
+      state.encrypt = getEncryptionEnabled();
+      void persistEncryptOnSend(state.encrypt);
     }
   } catch (_e) {
-    // Header read failed — leave the default-on state alone.
+    // Header read failed — fall back to the mailbox-wide default; the
+    // user can still flip the toggle which will write the header.
+    state.encrypt = getEncryptionEnabled();
   }
 
   await refreshRecipients();
   renderToggleUI();
   renderPolicyPanels();
+  void syncEncryptionBanner();
   bccWarning.hidden = state.recipients.bcc.length === 0 || !state.encrypt;
 
   // Live recipient updates (Mailbox 1.7+). Without this the toggle UI is

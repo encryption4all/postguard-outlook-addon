@@ -14,6 +14,8 @@ const en: Bundle = {
 
   composeSwitchBarEnabled: "PostGuard encryption is on",
   composeSwitchBarDisabled: "PostGuard encryption is off. Sensitive content? Turn it on.",
+  composeEncryptionOnBanner: "PostGuard is on — this message will be encrypted on send.",
+  composeEncryptionOffBanner: "PostGuard is off — this message will be sent unencrypted.",
   manageAccess: "Manage Access",
   sign: "Sign",
   encryptAndSend: "Encrypt & Send",
@@ -70,6 +72,10 @@ const en: Bundle = {
   recipientUnknown: "This message was not encrypted for the mail account it was received on.",
 
   settingsTitle: "PostGuard Settings",
+  settingsEncryptionTitle: "Encryption",
+  settingsEncryptionDefaultLabel: "Encrypt new messages by default",
+  settingsEncryptionDefaultHelp:
+    "Off by default. When on, every new message starts with PostGuard encryption enabled and shows a banner in the message until you turn it off in the compose taskpane.",
   settingsPrefillTitle: "Sender attributes",
   settingsPrefillHelp:
     "These attributes are always offered when you sign a message. Fill in a value to make the disclosure mandatory (the Yivi app must match it). Leave blank to keep the attribute optional — you decide in the Yivi app at signing time.",
@@ -100,6 +106,8 @@ const nl: Bundle = {
 
   composeSwitchBarEnabled: "PostGuard-versleuteling staat aan",
   composeSwitchBarDisabled: "PostGuard-versleuteling staat uit. Gevoelige inhoud? Schakel het in.",
+  composeEncryptionOnBanner: "PostGuard staat aan — dit bericht wordt bij verzenden versleuteld.",
+  composeEncryptionOffBanner: "PostGuard staat uit — dit bericht wordt onversleuteld verzonden.",
   manageAccess: "Toegang beheren",
   sign: "Ondertekenen",
   encryptAndSend: "Versleutelen en verzenden",
@@ -158,6 +166,10 @@ const nl: Bundle = {
     "Dit bericht is niet versleuteld voor het e-mailaccount waarop het is ontvangen.",
 
   settingsTitle: "PostGuard-instellingen",
+  settingsEncryptionTitle: "Versleuteling",
+  settingsEncryptionDefaultLabel: "Nieuwe berichten standaard versleutelen",
+  settingsEncryptionDefaultHelp:
+    "Standaard uit. Wanneer aan, start elk nieuw bericht met PostGuard-versleuteling ingeschakeld en wordt een banner in het bericht getoond totdat je het uitschakelt in het opstel-taakvenster.",
   settingsPrefillTitle: "Afzenderattributen",
   settingsPrefillHelp:
     "Deze attributen worden altijd aangeboden wanneer je een bericht ondertekent. Vul een waarde in om de onthulling verplicht te maken (de Yivi-app moet exact deze waarde tonen). Laat leeg om het attribuut optioneel te houden — dan beslis je in de Yivi-app of je het onthult.",
