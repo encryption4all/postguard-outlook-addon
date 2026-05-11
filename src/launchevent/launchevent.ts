@@ -75,16 +75,23 @@ function log(msg: string): void {
   console.log(`[pg-launchevent] ${msg}`);
 }
 
-function allowAfterTimeout(event: Office.AddinCommands.Event, ms = 270000): () => void {
-  // 4½ min — gives the user time to find their phone and scan the QR.
-  // Outlook's own Smart Alerts hard-cap is 5 min so we stay just under.
+// Encryption-path watchdog. Once the user opts into encrypting this
+// message (x-pg-encrypt-on-send=true), we must never release the send
+// in cleartext — silently sending an unencrypted email that the user
+// asked to be encrypted is the worst possible failure mode. So if the
+// encryption flow doesn't complete in time, block the send with a
+// clear error and let the user retry.
+//
+// 4½ min: Outlook's Smart Alerts hard-cap is 5 min, so we stay just
+// under. The user has that long to find their phone and scan the QR.
+function blockAfterTimeout(
+  event: Office.AddinCommands.Event,
+  onFire: () => void,
+  ms = 270000
+): () => void {
   const timer = setTimeout(() => {
-    log(`fallback timeout (${ms}ms) reached; allowing the send`);
-    try {
-      event.completed({ allowEvent: true });
-    } catch (e) {
-      log(`fallback event.completed threw: ${String(e)}`);
-    }
+    log(`fallback timeout (${ms}ms) reached; blocking the send`);
+    onFire();
   }, ms);
   return () => clearTimeout(timer);
 }
@@ -511,19 +518,51 @@ async function encryptAndApply(
 }
 
 function onMessageSendHandler(event: Office.AddinCommands.Event): void {
-  // Outer guard: any unexpected failure in this handler must NOT block
-  // the send. If PostGuard is off (or anything goes wrong reading state),
-  // we release the send immediately so a broken add-in can never stop
-  // an unencrypted email from going out.
-  let released = false;
+  // Two completion modes:
+  //   - release  → event.completed({ allowEvent: true }).  Email goes
+  //                out as-is (no PostGuard involvement). Use for the
+  //                "off" or "indeterminate" paths so a broken add-in
+  //                can never stop an unencrypted send from happening.
+  //   - blockSend → event.completed({ allowEvent: false, errorMessage }).
+  //                Outlook shows a Smart Alert and refuses the send.
+  //                Use whenever we have committed to encrypting and
+  //                something then went wrong — silently sending a
+  //                "supposed to be encrypted" email in plaintext is
+  //                the failure mode we never accept.
+  //
+  // `committedToEncrypt` flips to true the instant we confirm the
+  // header is "true", so any error after that point routes to
+  // blockSend instead of releaseSend.
+  let settled = false;
+  let committedToEncrypt = false;
+
   const releaseSend = (reason: string): void => {
-    if (released) return;
-    released = true;
+    if (settled) return;
+    settled = true;
     log(`releasing send: ${reason}`);
     try {
       event.completed({ allowEvent: true });
     } catch (e) {
       log(`event.completed threw on release: ${String(e)}`);
+    }
+  };
+
+  const blockSend = (errorMessage: string): void => {
+    if (settled) return;
+    settled = true;
+    log(`blocking send: ${errorMessage}`);
+    try {
+      block(event, errorMessage);
+    } catch (e) {
+      log(`block threw: ${String(e)}`);
+    }
+  };
+
+  const onFailure = (reason: string): void => {
+    if (committedToEncrypt) {
+      blockSend(`PostGuard encryption failed: ${reason}`);
+    } else {
+      releaseSend(reason);
     }
   };
 
@@ -540,95 +579,122 @@ function onMessageSendHandler(event: Office.AddinCommands.Event): void {
     // header is seeded from the mailbox-wide default by
     // OnNewMessageCompose and updated by the compose toggle. We only
     // run the encryption path when the header says "true" — anything
-    // else (false, absent, read failure) releases the send.
+    // else (false, absent, read failure) releases the send so a
+    // PostGuard outage cannot block an unencrypted email from going
+    // out. Once we *have* seen "true", encryption is non-negotiable.
     item.internetHeaders.getAsync(
       [HEADER_ENCRYPT_ON_SEND, HEADER_ENCRYPTED_RECIPIENTS],
       (hdrRes) => {
-        if (released) return;
+        if (settled) return;
 
-        if (hdrRes.status !== Office.AsyncResultStatus.Succeeded) {
-          releaseSend(`header read failed (status=${hdrRes.status})`);
-          return;
-        }
+        try {
+          if (hdrRes.status !== Office.AsyncResultStatus.Succeeded) {
+            releaseSend(`header read failed (status=${hdrRes.status})`);
+            return;
+          }
 
-        const encryptHeader = hdrRes.value[HEADER_ENCRYPT_ON_SEND];
-        if (encryptHeader !== "true") {
-          releaseSend(`x-pg-encrypt-on-send=${encryptHeader ?? "<absent>"}`);
-          return;
-        }
+          const encryptHeader = hdrRes.value[HEADER_ENCRYPT_ON_SEND];
+          if (encryptHeader !== "true") {
+            releaseSend(`x-pg-encrypt-on-send=${encryptHeader ?? "<absent>"}`);
+            return;
+          }
 
-        // Header says "true" — proceed with the (potentially slow)
-        // encryption flow. Arm the fallback timer only now, so the
-        // off-path never pays for it.
-        const cancelTimeout = allowAfterTimeout(event);
-        const stampedRecipients = hdrRes.value[HEADER_ENCRYPTED_RECIPIENTS] ?? "";
-
-        item.getAttachmentsAsync(async (attRes) => {
-          log(`getAttachmentsAsync status=${attRes.status}`);
-          const attachments =
-            attRes.status === Office.AsyncResultStatus.Succeeded ? attRes.value : [];
-          const alreadyEncrypted = attachments.some(
-            (a) => a.name?.toLowerCase() === POSTGUARD_ENCRYPTED_FILENAME
+          // From this point on, the user has explicitly asked for this
+          // message to be encrypted. Any error must block the send.
+          committedToEncrypt = true;
+          const cancelTimeout = blockAfterTimeout(event, () =>
+            blockSend(
+              "PostGuard encryption did not finish in time. The message was NOT sent. " +
+                "Try again, or turn PostGuard off in the taskpane to send this message unencrypted."
+            )
           );
-          log(`alreadyEncrypted=${alreadyEncrypted} (${attachments.length} attachments)`);
+          const stampedRecipients = hdrRes.value[HEADER_ENCRYPTED_RECIPIENTS] ?? "";
 
-          const [to, cc] = await Promise.all([
-            getRecipientsAsync(item.to),
-            getRecipientsAsync(item.cc),
-          ]);
-
-          if (!alreadyEncrypted) {
-            if (to.length + cc.length === 0) {
-              cancelTimeout();
-              block(event, "Add at least one recipient before sending.");
-              return;
-            }
-
-            // Outlook for Mac (native WKWebView) rejects displayDialogAsync
-            // from the launchevent runtime with E_FAIL regardless of options
-            // or sizing. Tracked upstream at office-js#6677; related stale
-            // reports are #3138, #3085, and #5681. Until Microsoft restores
-            // working dialog support, deflect Mac users to the manual
-            // taskpane "Encrypt & Send" button (which uses the dialog API
-            // from the taskpane runtime, where it works). Note: this only
-            // fires when the message is *not* already encrypted — once the
-            // user has clicked Encrypt & Send in the taskpane and we see
-            // the postguard.encrypted attachment, we fall through to the
-            // standard allow-send path. Remove this branch when 6677 ships.
-            if (Office.context.platform === Office.PlatformType.Mac) {
-              log("Outlook for Mac detected; deferring to taskpane flow");
-              cancelTimeout();
-              block(event, MAC_NOT_SUPPORTED_MESSAGE);
-              return;
-            }
-
+          item.getAttachmentsAsync(async (attRes) => {
+            // Inner guard: anything that throws (or any async rejection
+            // we forgot to handle) inside this async callback must
+            // route to blockSend, not bubble up as an unhandled rejection
+            // that lets the Smart Alert timer eventually release the
+            // send. We're past the committedToEncrypt point.
             try {
-              await encryptAndApply(event, item, to, cc, attachments);
+              log(`getAttachmentsAsync status=${attRes.status}`);
+              const attachments =
+                attRes.status === Office.AsyncResultStatus.Succeeded ? attRes.value : [];
+              const alreadyEncrypted = attachments.some(
+                (a) => a.name?.toLowerCase() === POSTGUARD_ENCRYPTED_FILENAME
+              );
+              log(`alreadyEncrypted=${alreadyEncrypted} (${attachments.length} attachments)`);
+
+              const [to, cc] = await Promise.all([
+                getRecipientsAsync(item.to),
+                getRecipientsAsync(item.cc),
+              ]);
+
+              if (!alreadyEncrypted) {
+                if (to.length + cc.length === 0) {
+                  cancelTimeout();
+                  blockSend("Add at least one recipient before sending.");
+                  return;
+                }
+
+                // Outlook for Mac (native WKWebView) rejects displayDialogAsync
+                // from the launchevent runtime with E_FAIL regardless of options
+                // or sizing. Tracked upstream at office-js#6677; related stale
+                // reports are #3138, #3085, and #5681. Until Microsoft restores
+                // working dialog support, deflect Mac users to the manual
+                // taskpane "Encrypt & Send" button (which uses the dialog API
+                // from the taskpane runtime, where it works). Note: this only
+                // fires when the message is *not* already encrypted — once the
+                // user has clicked Encrypt & Send in the taskpane and we see
+                // the postguard.encrypted attachment, we fall through to the
+                // standard allow-send path. Remove this branch when 6677 ships.
+                if (Office.context.platform === Office.PlatformType.Mac) {
+                  log("Outlook for Mac detected; deferring to taskpane flow");
+                  cancelTimeout();
+                  blockSend(MAC_NOT_SUPPORTED_MESSAGE);
+                  return;
+                }
+
+                try {
+                  await encryptAndApply(event, item, to, cc, attachments);
+                  cancelTimeout();
+                  if (!settled) {
+                    settled = true;
+                    event.completed({ allowEvent: true });
+                  }
+                } catch (e) {
+                  cancelTimeout();
+                  blockSend(`PostGuard encryption failed: ${stringifyError(e)}`);
+                }
+                return;
+              }
+
+              // Verify the encryption matches the message's current To+Cc list.
+              const currentKey = recipientsKey([...to, ...cc]);
+              const stale = stampedRecipients === "" || currentKey !== stampedRecipients;
+              log(`stamped=${stampedRecipients || "<empty>"} current=${currentKey} stale=${stale}`);
+
               cancelTimeout();
-              event.completed({ allowEvent: true });
+              if (stale) {
+                blockSend(STALE_ENCRYPTION_MESSAGE);
+                return;
+              }
+              if (!settled) {
+                settled = true;
+                event.completed({ allowEvent: true });
+              }
             } catch (e) {
               cancelTimeout();
-              block(event, `Encryption failed: ${stringifyError(e)}`);
+              blockSend(`PostGuard encryption failed: ${stringifyError(e)}`);
             }
-            return;
-          }
-
-          // Verify the encryption matches the message's current To+Cc list.
-          const currentKey = recipientsKey([...to, ...cc]);
-          const stale = stampedRecipients === "" || currentKey !== stampedRecipients;
-          log(`stamped=${stampedRecipients || "<empty>"} current=${currentKey} stale=${stale}`);
-
-          cancelTimeout();
-          if (stale) {
-            block(event, STALE_ENCRYPTION_MESSAGE);
-            return;
-          }
-          event.completed({ allowEvent: true });
-        });
+          });
+        } catch (e) {
+          onFailure(`unexpected error after header read: ${stringifyError(e)}`);
+        }
       }
     );
   } catch (e) {
-    releaseSend(`unexpected error in handler: ${stringifyError(e)}`);
+    onFailure(`unexpected error before main flow: ${stringifyError(e)}`);
   }
 }
 
