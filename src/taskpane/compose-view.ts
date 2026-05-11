@@ -18,6 +18,7 @@ import {
   getItemHeaders,
   getSenderEmail,
   showNotification,
+  removeNotification,
 } from "../lib/office-helpers";
 import { toBase64 } from "../lib/encoding";
 import { EMAIL_ATTRIBUTE_TYPE } from "../lib/attributes";
@@ -128,20 +129,25 @@ const state: ComposeState = {
   encryptedRecipientsHeader: null,
 };
 
-// Single notification key for the encryption-status banner. Reusing the
-// same key means replaceAsync swaps the message in place instead of
-// stacking two banners.
+// Single notification key for the encryption-status banner.
 const ENCRYPTION_STATUS_NOTIFICATION_KEY = "postguard-encryption-status";
 
 // Show the persistent in-message banner that mirrors the toggle. The
 // taskpane is not always open while the user composes, so this banner is
 // the user-visible "PostGuard is on/off" indicator on the message itself.
-// Best-effort — a notificationMessages failure shouldn't break compose.
+//
+// Implementation note: new Outlook's notificationMessages.replaceAsync
+// silently no-ops in compose mode when called with the same key — the
+// callback reports success but the visible banner text doesn't change.
+// Remove the existing entry first and then add the new one so the
+// renderer actually re-paints. Best-effort throughout; a
+// notificationMessages failure shouldn't break compose.
 async function syncEncryptionBanner(): Promise<void> {
   try {
     const message = state.encrypt
       ? t("composeEncryptionOnBanner")
       : t("composeEncryptionOffBanner");
+    await removeNotification(ENCRYPTION_STATUS_NOTIFICATION_KEY);
     await showNotification(ENCRYPTION_STATUS_NOTIFICATION_KEY, message, { persistent: true });
   } catch (_e) {
     // ignore

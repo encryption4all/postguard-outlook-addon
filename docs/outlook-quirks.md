@@ -226,6 +226,16 @@ base64 ciphertext block) the server-side commit can take long enough to look
 like a hang. Either trim the body before setAsync, or call `saveAsync` after
 to surface the wait inside the taskpane's "Saving…" UI rather than at Send.
 
+### `notificationMessages.replaceAsync` silently no-ops on the same key
+
+In new Outlook compose mode, calling `replaceAsync(key, details)` on an
+existing persistent notification reports `Succeeded` but the rendered
+banner text doesn't change — the user keeps seeing the old message.
+`removeAsync(key)` followed by `replaceAsync(key, …)` (or `addAsync`)
+forces a re-paint. We hit this when swapping the "PostGuard is on"
+banner to "PostGuard is off" as the user toggles encryption in the
+taskpane.
+
 ---
 
 ## Display & rendering
