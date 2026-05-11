@@ -25,11 +25,7 @@ import { EMAIL_ATTRIBUTE_TYPE } from "../lib/attributes";
 import { Policy, MimeAttachment } from "../lib/types";
 import { PKG_URL, CRYPTIFY_URL, POSTGUARD_WEBSITE_URL, clientHeaders } from "../lib/pkg-client";
 import { POSTGUARD_ENCRYPTED_FILENAME } from "../lib/mime";
-import {
-  buildSignAttributes,
-  getEncryptionEnabled,
-  setEncryptionEnabled,
-} from "../lib/settings";
+import { buildSignAttributes, getEncryptionEnabled } from "../lib/settings";
 import { t } from "../lib/i18n";
 import { mountPolicyPanel } from "./policy-editor";
 import { showView, setStatus, showError } from "./taskpane";
@@ -38,6 +34,12 @@ const ADDIN_VERSION = "0.1.0";
 
 // Internet-header keys shared with the OnMessageSend handler. Custom header
 // names must be x-prefixed.
+//
+// Per-draft "encrypt this message on send" flag. This header is the
+// single source of truth at send time — the OnMessageSend handler only
+// runs the encryption flow when it reads "true" here, so the user's
+// global Encryption setting only acts as the default that
+// OnNewMessageCompose seeds onto each new draft.
 const HEADER_ENCRYPT_ON_SEND = "x-pg-encrypt-on-send";
 // Comma-joined sorted list of lowercase To+Cc emails captured at encrypt
 // time. The handler compares this against the message's current recipients
@@ -54,17 +56,14 @@ const POSTGUARD_VERSION = "0.1.0";
 
 async function persistEncryptOnSend(value: boolean): Promise<void> {
   try {
-    // saveItem() before and after the header write: the first ensures the
-    // draft has an itemId, the second flushes the header change to the
-    // server so the OnMessageSend handler sees it.
-    //
-    // Always write an explicit "true" or "false" — if we removed the
-    // header for the off state, a draft the user explicitly toggled off
-    // would reopen as default-on (since "absent" means "no choice yet").
+    // saveItem() before and after the header write: the first ensures
+    // the draft has an itemId, the second flushes the header change to
+    // the server so the OnMessageSend handler sees it. The header is
+    // always set to an explicit "true" or "false" so the send-side
+    // handler never has to fall back to anything else.
     await saveItem();
     await setItemHeaders({ [HEADER_ENCRYPT_ON_SEND]: value ? "true" : "false" });
     await saveItem();
-
     console.log(`[pg] persisted encryptOnSend=${value}`);
   } catch (e) {
     console.error(`[pg] failed to persist encryptOnSend:`, e);
@@ -187,13 +186,12 @@ export async function mountComposeView(): Promise<void> {
 
   toggle.addEventListener("change", () => {
     state.encrypt = toggle.checked;
-    // The toggle is the global control: write the per-draft header so the
-    // OnMessageSend handler agrees with what the user sees, AND write the
-    // mailbox-wide default so future new drafts open in the same state.
+    // Write the per-draft header. The OnMessageSend handler reads only
+    // this header — never the global setting — so a PostGuard outage
+    // can never block an unencrypted send. The global Encryption
+    // setting in the Settings view changes only the default for new
+    // drafts (seeded by OnNewMessageCompose).
     void persistEncryptOnSend(state.encrypt);
-    void setEncryptionEnabled(state.encrypt).catch((err) => {
-      console.error("[pg-compose] failed to persist global encryption setting:", err);
-    });
     void syncEncryptionBanner();
     renderToggleUI();
     renderPolicyPanels();
@@ -217,15 +215,10 @@ export async function mountComposeView(): Promise<void> {
     showView("compose");
   });
 
-  // Restore the toggle state from the per-draft header so a soft-block
-  // round trip or a taskpane reopen doesn't lose the user's choice.
-  // The header has three states:
-  //   "true"  → user explicitly enabled on this draft
-  //   "false" → user explicitly disabled on this draft
-  //   absent  → never interacted; fall back to the mailbox-wide default
-  //             (off unless the user enabled it globally). Persist the
-  //             current intent so the OnMessageSend handler sees the
-  //             same state the toggle visually shows.
+  // The per-draft header is authoritative. OnNewMessageCompose seeds
+  // it from the mailbox-wide default on compose open, but the user may
+  // have opened the taskpane before OnNewMessageCompose ran (or on a
+  // draft that predates it), so seed here too if missing.
   try {
     const headers = await getItemHeaders([HEADER_ENCRYPT_ON_SEND]);
     const v = headers[HEADER_ENCRYPT_ON_SEND];
@@ -238,7 +231,8 @@ export async function mountComposeView(): Promise<void> {
       void persistEncryptOnSend(state.encrypt);
     }
   } catch (_e) {
-    // Header read failed — fall back to the mailbox-wide default.
+    // Header read failed — fall back to the mailbox-wide default; the
+    // user can still flip the toggle which will write the header.
     state.encrypt = getEncryptionEnabled();
   }
 

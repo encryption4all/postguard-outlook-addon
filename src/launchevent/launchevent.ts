@@ -28,6 +28,12 @@ import { t } from "../lib/i18n";
 
 const ENCRYPTION_STATUS_NOTIFICATION_KEY = "postguard-encryption-status";
 
+// Per-draft "is this email going to be encrypted on send" flag. Written
+// by the taskpane's compose toggle and seeded from the mailbox-wide
+// default by OnNewMessageCompose, so by the time OnMessageSend fires
+// the header reflects the user's explicit intent for *this* message.
+// The OnMessageSend handler reads only this header — never the global
+// setting — so a PostGuard outage can never block an unencrypted send.
 const HEADER_ENCRYPT_ON_SEND = "x-pg-encrypt-on-send";
 const HEADER_ENCRYPTED_RECIPIENTS = "x-pg-encrypted-recipients";
 const HEADER_POSTGUARD = "x-postguard";
@@ -505,127 +511,151 @@ async function encryptAndApply(
 }
 
 function onMessageSendHandler(event: Office.AddinCommands.Event): void {
-  log("onMessageSendHandler invoked");
-  const cancelTimeout = allowAfterTimeout(event);
-
-  const item = Office.context.mailbox.item as Office.MessageCompose;
-  if (!item) {
-    log("no mailbox item; allowing");
-    cancelTimeout();
-    event.completed({ allowEvent: true });
-    return;
-  }
-
-  item.internetHeaders.getAsync([HEADER_ENCRYPT_ON_SEND, HEADER_ENCRYPTED_RECIPIENTS], (hdrRes) => {
-    log(`internetHeaders.getAsync status=${hdrRes.status}`);
-    if (hdrRes.status !== Office.AsyncResultStatus.Succeeded) {
-      cancelTimeout();
+  // Outer guard: any unexpected failure in this handler must NOT block
+  // the send. If PostGuard is off (or anything goes wrong reading state),
+  // we release the send immediately so a broken add-in can never stop
+  // an unencrypted email from going out.
+  let released = false;
+  const releaseSend = (reason: string): void => {
+    if (released) return;
+    released = true;
+    log(`releasing send: ${reason}`);
+    try {
       event.completed({ allowEvent: true });
+    } catch (e) {
+      log(`event.completed threw on release: ${String(e)}`);
+    }
+  };
+
+  try {
+    log("onMessageSendHandler invoked");
+
+    const item = Office.context.mailbox.item as Office.MessageCompose | undefined;
+    if (!item || !item.internetHeaders) {
+      releaseSend("no compose item / no internetHeaders");
       return;
     }
 
-    // Per-draft header overrides the mailbox-wide default. "true"/"false"
-    // both mean the user toggled this specific draft explicitly; only when
-    // the header is absent do we fall back to the global setting (which
-    // defaults to off — see settings.ts).
-    const headerVal = hdrRes.value[HEADER_ENCRYPT_ON_SEND];
-    let encryptRequested: boolean;
-    if (headerVal === "true") {
-      encryptRequested = true;
-    } else if (headerVal === "false") {
-      encryptRequested = false;
-    } else {
-      encryptRequested = getEncryptionEnabled();
-    }
-    log(`encryptRequested=${encryptRequested} (header=${headerVal ?? "<absent>"})`);
-    if (!encryptRequested) {
-      cancelTimeout();
-      event.completed({ allowEvent: true });
-      return;
-    }
+    // Single source of truth at send time: the per-draft header. The
+    // header is seeded from the mailbox-wide default by
+    // OnNewMessageCompose and updated by the compose toggle. We only
+    // run the encryption path when the header says "true" — anything
+    // else (false, absent, read failure) releases the send.
+    item.internetHeaders.getAsync(
+      [HEADER_ENCRYPT_ON_SEND, HEADER_ENCRYPTED_RECIPIENTS],
+      (hdrRes) => {
+        if (released) return;
 
-    const stampedRecipients = hdrRes.value[HEADER_ENCRYPTED_RECIPIENTS] ?? "";
-
-    item.getAttachmentsAsync(async (attRes) => {
-      log(`getAttachmentsAsync status=${attRes.status}`);
-      const attachments = attRes.status === Office.AsyncResultStatus.Succeeded ? attRes.value : [];
-      const alreadyEncrypted = attachments.some(
-        (a) => a.name?.toLowerCase() === POSTGUARD_ENCRYPTED_FILENAME
-      );
-      log(`alreadyEncrypted=${alreadyEncrypted} (${attachments.length} attachments)`);
-
-      const [to, cc] = await Promise.all([
-        getRecipientsAsync(item.to),
-        getRecipientsAsync(item.cc),
-      ]);
-
-      if (!alreadyEncrypted) {
-        if (to.length + cc.length === 0) {
-          cancelTimeout();
-          block(event, "Add at least one recipient before sending.");
+        if (hdrRes.status !== Office.AsyncResultStatus.Succeeded) {
+          releaseSend(`header read failed (status=${hdrRes.status})`);
           return;
         }
 
-        // Outlook for Mac (native WKWebView) rejects displayDialogAsync
-        // from the launchevent runtime with E_FAIL regardless of options
-        // or sizing. Tracked upstream at office-js#6677; related stale
-        // reports are #3138, #3085, and #5681. Until Microsoft restores
-        // working dialog support, deflect Mac users to the manual
-        // taskpane "Encrypt & Send" button (which uses the dialog API
-        // from the taskpane runtime, where it works). Note: this only
-        // fires when the message is *not* already encrypted — once the
-        // user has clicked Encrypt & Send in the taskpane and we see
-        // the postguard.encrypted attachment, we fall through to the
-        // standard allow-send path. Remove this branch when 6677 ships.
-        if (Office.context.platform === Office.PlatformType.Mac) {
-          log("Outlook for Mac detected; deferring to taskpane flow");
-          cancelTimeout();
-          block(event, MAC_NOT_SUPPORTED_MESSAGE);
+        const encryptHeader = hdrRes.value[HEADER_ENCRYPT_ON_SEND];
+        if (encryptHeader !== "true") {
+          releaseSend(`x-pg-encrypt-on-send=${encryptHeader ?? "<absent>"}`);
           return;
         }
 
-        try {
-          await encryptAndApply(event, item, to, cc, attachments);
+        // Header says "true" — proceed with the (potentially slow)
+        // encryption flow. Arm the fallback timer only now, so the
+        // off-path never pays for it.
+        const cancelTimeout = allowAfterTimeout(event);
+        const stampedRecipients = hdrRes.value[HEADER_ENCRYPTED_RECIPIENTS] ?? "";
+
+        item.getAttachmentsAsync(async (attRes) => {
+          log(`getAttachmentsAsync status=${attRes.status}`);
+          const attachments =
+            attRes.status === Office.AsyncResultStatus.Succeeded ? attRes.value : [];
+          const alreadyEncrypted = attachments.some(
+            (a) => a.name?.toLowerCase() === POSTGUARD_ENCRYPTED_FILENAME
+          );
+          log(`alreadyEncrypted=${alreadyEncrypted} (${attachments.length} attachments)`);
+
+          const [to, cc] = await Promise.all([
+            getRecipientsAsync(item.to),
+            getRecipientsAsync(item.cc),
+          ]);
+
+          if (!alreadyEncrypted) {
+            if (to.length + cc.length === 0) {
+              cancelTimeout();
+              block(event, "Add at least one recipient before sending.");
+              return;
+            }
+
+            // Outlook for Mac (native WKWebView) rejects displayDialogAsync
+            // from the launchevent runtime with E_FAIL regardless of options
+            // or sizing. Tracked upstream at office-js#6677; related stale
+            // reports are #3138, #3085, and #5681. Until Microsoft restores
+            // working dialog support, deflect Mac users to the manual
+            // taskpane "Encrypt & Send" button (which uses the dialog API
+            // from the taskpane runtime, where it works). Note: this only
+            // fires when the message is *not* already encrypted — once the
+            // user has clicked Encrypt & Send in the taskpane and we see
+            // the postguard.encrypted attachment, we fall through to the
+            // standard allow-send path. Remove this branch when 6677 ships.
+            if (Office.context.platform === Office.PlatformType.Mac) {
+              log("Outlook for Mac detected; deferring to taskpane flow");
+              cancelTimeout();
+              block(event, MAC_NOT_SUPPORTED_MESSAGE);
+              return;
+            }
+
+            try {
+              await encryptAndApply(event, item, to, cc, attachments);
+              cancelTimeout();
+              event.completed({ allowEvent: true });
+            } catch (e) {
+              cancelTimeout();
+              block(event, `Encryption failed: ${stringifyError(e)}`);
+            }
+            return;
+          }
+
+          // Verify the encryption matches the message's current To+Cc list.
+          const currentKey = recipientsKey([...to, ...cc]);
+          const stale = stampedRecipients === "" || currentKey !== stampedRecipients;
+          log(`stamped=${stampedRecipients || "<empty>"} current=${currentKey} stale=${stale}`);
+
           cancelTimeout();
+          if (stale) {
+            block(event, STALE_ENCRYPTION_MESSAGE);
+            return;
+          }
           event.completed({ allowEvent: true });
-        } catch (e) {
-          cancelTimeout();
-          block(event, `Encryption failed: ${stringifyError(e)}`);
-        }
-        return;
+        });
       }
-
-      // Verify the encryption matches the message's current To+Cc list.
-      const currentKey = recipientsKey([...to, ...cc]);
-      const stale = stampedRecipients === "" || currentKey !== stampedRecipients;
-      log(`stamped=${stampedRecipients || "<empty>"} current=${currentKey} stale=${stale}`);
-
-      cancelTimeout();
-      if (stale) {
-        block(event, STALE_ENCRYPTION_MESSAGE);
-        return;
-      }
-      event.completed({ allowEvent: true });
-    });
-  });
+    );
+  } catch (e) {
+    releaseSend(`unexpected error in handler: ${stringifyError(e)}`);
+  }
 }
 
 // OnNewMessageCompose handler. Fires when the user opens a new message,
 // reply, or forward — independent of whether the user has clicked the
-// PostGuard ribbon button. We use it to set the "PostGuard is on/off"
-// notification banner at compose-open time so the user always sees
-// whether the next send will be encrypted, before the taskpane is open.
-//
-// Decision order matches OnMessageSend so the banner and the actual
-// behavior never disagree: per-draft header wins, otherwise fall back
-// to the mailbox-wide setting (default off).
+// PostGuard ribbon button. Two jobs:
+//   1. Seed the per-draft x-pg-encrypt-on-send header from the
+//      mailbox-wide default if it isn't already set. This makes the
+//      header the single source of truth for the OnMessageSend handler
+//      while still letting the user pick a default in Settings.
+//   2. Set the persistent in-message "PostGuard is on/off" banner so
+//      the user always sees the current state of this specific draft,
+//      even before opening the taskpane.
 function onNewMessageComposeHandler(event: Office.AddinCommands.Event): void {
   log("onNewMessageComposeHandler invoked");
   const item = Office.context.mailbox.item as Office.MessageCompose | undefined;
-  if (!item || !item.notificationMessages) {
-    log("no compose item or notificationMessages; completing");
+  if (!item || !item.notificationMessages || !item.internetHeaders) {
+    log("no compose item / notificationMessages / internetHeaders; completing");
     event.completed();
     return;
+  }
+
+  let globalDefault = false;
+  try {
+    globalDefault = getEncryptionEnabled();
+  } catch (e) {
+    log(`failed to read encryption setting; assuming off: ${stringifyError(e)}`);
   }
 
   const applyBanner = (encryptOn: boolean): void => {
@@ -654,15 +684,35 @@ function onNewMessageComposeHandler(event: Office.AddinCommands.Event): void {
 
   item.internetHeaders.getAsync([HEADER_ENCRYPT_ON_SEND], (hdrRes) => {
     let encryptOn: boolean;
+    let needsSeed = false;
     if (hdrRes.status === Office.AsyncResultStatus.Succeeded) {
       const v = hdrRes.value[HEADER_ENCRYPT_ON_SEND];
-      if (v === "true") encryptOn = true;
-      else if (v === "false") encryptOn = false;
-      else encryptOn = getEncryptionEnabled();
+      if (v === "true") {
+        encryptOn = true;
+      } else if (v === "false") {
+        encryptOn = false;
+      } else {
+        encryptOn = globalDefault;
+        needsSeed = true;
+      }
     } else {
-      encryptOn = getEncryptionEnabled();
+      // Header read failed — don't write anything, just paint the
+      // banner from the global default. The toggle in the taskpane
+      // can still write the header explicitly later.
+      encryptOn = globalDefault;
     }
-    applyBanner(encryptOn);
+    log(`encryptOn=${encryptOn} (header=${hdrRes.value?.[HEADER_ENCRYPT_ON_SEND] ?? "<absent>"})`);
+
+    if (!needsSeed) {
+      applyBanner(encryptOn);
+      return;
+    }
+    // Seed the header so OnMessageSend has a definite per-draft answer
+    // even if the user never opens the taskpane. Best-effort: if the
+    // write fails we still show the banner so the user sees the state.
+    item.internetHeaders.setAsync({ [HEADER_ENCRYPT_ON_SEND]: encryptOn ? "true" : "false" }, () => {
+      applyBanner(encryptOn);
+    });
   });
 }
 
