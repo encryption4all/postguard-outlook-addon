@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.3.0](https://github.com/encryption4all/postguard-outlook-addon/compare/v0.2.0...v0.3.0) (2026-05-11)
+
+
+### Features
+
+* **compose:** default encryption off and add global toggle + status banner ([2685299](https://github.com/encryption4all/postguard-outlook-addon/commit/2685299aba05520a69d507fd96e9274de847268c))
+* **compose:** per-draft x-pg-encrypt-on-send is the send-time authority ([79a93f6](https://github.com/encryption4all/postguard-outlook-addon/commit/79a93f666744442129e20cd135438b51a37a7470))
+* **launchevent:** set status banner on compose open via OnNewMessageCompose ([b640ab8](https://github.com/encryption4all/postguard-outlook-addon/commit/b640ab88b6aa0e4dacdfb4e3e8b28d6fefc24bd5))
+
+
+### Bug Fixes
+
+* **compose:** force-repaint status banner via remove + replace ([f6a1e08](https://github.com/encryption4all/postguard-outlook-addon/commit/f6a1e082b8a2140018a2973f1d126dc7dcbf605a))
+* **launchevent:** address dobby review on PR [#67](https://github.com/encryption4all/postguard-outlook-addon/issues/67) ([f0d968d](https://github.com/encryption4all/postguard-outlook-addon/commit/f0d968d42b1d401a40928bc726ba7dfab97104c5))
+* **launchevent:** block the send on any failure once encryption is committed ([9cf7adc](https://github.com/encryption4all/postguard-outlook-addon/commit/9cf7adc9a3290a9dc3f462e9181a61c5516b5d31))
+
 ## [0.2.0](https://github.com/encryption4all/postguard-outlook-addon/compare/v0.1.6...v0.2.0) (2026-05-10)
 
 
