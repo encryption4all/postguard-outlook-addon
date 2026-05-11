@@ -24,6 +24,9 @@ import {
   getEncryptionEnabled,
 } from "../lib/settings";
 import { stringifyError } from "../lib/stringify-error";
+import { t } from "../lib/i18n";
+
+const ENCRYPTION_STATUS_NOTIFICATION_KEY = "postguard-encryption-status";
 
 const HEADER_ENCRYPT_ON_SEND = "x-pg-encrypt-on-send";
 const HEADER_ENCRYPTED_RECIPIENTS = "x-pg-encrypted-recipients";
@@ -607,9 +610,66 @@ function onMessageSendHandler(event: Office.AddinCommands.Event): void {
   });
 }
 
+// OnNewMessageCompose handler. Fires when the user opens a new message,
+// reply, or forward — independent of whether the user has clicked the
+// PostGuard ribbon button. We use it to set the "PostGuard is on/off"
+// notification banner at compose-open time so the user always sees
+// whether the next send will be encrypted, before the taskpane is open.
+//
+// Decision order matches OnMessageSend so the banner and the actual
+// behavior never disagree: per-draft header wins, otherwise fall back
+// to the mailbox-wide setting (default off).
+function onNewMessageComposeHandler(event: Office.AddinCommands.Event): void {
+  log("onNewMessageComposeHandler invoked");
+  const item = Office.context.mailbox.item as Office.MessageCompose | undefined;
+  if (!item || !item.notificationMessages) {
+    log("no compose item or notificationMessages; completing");
+    event.completed();
+    return;
+  }
+
+  const applyBanner = (encryptOn: boolean): void => {
+    const messageText = encryptOn
+      ? t("composeEncryptionOnBanner")
+      : t("composeEncryptionOffBanner");
+    const details: Office.NotificationMessageDetails = {
+      type: Office.MailboxEnums.ItemNotificationMessageType.InformationalMessage,
+      message: messageText.slice(0, 150),
+      icon: "Icon.16x16",
+      persistent: true,
+    };
+    // Remove first, then add: replaceAsync silently no-ops on the same
+    // key in new Outlook compose mode (see docs/outlook-quirks.md).
+    item.notificationMessages.removeAsync(ENCRYPTION_STATUS_NOTIFICATION_KEY, () => {
+      item.notificationMessages.replaceAsync(
+        ENCRYPTION_STATUS_NOTIFICATION_KEY,
+        details,
+        () => {
+          log(`banner set: encryptOn=${encryptOn}`);
+          event.completed();
+        }
+      );
+    });
+  };
+
+  item.internetHeaders.getAsync([HEADER_ENCRYPT_ON_SEND], (hdrRes) => {
+    let encryptOn: boolean;
+    if (hdrRes.status === Office.AsyncResultStatus.Succeeded) {
+      const v = hdrRes.value[HEADER_ENCRYPT_ON_SEND];
+      if (v === "true") encryptOn = true;
+      else if (v === "false") encryptOn = false;
+      else encryptOn = getEncryptionEnabled();
+    } else {
+      encryptOn = getEncryptionEnabled();
+    }
+    applyBanner(encryptOn);
+  });
+}
+
 log("script loaded");
 Office.onReady((info) => {
   log(`Office.onReady fired; host=${info?.host} platform=${info?.platform}`);
   Office.actions.associate("onMessageSendHandler", onMessageSendHandler);
-  log("handler associated");
+  Office.actions.associate("onNewMessageComposeHandler", onNewMessageComposeHandler);
+  log("handlers associated");
 });
