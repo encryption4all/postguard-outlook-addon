@@ -84,11 +84,7 @@ function log(msg: string): void {
 //
 // 4½ min: Outlook's Smart Alerts hard-cap is 5 min, so we stay just
 // under. The user has that long to find their phone and scan the QR.
-function blockAfterTimeout(
-  event: Office.AddinCommands.Event,
-  onFire: () => void,
-  ms = 270000
-): () => void {
+function blockAfterTimeout(onFire: () => void, ms = 270000): () => void {
   const timer = setTimeout(() => {
     log(`fallback timeout (${ms}ms) reached; blocking the send`);
     onFire();
@@ -602,7 +598,7 @@ function onMessageSendHandler(event: Office.AddinCommands.Event): void {
           // From this point on, the user has explicitly asked for this
           // message to be encrypted. Any error must block the send.
           committedToEncrypt = true;
-          const cancelTimeout = blockAfterTimeout(event, () =>
+          const cancelTimeout = blockAfterTimeout(() =>
             blockSend(
               "PostGuard encryption did not finish in time. The message was NOT sent. " +
                 "Try again, or turn PostGuard off in the taskpane to send this message unencrypted."
@@ -737,48 +733,63 @@ function onNewMessageComposeHandler(event: Office.AddinCommands.Event): void {
     // Remove first, then add: replaceAsync silently no-ops on the same
     // key in new Outlook compose mode (see docs/outlook-quirks.md).
     item.notificationMessages.removeAsync(ENCRYPTION_STATUS_NOTIFICATION_KEY, () => {
-      item.notificationMessages.replaceAsync(
-        ENCRYPTION_STATUS_NOTIFICATION_KEY,
-        details,
-        () => {
-          log(`banner set: encryptOn=${encryptOn}`);
-          event.completed();
-        }
-      );
+      item.notificationMessages.replaceAsync(ENCRYPTION_STATUS_NOTIFICATION_KEY, details, () => {
+        log(`banner set: encryptOn=${encryptOn}`);
+        event.completed();
+      });
     });
   };
 
   item.internetHeaders.getAsync([HEADER_ENCRYPT_ON_SEND], (hdrRes) => {
-    let encryptOn: boolean;
-    let needsSeed = false;
+    let desired: boolean;
+    let needsSeed: boolean;
     if (hdrRes.status === Office.AsyncResultStatus.Succeeded) {
       const v = hdrRes.value[HEADER_ENCRYPT_ON_SEND];
       if (v === "true") {
-        encryptOn = true;
+        desired = true;
+        needsSeed = false;
       } else if (v === "false") {
-        encryptOn = false;
+        desired = false;
+        needsSeed = false;
       } else {
-        encryptOn = globalDefault;
+        desired = globalDefault;
         needsSeed = true;
       }
     } else {
-      // Header read failed — don't write anything, just paint the
-      // banner from the global default. The toggle in the taskpane
-      // can still write the header explicitly later.
-      encryptOn = globalDefault;
+      // Header read failed. We have no way to know whether a prior
+      // value already exists, so we still attempt to seed: if the write
+      // succeeds the banner and OnMessageSend agree on the new value;
+      // if it fails, we MUST paint "off" — anything else would be
+      // lying to the user, because OnMessageSend reads only the header
+      // and an unwritten/unreadable header releases the send in
+      // cleartext.
+      desired = globalDefault;
+      needsSeed = true;
     }
-    log(`encryptOn=${encryptOn} (header=${hdrRes.value?.[HEADER_ENCRYPT_ON_SEND] ?? "<absent>"})`);
+    log(
+      `desired=${desired} needsSeed=${needsSeed} ` +
+        `header=${hdrRes.value?.[HEADER_ENCRYPT_ON_SEND] ?? "<absent>"} ` +
+        `getStatus=${hdrRes.status}`
+    );
 
     if (!needsSeed) {
-      applyBanner(encryptOn);
+      applyBanner(desired);
       return;
     }
     // Seed the header so OnMessageSend has a definite per-draft answer
-    // even if the user never opens the taskpane. Best-effort: if the
-    // write fails we still show the banner so the user sees the state.
-    item.internetHeaders.setAsync({ [HEADER_ENCRYPT_ON_SEND]: encryptOn ? "true" : "false" }, () => {
-      applyBanner(encryptOn);
-    });
+    // even if the user never opens the taskpane. If the write fails,
+    // paint "off" so the banner cannot lie about what will happen on
+    // Send.
+    item.internetHeaders.setAsync(
+      { [HEADER_ENCRYPT_ON_SEND]: desired ? "true" : "false" },
+      (setRes) => {
+        const effective = setRes.status === Office.AsyncResultStatus.Succeeded ? desired : false;
+        if (effective !== desired) {
+          log(`header seed failed (status=${setRes.status}); painting banner as off`);
+        }
+        applyBanner(effective);
+      }
+    );
   });
 }
 
