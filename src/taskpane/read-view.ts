@@ -28,6 +28,7 @@ import {
 import { Badge, FriendlySender } from "../lib/types";
 import { PKG_URL, CRYPTIFY_URL, clientHeaders } from "../lib/pkg-client";
 import { t } from "../lib/i18n";
+import { stringifyError } from "../lib/stringify-error";
 import { showView, setStatus, showError } from "./taskpane";
 
 const ADDIN_VERSION = "0.1.0";
@@ -183,7 +184,8 @@ async function runDecryption(): Promise<void> {
     renderDecrypted(result.plaintext, result.sender);
     setStatus("");
   } catch (err) {
-    const message = err instanceof Error ? err.message : t("decryptionError");
+    const detail = stringifyError(err);
+    const message = detail || t("decryptionError");
     if (/KEM/i.test(message)) {
       showError(t("decryptionFailed"));
     } else {

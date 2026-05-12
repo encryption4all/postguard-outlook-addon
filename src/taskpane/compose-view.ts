@@ -27,6 +27,7 @@ import { PKG_URL, CRYPTIFY_URL, POSTGUARD_WEBSITE_URL, clientHeaders } from "../
 import { POSTGUARD_ENCRYPTED_FILENAME } from "../lib/mime";
 import { buildSignAttributes, getEncryptionEnabled } from "../lib/settings";
 import { t } from "../lib/i18n";
+import { stringifyError } from "../lib/stringify-error";
 import { mountPolicyPanel } from "./policy-editor";
 import { showView, setStatus, showError } from "./taskpane";
 
@@ -519,7 +520,8 @@ async function encryptAndPrepareSend(): Promise<void> {
       persistent: true,
     });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : t("encryptionError");
+    const detail = stringifyError(err);
+    const msg = detail || t("encryptionError");
     setStatus(msg, "error");
     showView("compose");
     showError(msg);

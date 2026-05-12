@@ -259,7 +259,7 @@ Office.onReady(() => {
       try {
         payload = JSON.parse(arg.message) as DialogMessage;
       } catch (e) {
-        log(`failed to parse parent message: ${String(e)}`);
+        log(`failed to parse parent message: ${stringifyError(e)}`);
         return;
       }
       if (isChunkMessage(payload)) {
