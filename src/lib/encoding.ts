@@ -21,10 +21,6 @@ export function fromBase64(b64: string): Uint8Array {
   return bytes;
 }
 
-export function utf8ToBytes(str: string): Uint8Array {
-  return new TextEncoder().encode(str);
-}
-
 export function bytesToUtf8(bytes: Uint8Array): string {
   return new TextDecoder("utf-8").decode(bytes);
 }
