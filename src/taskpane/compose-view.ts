@@ -27,6 +27,7 @@ import { PKG_URL, CRYPTIFY_URL, POSTGUARD_WEBSITE_URL, clientHeaders } from "../
 import { POSTGUARD_ENCRYPTED_FILENAME } from "../lib/mime";
 import { buildSignAttributes, getEncryptionEnabled } from "../lib/settings";
 import { t } from "../lib/i18n";
+import { stringifyError } from "../lib/stringify-error";
 import { mountPolicyPanel } from "./policy-editor";
 import { showView, setStatus, showError } from "./taskpane";
 
@@ -526,9 +527,7 @@ async function encryptAndPrepareSend(): Promise<void> {
     const msg =
       err instanceof UploadSessionExpiredError
         ? t("uploadSessionExpiredError")
-        : err instanceof Error
-          ? err.message
-          : t("encryptionError");
+        : stringifyError(err);
     setStatus(msg, "error");
     showView("compose");
     showError(msg);
