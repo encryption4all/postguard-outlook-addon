@@ -26,6 +26,9 @@ jobs:
       - name: Lint (no errors, no warnings)
         run: npx eslint -c eslint.config.mjs --max-warnings=0 "src/**/*.{ts,js}"
 
+      - name: Prettier (format check)
+        run: npx prettier --check "src/**/*.{ts,js}"
+
       - name: Typecheck
         run: npx tsc --noEmit
 
