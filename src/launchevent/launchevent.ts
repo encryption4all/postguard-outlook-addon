@@ -86,7 +86,7 @@ function encryptionFailureMessage(e: unknown): string {
     e !== null &&
     (e as { code?: unknown }).code === "upload_session_expired"
   ) {
-    return stringifyError(e);
+    return t("uploadSessionExpiredError");
   }
   return `PostGuard encryption failed: ${stringifyError(e)}`;
 }
