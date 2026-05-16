@@ -1,7 +1,7 @@
 // Compose-mode taskpane view: encryption toggle, policy editor entry points,
 // and the "Encrypt & Send" action that runs the SDK + Yivi flow inline.
 
-import { PostGuard, buildMime } from "@e4a/pg-js";
+import { PostGuard, buildMime, UploadSessionExpiredError } from "@e4a/pg-js";
 import {
   getRecipients,
   getSubject,
@@ -27,6 +27,7 @@ import { PKG_URL, CRYPTIFY_URL, POSTGUARD_WEBSITE_URL, clientHeaders } from "../
 import { POSTGUARD_ENCRYPTED_FILENAME } from "../lib/mime";
 import { buildSignAttributes, getEncryptionEnabled } from "../lib/settings";
 import { t } from "../lib/i18n";
+import { stringifyError } from "../lib/stringify-error";
 import { mountPolicyPanel } from "./policy-editor";
 import { showView, setStatus, showError } from "./taskpane";
 
@@ -519,7 +520,14 @@ async function encryptAndPrepareSend(): Promise<void> {
       persistent: true,
     });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : t("encryptionError");
+    // pg-js raises UploadSessionExpiredError when cryptify's structured
+    // 404 says the upload session is gone (TTL expired, server restart,
+    // unknown UUID, or wrong recovery_token). Show a clearer message
+    // instead of the raw pg-js diagnostic. See issue #82.
+    const msg =
+      err instanceof UploadSessionExpiredError
+        ? t("uploadSessionExpiredError")
+        : stringifyError(err);
     setStatus(msg, "error");
     showView("compose");
     showError(msg);
