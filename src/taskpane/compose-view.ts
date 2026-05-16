@@ -28,6 +28,11 @@ import { POSTGUARD_ENCRYPTED_FILENAME } from "../lib/mime";
 import { buildSignAttributes, getEncryptionEnabled } from "../lib/settings";
 import { t } from "../lib/i18n";
 import { stringifyError } from "../lib/stringify-error";
+import {
+  recordPendingUpload,
+  clearPendingUpload,
+  probeAndClearPendingUpload,
+} from "../lib/pending-upload";
 import { mountPolicyPanel } from "./policy-editor";
 import { showView, setStatus, showError } from "./taskpane";
 
@@ -169,6 +174,12 @@ function relevantStateString(): string {
 
 export async function mountComposeView(): Promise<void> {
   showView("compose");
+
+  // Probe any leftover recovery token from a prior interrupted send.
+  // Diagnostic only — pg-js 1.8.0 doesn't yet accept a pre-resumed
+  // FileState back into createEnvelope, so the probe just drops stale
+  // entries. See issue #82.
+  void probeAndClearPendingUpload("roaming", CRYPTIFY_URL).catch(() => undefined);
 
   const toggle = byId<HTMLInputElement>("pg-toggle-encrypt");
   const bccWarning = byId<HTMLElement>("pg-bcc-warning");
@@ -461,7 +472,10 @@ async function encryptAndPrepareSend(): Promise<void> {
       sealed,
       from: senderEmail,
       websiteUrl: POSTGUARD_WEBSITE_URL,
+      onUploadInit: (info: { uuid: string; recoveryToken: string }) =>
+        recordPendingUpload("roaming", info),
     } as never);
+    clearPendingUpload("roaming");
 
     await setSubject(envelope.subject);
     await setBody(envelope.htmlBody);

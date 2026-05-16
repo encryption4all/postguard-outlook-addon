@@ -13,6 +13,11 @@ import { toBase64, fromBase64 } from "../lib/encoding";
 import { PKG_URL, CRYPTIFY_URL, POSTGUARD_WEBSITE_URL } from "../lib/pkg-client";
 import { ChunkAssembler, chunkPayload, isChunkMessage, ChunkMessage } from "../lib/dialog-chunk";
 import { stringifyError } from "../lib/stringify-error";
+import {
+  recordPendingUpload,
+  clearPendingUpload,
+  probeAndClearPendingUpload,
+} from "../lib/pending-upload";
 
 const ADDIN_VERSION = "0.1.0";
 
@@ -171,7 +176,10 @@ async function runEncryption(req: EncryptRequest): Promise<EncryptResult> {
     sealed,
     from: req.senderEmail,
     websiteUrl: POSTGUARD_WEBSITE_URL,
+    onUploadInit: (info: { uuid: string; recoveryToken: string }) =>
+      recordPendingUpload("local", info),
   } as never);
+  clearPendingUpload("local");
 
   setSubtitle("Encrypting…");
   // pg-js 1.1.0+: envelope.attachment is null in tier 3 (the encrypted
@@ -236,6 +244,17 @@ function handlePayload(msg: DialogMessage): void {
 
 Office.onReady(() => {
   log("Office.onReady fired");
+
+  // If a previous send left a recovery token behind, probe cryptify to
+  // learn whether the session is still alive. pg-js 1.8.0 doesn't yet
+  // accept a pre-resumed FileState back into createEnvelope, so the
+  // probe is diagnostic: stale-session entries are dropped, live ones
+  // are reported in the log and cleared (the user has to resend).
+  void probeAndClearPendingUpload("local", CRYPTIFY_URL)
+    .then((uploaded) => {
+      if (uploaded !== null) log(`prior upload had ${uploaded} bytes on cryptify; entry cleared`);
+    })
+    .catch(() => undefined);
 
   // Show a hint in Safari pointing at the per-site popup setting.
   // Match Safari only — not WKWebView (Outlook for Mac), where no
