@@ -256,16 +256,73 @@ export async function mountComposeView(): Promise<void> {
 
   // Live recipient updates (Mailbox 1.7+). Without this the toggle UI is
   // stuck in whatever state the recipient lists were in at mount time.
+  //
+  // RecipientsChanged is the fast path but fires inconsistently: Outlook
+  // on the web debounces it, Outlook for Mac is reported to miss the
+  // autocomplete/paste/contact-picker paths, and rapid edits can race
+  // two in-flight refreshes against each other. Pair it with a
+  // poll-and-diff fallback so the Manage Access panel always catches up
+  // within ~1.5 s of any change. See issue #54.
   const item = Office.context.mailbox.item as Office.MessageCompose;
   item.addHandlerAsync(Office.EventType.RecipientsChanged, () => {
-    void (async () => {
+    void refreshAndRenderRecipients();
+  });
+  startRecipientPoll();
+}
+
+// Serialises refreshes so two RecipientsChanged events (or an event +
+// poll tick) can't interleave and leave state.recipients stale.
+let recipientRefreshInFlight: Promise<void> | null = null;
+async function refreshAndRenderRecipients(): Promise<void> {
+  if (recipientRefreshInFlight) {
+    await recipientRefreshInFlight;
+    return;
+  }
+  recipientRefreshInFlight = (async () => {
+    try {
       await refreshRecipients();
       renderToggleUI();
-      // Re-mount the manage panel so newly added/removed recipients show up
-      // (or disappear) without needing a taskpane reopen.
       renderPolicyPanels();
+    } finally {
+      recipientRefreshInFlight = null;
+    }
+  })();
+  await recipientRefreshInFlight;
+}
+
+let recipientPollStarted = false;
+function startRecipientPoll(): void {
+  if (recipientPollStarted) return;
+  recipientPollStarted = true;
+  const allRecipientsKey = (): string =>
+    [...state.recipients.to, ...state.recipients.cc, ...state.recipients.bcc]
+      .map((e) => e.toLowerCase().trim())
+      .filter(Boolean)
+      .sort()
+      .join(",");
+  let lastKey = allRecipientsKey();
+  setInterval(() => {
+    void (async () => {
+      try {
+        const [toR, ccR, bccR] = await Promise.all([
+          getRecipients("to"),
+          getRecipients("cc"),
+          getRecipients("bcc"),
+        ]);
+        const probe = [...toR, ...ccR, ...bccR]
+          .map((r) => r.emailAddress.toLowerCase().trim())
+          .filter(Boolean)
+          .sort()
+          .join(",");
+        if (probe !== lastKey) {
+          await refreshAndRenderRecipients();
+          lastKey = allRecipientsKey();
+        }
+      } catch (_e) {
+        // Best-effort — the event handler is still the primary path.
+      }
     })();
-  });
+  }, 1500);
 }
 
 function renderPolicyPanels(): void {
