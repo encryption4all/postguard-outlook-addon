@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.4.0](https://github.com/encryption4all/postguard-outlook-addon/compare/v0.3.0...v0.4.0) (2026-05-16)
+
+
+### Features
+
+* persist upload recoveryToken via pg-js onUploadInit ([c6baad5](https://github.com/encryption4all/postguard-outlook-addon/commit/c6baad5ecf9a3d2fe4d0d84947ea89a400a8c2e9))
+* persist upload recoveryToken via pg-js onUploadInit ([04af0a6](https://github.com/encryption4all/postguard-outlook-addon/commit/04af0a67a4dec200156c4e2fec1bfd77fbdf8a18))
+* surface UploadSessionExpiredError distinctly, bump pg-js to 1.7.0 ([9c0b01b](https://github.com/encryption4all/postguard-outlook-addon/commit/9c0b01b80944c6f36b331dba46dad5417a0b4289))
+* surface UploadSessionExpiredError distinctly, bump pg-js to 1.7.0 ([a0a51f2](https://github.com/encryption4all/postguard-outlook-addon/commit/a0a51f2b58810fe943177c8edff61699830eea01)), closes [#82](https://github.com/encryption4all/postguard-outlook-addon/issues/82)
+
+
+### Bug Fixes
+
+* localise upload-session-expired Smart Alert text ([e3dae43](https://github.com/encryption4all/postguard-outlook-addon/commit/e3dae432ed09b94d8dc0e3ee689c2e6d34b5056b))
+
 ## [0.3.0](https://github.com/encryption4all/postguard-outlook-addon/compare/v0.2.0...v0.3.0) (2026-05-11)
 
 

@@ -1,6 +1,6 @@
 {
   "name": "postguard-outlook-addin",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "description": "PostGuard end-to-end email encryption for Outlook (new Outlook on Windows + macOS).",
   "license": "MIT",
@@ -24,8 +24,8 @@
     "watch": "webpack --mode development --watch"
   },
   "dependencies": {
-    "@e4a/pg-js": "^1.6.0",
-    "@privacybydesign/yivi-css": "^1.0.0-beta.7",
+    "@e4a/pg-js": "^1.8.0",
+    "@privacybydesign/yivi-css": "^1.0.1",
     "core-js": "^3.49.0",
     "regenerator-runtime": "^0.14.1"
   },
@@ -36,8 +36,8 @@
     "@babel/core": "^7.29.0",
     "@babel/preset-env": "^7.29.5",
     "@babel/preset-typescript": "^7.28.5",
-    "@types/office-js": "^1.0.589",
-    "@types/office-runtime": "^1.0.36",
+    "@types/office-js": "^1.0.591",
+    "@types/office-runtime": "^1.0.37",
     "babel-loader": "^10.1.1",
     "copy-webpack-plugin": "^14.0.0",
     "dotenv": "^17.4.2",
@@ -57,7 +57,7 @@
     "typescript": "^6.0.3",
     "webpack": "^5.106.2",
     "webpack-cli": "^7.0.2",
-    "webpack-dev-server": "^5.2.3"
+    "webpack-dev-server": "^5.2.4"
   },
   "prettier": "office-addin-prettier-config",
   "browserslist": [

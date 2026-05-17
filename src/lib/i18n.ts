@@ -65,6 +65,8 @@ const en: Bundle = {
     "Decryption failed: the disclosed attributes did not match. Make sure you verify the correct email address in your Yivi app.",
   decryptionError: "Decryption failed. Please try again.",
   encryptionError: "Encryption failed. Please try again.",
+  uploadSessionExpiredError:
+    "The upload session expired before the file finished uploading. Please start a new send.",
   networkError: "Could not connect to PostGuard server. Check your network connection.",
   startupError:
     "PostGuard failed to initialize. Encryption and decryption will not work until the issue is resolved.",
@@ -157,6 +159,8 @@ const nl: Bundle = {
     "Ontsleutelen mislukt: de onthulde attributen kwamen niet overeen. Controleer of je in de Yivi-app het juiste e-mailadres gebruikt.",
   decryptionError: "Ontsleutelen mislukt. Probeer het opnieuw.",
   encryptionError: "Versleutelen mislukt. Probeer het opnieuw.",
+  uploadSessionExpiredError:
+    "De uploadsessie is verlopen voordat het bestand klaar was met uploaden. Begin opnieuw met verzenden.",
   networkError:
     "Kan geen verbinding maken met de PostGuard-server. Controleer je netwerkverbinding.",
   startupError:

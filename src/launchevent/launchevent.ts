@@ -75,6 +75,22 @@ function log(msg: string): void {
   console.log(`[pg-launchevent] ${msg}`);
 }
 
+// Build the Smart Alert text for a thrown encryption failure. The dialog
+// tags upload-session-expired rejections with `code: "upload_session_expired"`
+// (see runEncryptDialog's encrypt-error dispatch) so we can show the
+// dedicated message verbatim instead of burying it behind the generic
+// "PostGuard encryption failed:" prefix. See issue #82.
+function encryptionFailureMessage(e: unknown): string {
+  if (
+    typeof e === "object" &&
+    e !== null &&
+    (e as { code?: unknown }).code === "upload_session_expired"
+  ) {
+    return t("uploadSessionExpiredError");
+  }
+  return `PostGuard encryption failed: ${stringifyError(e)}`;
+}
+
 // Encryption-path watchdog. Once the user opts into encrypting this
 // message (x-pg-encrypt-on-send=true), we must never release the send
 // in cleartext — silently sending an unencrypted email that the user
@@ -363,7 +379,15 @@ async function runEncryptDialog(payload: DialogMessage): Promise<EncryptResult> 
                 : raw === undefined
                   ? "Encryption failed"
                   : stringifyError(raw);
-            reject(new Error(text));
+            const err = new Error(text);
+            // Propagate the upload-session-expired marker so the outer
+            // blockSend path can route to a dedicated Smart Alert message
+            // without the generic "PostGuard encryption failed:" prefix.
+            // See issue #82 / pg-js UploadSessionExpiredError.
+            if (body.code === "upload_session_expired") {
+              (err as Error & { code?: string }).code = "upload_session_expired";
+            }
+            reject(err);
           });
           break;
         case "cancelled":
@@ -659,7 +683,7 @@ function onMessageSendHandler(event: Office.AddinCommands.Event): void {
                   }
                 } catch (e) {
                   cancelTimeout();
-                  blockSend(`PostGuard encryption failed: ${stringifyError(e)}`);
+                  blockSend(encryptionFailureMessage(e));
                 }
                 return;
               }
@@ -680,7 +704,7 @@ function onMessageSendHandler(event: Office.AddinCommands.Event): void {
               }
             } catch (e) {
               cancelTimeout();
-              blockSend(`PostGuard encryption failed: ${stringifyError(e)}`);
+              blockSend(encryptionFailureMessage(e));
             }
           });
         } catch (e) {
