@@ -1,6 +1,8 @@
 // Promisified wrappers around the callback-based Office.js mailbox APIs.
 // All helpers reject if Office.js returns a non-succeeded AsyncResult.
 
+import { stringifyError } from "./stringify-error";
+
 function p<T>(fn: (cb: (r: Office.AsyncResult<T>) => void) => void): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     fn((res) => {
@@ -228,8 +230,8 @@ export async function getComposeFromAsync(item?: Office.MessageCompose): Promise
       const details = await p<Office.EmailAddressDetails>((cb) => from.getAsync(cb));
       const addr = details?.emailAddress?.toLowerCase().trim();
       if (addr) return addr;
-    } catch {
-      // Fall through to userProfile fallback.
+    } catch (e) {
+      console.warn(`getComposeFromAsync: item.from.getAsync failed: ${stringifyError(e)}`);
     }
   }
   return Office.context.mailbox.userProfile.emailAddress?.toLowerCase() ?? "";
