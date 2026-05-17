@@ -297,8 +297,22 @@ function renderPolicyPanels(): void {
           attrs.unshift({ t: EMAIL_ATTRIBUTE_TYPE, v: email });
         }
       }
+      // Re-render toggle/button so the encrypt button reflects validation
+      // (e.g. empty required-attribute values block encryption per #57).
+      renderToggleUI();
     },
   });
+}
+
+function hasMissingPolicyValues(policy: Policy): boolean {
+  for (const attrs of Object.values(policy)) {
+    for (const a of attrs) {
+      if (a.t === EMAIL_ATTRIBUTE_TYPE) continue;
+      if (a.optional) continue;
+      if (!a.v || a.v.trim().length === 0) return true;
+    }
+  }
+  return false;
 }
 
 function renderToggleUI(): void {
@@ -314,6 +328,7 @@ function renderToggleUI(): void {
 
   const hasRecipients = state.recipients.to.length + state.recipients.cc.length > 0;
   const bccPresent = state.recipients.bcc.length > 0;
+  const policyHasMissingValues = hasMissingPolicyValues(state.policy);
 
   // Re-encrypt mode: after a successful encryption, the button is only
   // useful if recipients/policy/sign attributes have drifted from what's
@@ -322,7 +337,14 @@ function renderToggleUI(): void {
   const needsReencrypt = state.encrypted && relevantStateString() !== state.encryptedSnapshot;
   btnEncryptSend.textContent = state.encrypted ? t("reencryptAndSend") : t("encryptAndSend");
   btnEncryptSend.disabled =
-    !state.encrypt || !hasRecipients || bccPresent || (state.encrypted && !needsReencrypt);
+    !state.encrypt ||
+    !hasRecipients ||
+    bccPresent ||
+    policyHasMissingValues ||
+    (state.encrypted && !needsReencrypt);
+  if (state.encrypt && policyHasMissingValues) {
+    setStatus(t("composePolicyValueMissing"), "error");
+  }
 
   // Sync the x-pg-encrypted-recipients header to the current state. It
   // should hold the recipient list when the encryption is current, and be
@@ -378,6 +400,9 @@ async function encryptAndPrepareSend(): Promise<void> {
     }
     if (state.recipients.to.length + state.recipients.cc.length === 0) {
       throw new Error(t("composeNoRecipients"));
+    }
+    if (hasMissingPolicyValues(state.policy)) {
+      throw new Error(t("composePolicyValueMissing"));
     }
 
     const senderEmail = getSenderEmail();

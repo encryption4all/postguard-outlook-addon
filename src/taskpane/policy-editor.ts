@@ -45,10 +45,12 @@ export function mountPolicyPanel(container: HTMLElement, opts: PolicyPanelOption
           ...extras.map((a) => ({ t: a.t, optional: true })),
         ];
       } else {
-        const valid = extras
-          .map((a) => ({ t: a.t, v: (a.v ?? "").trim() }))
-          .filter((a) => a.v.length > 0);
-        result[email] = [{ t: EMAIL_ATTRIBUTE_TYPE, v: email }, ...valid];
+        // Keep empty-valued rows in the policy so the compose view can
+        // surface them and block encryption. Previously these were silently
+        // filtered, which made the encrypt-time policy email-only without
+        // the user realising (#57).
+        const kept = extras.map((a) => ({ t: a.t, v: (a.v ?? "").trim() }));
+        result[email] = [{ t: EMAIL_ATTRIBUTE_TYPE, v: email }, ...kept];
       }
     }
     opts.onChange(result);
@@ -208,6 +210,19 @@ function renderAttrRow(
 
   const input = document.createElement("input");
   input.id = inputId;
+  const hint = document.createElement("div");
+  hint.className = "pg-policy-attr-hint";
+  hint.textContent = t(
+    "policyAttrValueMissingHint",
+    "Required attributes need a value. The recipient must disclose this exact value to decrypt."
+  );
+  hint.hidden = true;
+  const markMissing = () => {
+    const missing = (input.value ?? "").trim().length === 0;
+    input.classList.toggle("pg-policy-attr-missing", missing);
+    input.setAttribute("aria-invalid", missing ? "true" : "false");
+    hint.hidden = !missing;
+  };
 
   if (desc.type === "pbdf.gemeente.personalData.dateofbirth") {
     // Yivi stores DOB as DD-MM-YYYY but <input type="date"> uses YYYY-MM-DD.
@@ -217,6 +232,7 @@ function renderAttrRow(
     input.value = ddmmyyyyToHtml(attr.v ?? "");
     input.addEventListener("input", () => {
       attr.v = htmlToDdmmyyyy(input.value);
+      markMissing();
       fireChange();
     });
   } else if (desc.type === "pbdf.sidn-pbdf.mobilenumber.mobilenumber") {
@@ -228,6 +244,7 @@ function renderAttrRow(
     input.value = attr.v ?? "";
     input.addEventListener("input", () => {
       attr.v = input.value;
+      markMissing();
       fireChange();
     });
   } else {
@@ -235,9 +252,11 @@ function renderAttrRow(
     input.value = attr.v ?? "";
     input.addEventListener("input", () => {
       attr.v = input.value;
+      markMissing();
       fireChange();
     });
   }
+  markMissing();
 
   inputRow.appendChild(input);
 
@@ -256,6 +275,7 @@ function renderAttrRow(
   inputRow.appendChild(deleteBtn);
 
   row.appendChild(inputRow);
+  row.appendChild(hint);
   return row;
 }
 
