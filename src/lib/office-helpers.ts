@@ -217,6 +217,24 @@ export function getSenderEmail(): string {
   return profile.emailAddress.toLowerCase();
 }
 
+// Compose mode: returns the address currently shown in the From selector.
+// Falls back to the mailbox default when item.from is unavailable (older
+// hosts) or when getAsync errors. Callers treat "" as "no sender available".
+export async function getComposeFromAsync(item?: Office.MessageCompose): Promise<string> {
+  const composeItem = item ?? (getItem() as Office.MessageCompose);
+  const from = (composeItem as { from?: Office.From }).from;
+  if (from && typeof from.getAsync === "function") {
+    try {
+      const details = await p<Office.EmailAddressDetails>((cb) => from.getAsync(cb));
+      const addr = details?.emailAddress?.toLowerCase().trim();
+      if (addr) return addr;
+    } catch {
+      // Fall through to userProfile fallback.
+    }
+  }
+  return Office.context.mailbox.userProfile.emailAddress?.toLowerCase() ?? "";
+}
+
 export function getSenderDisplayName(): string {
   return Office.context.mailbox.userProfile.displayName || "";
 }

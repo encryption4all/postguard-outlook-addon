@@ -16,7 +16,7 @@ import {
   setItemHeaders,
   removeItemHeaders,
   getItemHeaders,
-  getSenderEmail,
+  getComposeFromAsync,
   showNotification,
   removeNotification,
 } from "../lib/office-helpers";
@@ -380,7 +380,7 @@ async function encryptAndPrepareSend(): Promise<void> {
       throw new Error(t("composeNoRecipients"));
     }
 
-    const senderEmail = getSenderEmail();
+    const senderEmail = await getComposeFromAsync();
     if (!senderEmail) throw new Error(t("composeNoSenderEmail"));
 
     // If we're re-encrypting an already-encrypted draft, roll back first so
