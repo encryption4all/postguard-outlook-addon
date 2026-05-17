@@ -368,6 +368,17 @@ body {
   border-color: var(--pg-accent);
 }
 
+.pg-policy-attr-input input.pg-policy-attr-missing {
+  border-color: var(--pg-error-fg);
+  background: var(--pg-error-bg);
+}
+
+.pg-policy-attr-hint {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--pg-error-fg);
+}
+
 .pg-policy-attr-delete {
   width: 32px;
   flex-shrink: 0;

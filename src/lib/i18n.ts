@@ -25,6 +25,10 @@ const en: Bundle = {
   composeBccWarning: "PostGuard does not support BCC. Either remove BCC or disable PostGuard.",
   composeNoRecipients: "Add at least one recipient before encrypting.",
   composeNoSenderEmail: "Could not determine the sender email address.",
+  composePolicyValueMissing:
+    "Enter a value for each required attribute under Manage Access before encrypting.",
+  policyAttrValueMissingHint:
+    "Required attributes need a value. The recipient must disclose this exact value to decrypt.",
 
   decryptButton: "Decrypt",
   decryptingButton: "Decrypting…",
@@ -119,6 +123,10 @@ const nl: Bundle = {
   composeBccWarning: "PostGuard ondersteunt geen BCC. Verwijder BCC of schakel PostGuard uit.",
   composeNoRecipients: "Voeg ten minste één ontvanger toe voordat je versleutelt.",
   composeNoSenderEmail: "Het e-mailadres van de afzender kon niet worden bepaald.",
+  composePolicyValueMissing:
+    "Vul voor elk verplicht attribuut onder Toegang beheren een waarde in voordat je versleutelt.",
+  policyAttrValueMissingHint:
+    "Verplichte attributen hebben een waarde nodig. De ontvanger moet exact deze waarde onthullen om te kunnen ontsleutelen.",
 
   decryptButton: "Ontsleutelen",
   decryptingButton: "Bezig met ontsleutelen…",
