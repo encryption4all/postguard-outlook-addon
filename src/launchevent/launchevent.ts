@@ -322,8 +322,7 @@ async function runEncryptDialog(payload: DialogMessage): Promise<EncryptResult> 
     log(allowOptimistic ? "dialog opened (no prompt)" : "dialog opened (after prompt)");
   } catch (e) {
     if (!allowOptimistic) throw e;
-    const msg = (e as { message?: string })?.message ?? String(e);
-    log(`optimistic attempt failed (${msg}); retrying with promptBeforeOpen=true`);
+    log(`optimistic attempt failed (${stringifyError(e)}); retrying with promptBeforeOpen=true`);
     dialog = await openDialogAsync(YIVI_DIALOG_URL, {
       ...baseOptions,
       promptBeforeOpen: true,
@@ -344,7 +343,7 @@ async function runEncryptDialog(payload: DialogMessage): Promise<EncryptResult> 
       try {
         dialog.close();
       } catch (e) {
-        log(`dialog.close failed: ${String(e)}`);
+        log(`dialog.close failed: ${stringifyError(e)}`);
       }
     };
     const settle = (cb: () => void): void => {
@@ -467,7 +466,7 @@ async function readUserAttachments(
         log(`unsupported attachment format for ${a.name}: ${content.format}`);
       }
     } catch (e) {
-      log(`failed to read attachment ${a.name}: ${String(e)}`);
+      log(`failed to read attachment ${a.name}: ${stringifyError(e)}`);
       throw e;
     }
   }
@@ -517,7 +516,7 @@ async function encryptAndApply(
     try {
       await removeAttachmentAsync(item, a.id);
     } catch (e) {
-      log(`failed to remove original attachment ${a.name}: ${String(e)}`);
+      log(`failed to remove original attachment ${a.name}: ${stringifyError(e)}`);
     }
   }
   // Tier 1/2: include the encrypted bytes locally as postguard.encrypted.
@@ -563,7 +562,7 @@ function onMessageSendHandler(event: Office.AddinCommands.Event): void {
     try {
       event.completed({ allowEvent: true });
     } catch (e) {
-      log(`event.completed threw on release: ${String(e)}`);
+      log(`event.completed threw on release: ${stringifyError(e)}`);
     }
   };
 
@@ -574,7 +573,7 @@ function onMessageSendHandler(event: Office.AddinCommands.Event): void {
     try {
       block(event, errorMessage);
     } catch (e) {
-      log(`block threw: ${String(e)}`);
+      log(`block threw: ${stringifyError(e)}`);
     }
   };
 

@@ -3,6 +3,7 @@
 
 import { t } from "../lib/i18n";
 import { isComposeMode } from "../lib/office-helpers";
+import { stringifyError } from "../lib/stringify-error";
 import { mountComposeView } from "./compose-view";
 import { mountReadView } from "./read-view";
 import { mountSettingsView } from "./settings-view";
@@ -115,7 +116,8 @@ async function bootstrap(): Promise<void> {
       await mountReadView();
     }
   } catch (err) {
-    const message = err instanceof Error ? err.message : "PostGuard failed to start.";
+    const detail = stringifyError(err);
+    const message = detail || "PostGuard failed to start.";
 
     console.error(`[pg-taskpane] bootstrap threw: ${message}`, err);
     showError(message);

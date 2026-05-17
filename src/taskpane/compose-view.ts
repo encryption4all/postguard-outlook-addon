@@ -538,10 +538,13 @@ async function encryptAndPrepareSend(): Promise<void> {
     // 404 says the upload session is gone (TTL expired, server restart,
     // unknown UUID, or wrong recovery_token). Show a clearer message
     // instead of the raw pg-js diagnostic. See issue #82.
-    const msg =
-      err instanceof UploadSessionExpiredError
-        ? t("uploadSessionExpiredError")
-        : stringifyError(err);
+    let msg: string;
+    if (err instanceof UploadSessionExpiredError) {
+      msg = t("uploadSessionExpiredError");
+    } else {
+      const detail = stringifyError(err);
+      msg = detail || t("encryptionError");
+    }
     setStatus(msg, "error");
     showView("compose");
     showError(msg);
