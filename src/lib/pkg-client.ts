@@ -15,5 +15,11 @@ export const CLIENT_ID = "pg4ol";
 export function clientHeaders(addinVersion: string): Record<string, string> {
   return {
     "X-PostGuard-Client-Version": `${CLIENT_NAME},1.0,${CLIENT_ID},${addinVersion}`,
+    // Identifies this add-in in cryptify's per-channel upload metrics.
+    // Required because cryptify's detect_channel checks the Origin
+    // header before User-Agent, and the add-in is served from
+    // addin.*.postguard.eu — without this header it would be
+    // misclassified as `website` / `staging-website`.
+    "X-Cryptify-Source": "outlook",
   };
 }
