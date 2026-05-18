@@ -23,6 +23,7 @@ import {
   getAllowOptimisticDialog,
   getEncryptionEnabled,
 } from "../lib/settings";
+import { getComposeFromAsync } from "../lib/office-helpers";
 import { stringifyError } from "../lib/stringify-error";
 import { t } from "../lib/i18n";
 
@@ -480,7 +481,7 @@ async function encryptAndApply(
   cc: Office.EmailAddressDetails[],
   userAttachments: Office.AttachmentDetailsCompose[]
 ): Promise<void> {
-  const senderEmail = Office.context.mailbox.userProfile.emailAddress.toLowerCase();
+  const senderEmail = await getComposeFromAsync(item);
   const subject = await getSubjectAsync(item);
   const htmlBody = await getBodyHtmlAsync(item);
   const attachments = await readUserAttachments(item, userAttachments);
