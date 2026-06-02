@@ -10,7 +10,13 @@
 
 import { PostGuard, buildMime, UploadSessionExpiredError } from "@e4a/pg-js";
 import { toBase64, fromBase64 } from "../lib/encoding";
-import { PKG_URL, CRYPTIFY_URL, POSTGUARD_WEBSITE_URL } from "../lib/pkg-client";
+import {
+  PKG_URL,
+  CRYPTIFY_URL,
+  POSTGUARD_WEBSITE_URL,
+  ADDIN_VERSION,
+  clientHeaders,
+} from "../lib/pkg-client";
 import { ChunkAssembler, chunkPayload, isChunkMessage, ChunkMessage } from "../lib/dialog-chunk";
 import { stringifyError } from "../lib/stringify-error";
 import {
@@ -18,8 +24,6 @@ import {
   clearPendingUpload,
   probeAndClearPendingUpload,
 } from "../lib/pending-upload";
-
-const ADDIN_VERSION = "0.1.0";
 
 interface AttachmentPayload {
   name: string;
@@ -131,9 +135,7 @@ async function runEncryption(req: EncryptRequest): Promise<EncryptResult> {
   const pg = new PostGuard({
     pkgUrl: PKG_URL,
     cryptifyUrl: CRYPTIFY_URL,
-    headers: {
-      "X-PostGuard-Client-Version": `Outlook,1.0,pg4outlook,${ADDIN_VERSION}`,
-    },
+    headers: clientHeaders(ADDIN_VERSION),
   } as never);
 
   const recipients = [...req.to, ...req.cc].map((email) =>

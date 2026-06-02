@@ -23,7 +23,13 @@ import {
 import { toBase64 } from "../lib/encoding";
 import { EMAIL_ATTRIBUTE_TYPE } from "../lib/attributes";
 import { Policy, MimeAttachment } from "../lib/types";
-import { PKG_URL, CRYPTIFY_URL, POSTGUARD_WEBSITE_URL, clientHeaders } from "../lib/pkg-client";
+import {
+  PKG_URL,
+  CRYPTIFY_URL,
+  POSTGUARD_WEBSITE_URL,
+  ADDIN_VERSION,
+  clientHeaders,
+} from "../lib/pkg-client";
 import { POSTGUARD_ENCRYPTED_FILENAME } from "../lib/mime";
 import { buildSignAttributes, getEncryptionEnabled } from "../lib/settings";
 import { t } from "../lib/i18n";
@@ -35,8 +41,6 @@ import {
 } from "../lib/pending-upload";
 import { mountPolicyPanel } from "./policy-editor";
 import { showView, setStatus, showError } from "./taskpane";
-
-const ADDIN_VERSION = "0.1.0";
 
 // Internet-header keys shared with the OnMessageSend handler. Custom header
 // names must be x-prefixed.

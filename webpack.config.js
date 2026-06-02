@@ -6,6 +6,8 @@ const HtmlWebpackPlugin = require("html-webpack-plugin");
 const webpack = require("webpack");
 require("dotenv").config();
 
+const { version: PACKAGE_VERSION } = require("./package.json");
+
 const urlDev = "https://localhost:3000/";
 const urlProd = process.env.ADDIN_PUBLIC_URL || "https://addin.postguard.eu/";
 
@@ -92,6 +94,10 @@ module.exports = async (env, options) => {
         // override (JSRuntime.Url) where window.location is an Office-
         // internal URL, not the add-in origin.
         "process.env.ADDIN_PUBLIC_URL": JSON.stringify(dev ? urlDev : urlProd),
+        // Fourth field of the X-PostGuard-Client-Version header. Sourced
+        // from package.json so release-please's version bumps flow through
+        // automatically — no separate constant to forget to update.
+        "process.env.ADDIN_VERSION": JSON.stringify(PACKAGE_VERSION),
       }),
       new HtmlWebpackPlugin({
         filename: "taskpane.html",

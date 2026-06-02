@@ -8,6 +8,9 @@ export const POSTGUARD_WEBSITE_URL: string = process.env.POSTGUARD_WEBSITE_URL a
 // OnMessageSend launchevent runtime to construct the Yivi dialog URL —
 // window.location is unreliable there on New Outlook for Mac.
 export const ADDIN_PUBLIC_URL: string = process.env.ADDIN_PUBLIC_URL as string;
+// Injected from package.json at build time so the fourth field of the
+// client-version header tracks the deployed release automatically.
+export const ADDIN_VERSION: string = process.env.ADDIN_VERSION as string;
 
 export const CLIENT_NAME = "Outlook";
 export const CLIENT_ID = "pg4ol";
