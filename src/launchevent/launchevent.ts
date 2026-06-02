@@ -31,6 +31,7 @@ import {
   HEADER_ENCRYPTED_RECIPIENTS,
   HEADER_POSTGUARD,
   POSTGUARD_VERSION,
+  keyForEmails,
 } from "../lib/pg-headers";
 import { stringifyError } from "../lib/stringify-error";
 import { t } from "../lib/i18n";
@@ -114,11 +115,7 @@ function block(event: Office.AddinCommands.Event, errorMessage: string): void {
 }
 
 function recipientsKey(addresses: Office.EmailAddressDetails[]): string {
-  return addresses
-    .map((a) => (a.emailAddress ?? "").toLowerCase().trim())
-    .filter(Boolean)
-    .sort()
-    .join(",");
+  return keyForEmails(addresses.map((a) => a.emailAddress ?? ""));
 }
 
 function getRecipientsAsync(recipients: Office.Recipients): Promise<Office.EmailAddressDetails[]> {

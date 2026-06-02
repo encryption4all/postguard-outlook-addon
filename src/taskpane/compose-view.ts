@@ -31,6 +31,7 @@ import {
   HEADER_ENCRYPTED_RECIPIENTS,
   HEADER_POSTGUARD,
   POSTGUARD_VERSION,
+  keyForEmails,
 } from "../lib/pg-headers";
 import { buildSignAttributes, getEncryptionEnabled } from "../lib/settings";
 import { t } from "../lib/i18n";
@@ -77,11 +78,7 @@ async function persistEncryptedRecipients(value: string | null): Promise<void> {
 }
 
 function recipientsKey(): string {
-  return [...state.recipients.to, ...state.recipients.cc]
-    .map((e) => e.toLowerCase().trim())
-    .filter(Boolean)
-    .sort()
-    .join(",");
+  return keyForEmails([...state.recipients.to, ...state.recipients.cc]);
 }
 
 interface ComposeState {

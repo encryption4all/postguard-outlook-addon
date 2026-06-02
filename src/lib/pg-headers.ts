@@ -32,3 +32,16 @@ export const POSTGUARD_VERSION = "0.1.0";
 // flips the toggle) and OnNewMessageCompose (which paints the initial
 // state on every new draft).
 export const ENCRYPTION_STATUS_NOTIFICATION_KEY = "postguard-encryption-status";
+
+// Canonical form of the x-pg-encrypted-recipients header value: a
+// comma-joined, sorted, lowercased, trimmed list of email addresses
+// with empty entries filtered out. Both runtimes must agree on this
+// exact shape — any deviation makes the OnMessageSend stale-recipients
+// check reject every send.
+export function keyForEmails(emails: string[]): string {
+  return emails
+    .map((e) => e.toLowerCase().trim())
+    .filter(Boolean)
+    .sort()
+    .join(",");
+}
