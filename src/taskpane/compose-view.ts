@@ -24,6 +24,7 @@ import { toBase64 } from "../lib/encoding";
 import { EMAIL_ATTRIBUTE_TYPE } from "../lib/attributes";
 import { Policy, MimeAttachment } from "../lib/types";
 import { PKG_URL, CRYPTIFY_URL, POSTGUARD_WEBSITE_URL, clientHeaders } from "../lib/pkg-client";
+import { byId } from "../lib/dom";
 import { guessContentType, POSTGUARD_ENCRYPTED_FILENAME } from "../lib/mime";
 import {
   ENCRYPTION_STATUS_NOTIFICATION_KEY,
@@ -602,10 +603,4 @@ async function collectComposeAttachments(): Promise<(MimeAttachment & { id: stri
     }
   }
   return out;
-}
-
-function byId<T extends HTMLElement>(id: string): T {
-  const el = document.getElementById(id);
-  if (!el) throw new Error(`Missing element #${id}`);
-  return el as T;
 }

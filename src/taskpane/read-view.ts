@@ -27,6 +27,7 @@ import {
 } from "../lib/mime";
 import { Badge, FriendlySender } from "../lib/types";
 import { PKG_URL, CRYPTIFY_URL, clientHeaders } from "../lib/pkg-client";
+import { byId } from "../lib/dom";
 import { t } from "../lib/i18n";
 import { stringifyError } from "../lib/stringify-error";
 import { showView, setStatus, showError } from "./taskpane";
@@ -319,10 +320,4 @@ function escape(s: string): string {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
-}
-
-function byId<T extends HTMLElement>(id: string): T {
-  const el = document.getElementById(id);
-  if (!el) throw new Error(`Missing element #${id}`);
-  return el as T;
 }

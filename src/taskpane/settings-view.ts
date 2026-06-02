@@ -20,6 +20,7 @@ import {
   setEncryptionEnabled,
   setSignPrefills,
 } from "../lib/settings";
+import { byId } from "../lib/dom";
 import { t } from "../lib/i18n";
 import { showView, setStatus, ViewName } from "./taskpane";
 
@@ -120,12 +121,6 @@ function wireListeners(): void {
     setStatus("");
     showView(returnView);
   });
-}
-
-function byId<T extends HTMLElement>(id: string): T {
-  const el = document.getElementById(id);
-  if (!el) throw new Error(`Missing element #${id}`);
-  return el as T;
 }
 
 function ddmmyyyyToHtml(ddmmyyyy: string): string {
