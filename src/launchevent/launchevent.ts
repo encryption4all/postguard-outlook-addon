@@ -24,22 +24,17 @@ import {
   getEncryptionEnabled,
 } from "../lib/settings";
 import { getComposeFromAsync } from "../lib/office-helpers";
+import { POSTGUARD_ENCRYPTED_FILENAME } from "../lib/mime";
+import {
+  ENCRYPTION_STATUS_NOTIFICATION_KEY,
+  HEADER_ENCRYPT_ON_SEND,
+  HEADER_ENCRYPTED_RECIPIENTS,
+  HEADER_POSTGUARD,
+  POSTGUARD_VERSION,
+} from "../lib/pg-headers";
 import { stringifyError } from "../lib/stringify-error";
 import { t } from "../lib/i18n";
 
-const ENCRYPTION_STATUS_NOTIFICATION_KEY = "postguard-encryption-status";
-
-// Per-draft "is this email going to be encrypted on send" flag. Written
-// by the taskpane's compose toggle and seeded from the mailbox-wide
-// default by OnNewMessageCompose, so by the time OnMessageSend fires
-// the header reflects the user's explicit intent for *this* message.
-// The OnMessageSend handler reads only this header — never the global
-// setting — so a PostGuard outage can never block an unencrypted send.
-const HEADER_ENCRYPT_ON_SEND = "x-pg-encrypt-on-send";
-const HEADER_ENCRYPTED_RECIPIENTS = "x-pg-encrypted-recipients";
-const HEADER_POSTGUARD = "x-postguard";
-const POSTGUARD_VERSION = "0.1.0";
-const POSTGUARD_ENCRYPTED_FILENAME = "postguard.encrypted";
 const COMPOSE_BUTTON_ID = "postGuardComposeButton";
 // Build the dialog URL from the add-in's public origin, injected at
 // build time. window.location.href is unreliable here: New Outlook for

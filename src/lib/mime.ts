@@ -200,5 +200,3 @@ function decodeQuotedPrintable(s: string): string {
 }
 
 export const POSTGUARD_ENCRYPTED_FILENAME = "postguard.encrypted";
-export const POSTGUARD_HEADER = "x-postguard";
-export const POSTGUARD_HEADER_VALUE = "0.1.0";

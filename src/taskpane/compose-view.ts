@@ -25,6 +25,13 @@ import { EMAIL_ATTRIBUTE_TYPE } from "../lib/attributes";
 import { Policy, MimeAttachment } from "../lib/types";
 import { PKG_URL, CRYPTIFY_URL, POSTGUARD_WEBSITE_URL, clientHeaders } from "../lib/pkg-client";
 import { POSTGUARD_ENCRYPTED_FILENAME } from "../lib/mime";
+import {
+  ENCRYPTION_STATUS_NOTIFICATION_KEY,
+  HEADER_ENCRYPT_ON_SEND,
+  HEADER_ENCRYPTED_RECIPIENTS,
+  HEADER_POSTGUARD,
+  POSTGUARD_VERSION,
+} from "../lib/pg-headers";
 import { buildSignAttributes, getEncryptionEnabled } from "../lib/settings";
 import { t } from "../lib/i18n";
 import { stringifyError } from "../lib/stringify-error";
@@ -37,28 +44,6 @@ import { mountPolicyPanel } from "./policy-editor";
 import { showView, setStatus, showError } from "./taskpane";
 
 const ADDIN_VERSION = "0.1.0";
-
-// Internet-header keys shared with the OnMessageSend handler. Custom header
-// names must be x-prefixed.
-//
-// Per-draft "encrypt this message on send" flag. This header is the
-// single source of truth at send time — the OnMessageSend handler only
-// runs the encryption flow when it reads "true" here, so the user's
-// global Encryption setting only acts as the default that
-// OnNewMessageCompose seeds onto each new draft.
-const HEADER_ENCRYPT_ON_SEND = "x-pg-encrypt-on-send";
-// Comma-joined sorted list of lowercase To+Cc emails captured at encrypt
-// time. The handler compares this against the message's current recipients
-// to refuse sending an encrypted blob to anyone who wasn't in the policy.
-const HEADER_ENCRYPTED_RECIPIENTS = "x-pg-encrypted-recipients";
-// PostGuard interop marker, written to outbound encrypted messages. The
-// Thunderbird addon writes the same header (background.ts:485) and uses it
-// as the OnMessageRead filter for the Outlook add-in. Detection on the
-// receive side is still primarily attachment + body armor, but the header
-// is a third independent signal that survives any HTML sanitation OWA
-// applies during send.
-const HEADER_POSTGUARD = "x-postguard";
-const POSTGUARD_VERSION = "0.1.0";
 
 async function persistEncryptOnSend(value: boolean): Promise<void> {
   try {
@@ -133,9 +118,6 @@ const state: ComposeState = {
   encryptedSnapshot: null,
   encryptedRecipientsHeader: null,
 };
-
-// Single notification key for the encryption-status banner.
-const ENCRYPTION_STATUS_NOTIFICATION_KEY = "postguard-encryption-status";
 
 // Show the persistent in-message banner that mirrors the toggle. The
 // taskpane is not always open while the user composes, so this banner is
