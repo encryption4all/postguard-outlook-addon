@@ -24,7 +24,7 @@ import { toBase64 } from "../lib/encoding";
 import { EMAIL_ATTRIBUTE_TYPE } from "../lib/attributes";
 import { Policy, MimeAttachment } from "../lib/types";
 import { PKG_URL, CRYPTIFY_URL, POSTGUARD_WEBSITE_URL, clientHeaders } from "../lib/pkg-client";
-import { POSTGUARD_ENCRYPTED_FILENAME } from "../lib/mime";
+import { guessContentType, POSTGUARD_ENCRYPTED_FILENAME } from "../lib/mime";
 import {
   ENCRYPTION_STATUS_NOTIFICATION_KEY,
   HEADER_ENCRYPT_ON_SEND,
@@ -611,22 +611,4 @@ function byId<T extends HTMLElement>(id: string): T {
   const el = document.getElementById(id);
   if (!el) throw new Error(`Missing element #${id}`);
   return el as T;
-}
-
-function guessContentType(name: string): string {
-  const ext = name.toLowerCase().split(".").pop() ?? "";
-  const map: Record<string, string> = {
-    pdf: "application/pdf",
-    txt: "text/plain",
-    csv: "text/csv",
-    html: "text/html",
-    jpg: "image/jpeg",
-    jpeg: "image/jpeg",
-    png: "image/png",
-    gif: "image/gif",
-    zip: "application/zip",
-    docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  };
-  return map[ext] ?? "application/octet-stream";
 }

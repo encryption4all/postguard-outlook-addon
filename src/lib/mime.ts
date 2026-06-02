@@ -200,3 +200,26 @@ function decodeQuotedPrintable(s: string): string {
 }
 
 export const POSTGUARD_ENCRYPTED_FILENAME = "postguard.encrypted";
+
+// Best-effort MIME type from a filename extension. Used when reading an
+// Office.js attachment, which only hands us a name (no Content-Type).
+// The map is intentionally short — anything not listed falls back to
+// application/octet-stream, which both pg-js and recipient mail clients
+// handle correctly.
+export function guessContentType(name: string): string {
+  const ext = name.toLowerCase().split(".").pop() ?? "";
+  const map: Record<string, string> = {
+    pdf: "application/pdf",
+    txt: "text/plain",
+    csv: "text/csv",
+    html: "text/html",
+    jpg: "image/jpeg",
+    jpeg: "image/jpeg",
+    png: "image/png",
+    gif: "image/gif",
+    zip: "application/zip",
+    docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  };
+  return map[ext] ?? "application/octet-stream";
+}
