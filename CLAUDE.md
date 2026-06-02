@@ -20,14 +20,15 @@ There are no automated tests in this project.
 
 ## Build-time configuration
 
-Four URLs are baked into the bundle via webpack `DefinePlugin` (see `webpack.config.js`):
+Five values are baked into the bundle via webpack `DefinePlugin` (see `webpack.config.js`):
 
 - `PKG_URL` — PostGuard Key Generation server.
 - `CRYPTIFY_URL` — Cryptify file-share service.
 - `POSTGUARD_WEBSITE_URL` — used by the SDK envelope for the browser fallback link.
 - `ADDIN_PUBLIC_URL` — the add-in's own public origin (e.g. `https://addin.postguard.eu/`). Used by `launchevent.ts` to build the Yivi dialog URL; `window.location` is unreliable in the launchevent runtime on New Outlook for Mac. Webpack picks `urlDev` in dev mode and `urlProd` (overridable via this env var) otherwise.
+- `ADDIN_VERSION` — the deployed extension version, read from `package.json` at build time. Stamped into the fourth field of `X-PostGuard-Client-Version` so PKG metrics can distinguish current vs. historical clients. release-please's `release-type: node` bumps `package.json` natively, so this stays in sync without extra config.
 
-These are read from `.env` (copy `.env.example`) or fall back to staging defaults. They are accessed through `src/lib/pkg-client.ts` — do not read `process.env` elsewhere.
+The URLs are read from `.env` (copy `.env.example`) or fall back to staging defaults; `ADDIN_VERSION` is sourced from `package.json`. All five are accessed through `src/lib/pkg-client.ts` — do not read `process.env` elsewhere.
 
 The webpack config also rewrites `https://localhost:3000/` → `ADDIN_PUBLIC_URL` (default `https://addin.postguard.eu/`) inside `manifest.xml` when building in non-development mode, so the *same* manifest is used for dev sideloading and production hosting.
 
