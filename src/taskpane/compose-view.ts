@@ -30,7 +30,16 @@ import {
   ADDIN_VERSION,
   clientHeaders,
 } from "../lib/pkg-client";
-import { POSTGUARD_ENCRYPTED_FILENAME } from "../lib/mime";
+import { byId } from "../lib/dom";
+import { guessContentType, POSTGUARD_ENCRYPTED_FILENAME } from "../lib/mime";
+import {
+  ENCRYPTION_STATUS_NOTIFICATION_KEY,
+  HEADER_ENCRYPT_ON_SEND,
+  HEADER_ENCRYPTED_RECIPIENTS,
+  HEADER_POSTGUARD,
+  POSTGUARD_VERSION,
+  keyForEmails,
+} from "../lib/pg-headers";
 import { buildSignAttributes, getEncryptionEnabled } from "../lib/settings";
 import { t } from "../lib/i18n";
 import { stringifyError } from "../lib/stringify-error";
@@ -41,28 +50,6 @@ import {
 } from "../lib/pending-upload";
 import { mountPolicyPanel } from "./policy-editor";
 import { showView, setStatus, showError } from "./taskpane";
-
-// Internet-header keys shared with the OnMessageSend handler. Custom header
-// names must be x-prefixed.
-//
-// Per-draft "encrypt this message on send" flag. This header is the
-// single source of truth at send time — the OnMessageSend handler only
-// runs the encryption flow when it reads "true" here, so the user's
-// global Encryption setting only acts as the default that
-// OnNewMessageCompose seeds onto each new draft.
-const HEADER_ENCRYPT_ON_SEND = "x-pg-encrypt-on-send";
-// Comma-joined sorted list of lowercase To+Cc emails captured at encrypt
-// time. The handler compares this against the message's current recipients
-// to refuse sending an encrypted blob to anyone who wasn't in the policy.
-const HEADER_ENCRYPTED_RECIPIENTS = "x-pg-encrypted-recipients";
-// PostGuard interop marker, written to outbound encrypted messages. The
-// Thunderbird addon writes the same header (background.ts:485) and uses it
-// as the OnMessageRead filter for the Outlook add-in. Detection on the
-// receive side is still primarily attachment + body armor, but the header
-// is a third independent signal that survives any HTML sanitation OWA
-// applies during send.
-const HEADER_POSTGUARD = "x-postguard";
-const POSTGUARD_VERSION = "0.1.0";
 
 async function persistEncryptOnSend(value: boolean): Promise<void> {
   try {
@@ -96,11 +83,7 @@ async function persistEncryptedRecipients(value: string | null): Promise<void> {
 }
 
 function recipientsKey(): string {
-  return [...state.recipients.to, ...state.recipients.cc]
-    .map((e) => e.toLowerCase().trim())
-    .filter(Boolean)
-    .sort()
-    .join(",");
+  return keyForEmails([...state.recipients.to, ...state.recipients.cc]);
 }
 
 interface ComposeState {
@@ -137,9 +120,6 @@ const state: ComposeState = {
   encryptedSnapshot: null,
   encryptedRecipientsHeader: null,
 };
-
-// Single notification key for the encryption-status banner.
-const ENCRYPTION_STATUS_NOTIFICATION_KEY = "postguard-encryption-status";
 
 // Show the persistent in-message banner that mirrors the toggle. The
 // taskpane is not always open while the user composes, so this banner is
@@ -627,28 +607,4 @@ async function collectComposeAttachments(): Promise<(MimeAttachment & { id: stri
     }
   }
   return out;
-}
-
-function byId<T extends HTMLElement>(id: string): T {
-  const el = document.getElementById(id);
-  if (!el) throw new Error(`Missing element #${id}`);
-  return el as T;
-}
-
-function guessContentType(name: string): string {
-  const ext = name.toLowerCase().split(".").pop() ?? "";
-  const map: Record<string, string> = {
-    pdf: "application/pdf",
-    txt: "text/plain",
-    csv: "text/csv",
-    html: "text/html",
-    jpg: "image/jpeg",
-    jpeg: "image/jpeg",
-    png: "image/png",
-    gif: "image/gif",
-    zip: "application/zip",
-    docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  };
-  return map[ext] ?? "application/octet-stream";
 }
