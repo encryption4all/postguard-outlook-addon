@@ -4,6 +4,7 @@ const devCerts = require("office-addin-dev-certs");
 const CopyWebpackPlugin = require("copy-webpack-plugin");
 const HtmlWebpackPlugin = require("html-webpack-plugin");
 const webpack = require("webpack");
+const pkg = require("./package.json");
 require("dotenv").config();
 
 const urlDev = "https://localhost:3000/";
@@ -92,6 +93,10 @@ module.exports = async (env, options) => {
         // override (JSRuntime.Url) where window.location is an Office-
         // internal URL, not the add-in origin.
         "process.env.ADDIN_PUBLIC_URL": JSON.stringify(dev ? urlDev : urlProd),
+        // Stamped into the X-PostGuard-Client-Version header so PKG /
+        // Cryptify dashboards can attribute metrics per release. Sourced
+        // from package.json, which release-please bumps on every release.
+        "process.env.ADDIN_VERSION": JSON.stringify(pkg.version),
       }),
       new HtmlWebpackPlugin({
         filename: "taskpane.html",

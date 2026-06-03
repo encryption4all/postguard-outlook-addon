@@ -23,7 +23,13 @@ import {
 import { toBase64 } from "../lib/encoding";
 import { EMAIL_ATTRIBUTE_TYPE } from "../lib/attributes";
 import { Policy, MimeAttachment } from "../lib/types";
-import { PKG_URL, CRYPTIFY_URL, POSTGUARD_WEBSITE_URL, clientHeaders } from "../lib/pkg-client";
+import {
+  PKG_URL,
+  CRYPTIFY_URL,
+  POSTGUARD_WEBSITE_URL,
+  ADDIN_VERSION,
+  clientHeaders,
+} from "../lib/pkg-client";
 import { byId } from "../lib/dom";
 import { guessContentType, POSTGUARD_ENCRYPTED_FILENAME } from "../lib/mime";
 import {
@@ -44,8 +50,6 @@ import {
 } from "../lib/pending-upload";
 import { mountPolicyPanel } from "./policy-editor";
 import { showView, setStatus, showError } from "./taskpane";
-
-const ADDIN_VERSION = "0.1.0";
 
 async function persistEncryptOnSend(value: boolean): Promise<void> {
   try {

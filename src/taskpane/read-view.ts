@@ -26,13 +26,11 @@ import {
   readMimeHeader,
 } from "../lib/mime";
 import { Badge, FriendlySender } from "../lib/types";
-import { PKG_URL, CRYPTIFY_URL, clientHeaders } from "../lib/pkg-client";
+import { PKG_URL, CRYPTIFY_URL, ADDIN_VERSION, clientHeaders } from "../lib/pkg-client";
 import { byId } from "../lib/dom";
 import { t } from "../lib/i18n";
 import { stringifyError } from "../lib/stringify-error";
 import { showView, setStatus, showError } from "./taskpane";
-
-const ADDIN_VERSION = "0.1.0";
 
 interface ReadState {
   ciphertext: Uint8Array | null;
