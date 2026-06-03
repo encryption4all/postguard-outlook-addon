@@ -23,23 +23,31 @@ import {
   getAllowOptimisticDialog,
   getEncryptionEnabled,
 } from "../lib/settings";
-import { getComposeFromAsync } from "../lib/office-helpers";
+import {
+  addBase64Attachment,
+  getAttachmentContentCompose,
+  getBody,
+  getComposeFromAsync,
+  getRecipients,
+  getSubject,
+  removeAttachment,
+  saveItem,
+  setBody,
+  setItemHeaders,
+  setSubject,
+} from "../lib/office-helpers";
+import { guessContentType, POSTGUARD_ENCRYPTED_FILENAME } from "../lib/mime";
+import {
+  ENCRYPTION_STATUS_NOTIFICATION_KEY,
+  HEADER_ENCRYPT_ON_SEND,
+  HEADER_ENCRYPTED_RECIPIENTS,
+  HEADER_POSTGUARD,
+  POSTGUARD_VERSION,
+  keyForEmails,
+} from "../lib/pg-headers";
 import { stringifyError } from "../lib/stringify-error";
 import { t } from "../lib/i18n";
 
-const ENCRYPTION_STATUS_NOTIFICATION_KEY = "postguard-encryption-status";
-
-// Per-draft "is this email going to be encrypted on send" flag. Written
-// by the taskpane's compose toggle and seeded from the mailbox-wide
-// default by OnNewMessageCompose, so by the time OnMessageSend fires
-// the header reflects the user's explicit intent for *this* message.
-// The OnMessageSend handler reads only this header — never the global
-// setting — so a PostGuard outage can never block an unencrypted send.
-const HEADER_ENCRYPT_ON_SEND = "x-pg-encrypt-on-send";
-const HEADER_ENCRYPTED_RECIPIENTS = "x-pg-encrypted-recipients";
-const HEADER_POSTGUARD = "x-postguard";
-const POSTGUARD_VERSION = "0.1.0";
-const POSTGUARD_ENCRYPTED_FILENAME = "postguard.encrypted";
 const COMPOSE_BUTTON_ID = "postGuardComposeButton";
 // Build the dialog URL from the add-in's public origin, injected at
 // build time. window.location.href is unreliable here: New Outlook for
@@ -119,129 +127,7 @@ function block(event: Office.AddinCommands.Event, errorMessage: string): void {
 }
 
 function recipientsKey(addresses: Office.EmailAddressDetails[]): string {
-  return addresses
-    .map((a) => (a.emailAddress ?? "").toLowerCase().trim())
-    .filter(Boolean)
-    .sort()
-    .join(",");
-}
-
-function getRecipientsAsync(recipients: Office.Recipients): Promise<Office.EmailAddressDetails[]> {
-  return new Promise((resolve) => {
-    recipients.getAsync((res) =>
-      resolve(res.status === Office.AsyncResultStatus.Succeeded ? res.value : [])
-    );
-  });
-}
-
-function getSubjectAsync(item: Office.MessageCompose): Promise<string> {
-  return new Promise((resolve, reject) => {
-    item.subject.getAsync((res) => {
-      if (res.status === Office.AsyncResultStatus.Succeeded) resolve(res.value);
-      else reject(res.error);
-    });
-  });
-}
-
-function setSubjectAsync(item: Office.MessageCompose, value: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    item.subject.setAsync(value, (res) => {
-      if (res.status === Office.AsyncResultStatus.Succeeded) resolve();
-      else reject(res.error);
-    });
-  });
-}
-
-function getBodyHtmlAsync(item: Office.MessageCompose): Promise<string> {
-  return new Promise((resolve, reject) => {
-    item.body.getAsync(Office.CoercionType.Html, (res) => {
-      if (res.status === Office.AsyncResultStatus.Succeeded) resolve(res.value);
-      else reject(res.error);
-    });
-  });
-}
-
-function setBodyHtmlAsync(item: Office.MessageCompose, value: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    item.body.setAsync(value, { coercionType: Office.CoercionType.Html }, (res) => {
-      if (res.status === Office.AsyncResultStatus.Succeeded) resolve();
-      else reject(res.error);
-    });
-  });
-}
-
-function addBase64AttachmentAsync(
-  item: Office.MessageCompose,
-  filename: string,
-  base64: string
-): Promise<string> {
-  return new Promise((resolve, reject) => {
-    item.addFileAttachmentFromBase64Async(base64, filename, (res) => {
-      if (res.status === Office.AsyncResultStatus.Succeeded)
-        resolve(res.value as unknown as string);
-      else reject(res.error);
-    });
-  });
-}
-
-function getAttachmentContentAsync(
-  item: Office.MessageCompose,
-  attachmentId: string
-): Promise<Office.AttachmentContent> {
-  return new Promise((resolve, reject) => {
-    item.getAttachmentContentAsync(attachmentId, (res) => {
-      if (res.status === Office.AsyncResultStatus.Succeeded) resolve(res.value);
-      else reject(res.error);
-    });
-  });
-}
-
-function removeAttachmentAsync(item: Office.MessageCompose, attachmentId: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    item.removeAttachmentAsync(attachmentId, (res) => {
-      if (res.status === Office.AsyncResultStatus.Succeeded) resolve();
-      else reject(res.error);
-    });
-  });
-}
-
-function guessContentType(name: string): string {
-  const ext = name.toLowerCase().split(".").pop() ?? "";
-  const map: Record<string, string> = {
-    pdf: "application/pdf",
-    txt: "text/plain",
-    csv: "text/csv",
-    html: "text/html",
-    jpg: "image/jpeg",
-    jpeg: "image/jpeg",
-    png: "image/png",
-    gif: "image/gif",
-    zip: "application/zip",
-    docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  };
-  return map[ext] ?? "application/octet-stream";
-}
-
-function setHeadersAsync(
-  item: Office.MessageCompose,
-  headers: Record<string, string>
-): Promise<void> {
-  return new Promise((resolve, reject) => {
-    item.internetHeaders.setAsync(headers, (res) => {
-      if (res.status === Office.AsyncResultStatus.Succeeded) resolve();
-      else reject(res.error);
-    });
-  });
-}
-
-function saveItemAsync(item: Office.MessageCompose): Promise<void> {
-  return new Promise((resolve, reject) => {
-    item.saveAsync((res) => {
-      if (res.status === Office.AsyncResultStatus.Succeeded) resolve();
-      else reject(res.error);
-    });
-  });
+  return keyForEmails(addresses.map((a) => a.emailAddress ?? ""));
 }
 
 // Target physical size of the Yivi dialog. Sized to fit the QR widget
@@ -444,7 +330,7 @@ async function readUserAttachments(
       continue;
     }
     try {
-      const content = await getAttachmentContentAsync(item, a.id);
+      const content = await getAttachmentContentCompose(a.id, item);
       const base64Len = content.content?.length ?? 0;
       log(
         `attachment "${a.name}" format=${content.format} ` +
@@ -482,8 +368,8 @@ async function encryptAndApply(
   userAttachments: Office.AttachmentDetailsCompose[]
 ): Promise<void> {
   const senderEmail = await getComposeFromAsync(item);
-  const subject = await getSubjectAsync(item);
-  const htmlBody = await getBodyHtmlAsync(item);
+  const subject = await getSubject(item);
+  const htmlBody = await getBody(Office.CoercionType.Html, item);
   const attachments = await readUserAttachments(item, userAttachments);
 
   // Sender attributes come from per-mailbox roaming settings (configured
@@ -507,15 +393,15 @@ async function encryptAndApply(
     signAttributes,
   });
 
-  await setSubjectAsync(item, result.subject);
-  await setBodyHtmlAsync(item, result.htmlBody);
+  await setSubject(result.subject, item);
+  await setBody(result.htmlBody, item);
   // Remove the original plaintext attachments now that they're inside the
   // encrypted envelope. Best-effort: a cloud attachment we couldn't read
   // would still be sent in the clear, so we leave it alone.
   for (const a of userAttachments) {
     if (a.attachmentType === Office.MailboxEnums.AttachmentType.Cloud) continue;
     try {
-      await removeAttachmentAsync(item, a.id);
+      await removeAttachment(a.id, item);
     } catch (e) {
       log(`failed to remove original attachment ${a.name}: ${stringifyError(e)}`);
     }
@@ -524,17 +410,20 @@ async function encryptAndApply(
   // Tier 3: pg-js gave us no attachment (too large) — recipients use the
   // Cryptify link in the body to fetch and decrypt.
   if (result.attachmentBase64) {
-    await addBase64AttachmentAsync(item, POSTGUARD_ENCRYPTED_FILENAME, result.attachmentBase64);
+    await addBase64Attachment(POSTGUARD_ENCRYPTED_FILENAME, result.attachmentBase64, item);
   } else {
     log(
       `tier ${result.tier}: skipping local attachment, recipients fetch via uuid=${result.uploadUuid}`
     );
   }
-  await setHeadersAsync(item, {
-    [HEADER_ENCRYPTED_RECIPIENTS]: recipientsKey([...to, ...cc]),
-    [HEADER_POSTGUARD]: POSTGUARD_VERSION,
-  });
-  await saveItemAsync(item);
+  await setItemHeaders(
+    {
+      [HEADER_ENCRYPTED_RECIPIENTS]: recipientsKey([...to, ...cc]),
+      [HEADER_POSTGUARD]: POSTGUARD_VERSION,
+    },
+    item
+  );
+  await saveItem(item);
 }
 
 function onMessageSendHandler(event: Office.AddinCommands.Event): void {
@@ -645,9 +534,13 @@ function onMessageSendHandler(event: Office.AddinCommands.Event): void {
               );
               log(`alreadyEncrypted=${alreadyEncrypted} (${attachments.length} attachments)`);
 
+              // launchevent historically swallowed recipient-read failures and
+              // returned []. Preserve that tolerance: the post-committedToEncrypt
+              // block-on-no-recipients path is the right one to hit even when
+              // Office.js misbehaves on the read.
               const [to, cc] = await Promise.all([
-                getRecipientsAsync(item.to),
-                getRecipientsAsync(item.cc),
+                getRecipients("to", item).catch(() => [] as Office.EmailAddressDetails[]),
+                getRecipients("cc", item).catch(() => [] as Office.EmailAddressDetails[]),
               ]);
 
               if (!alreadyEncrypted) {

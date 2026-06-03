@@ -31,20 +31,35 @@ export function isComposeMode(): boolean {
 }
 
 // --- Compose getters ---
+//
+// Each compose helper accepts an optional `item?: Office.MessageCompose`.
+// Taskpane callers omit it and the helper falls back to `getItem()` (the
+// active Office.context.mailbox.item). The OnMessageSend launchevent
+// runtime already narrows its item up front (it lives in a separate
+// WebView from the taskpane) and passes it in explicitly, which lets
+// both runtimes share these wrappers without the launchevent file
+// re-rolling its own copies.
 
-export function getSubject(): Promise<string> {
-  const item = getItem() as Office.MessageCompose;
-  return p<string>((cb) => item.subject.getAsync(cb));
+function composeItem(item?: Office.MessageCompose): Office.MessageCompose {
+  return item ?? (getItem() as Office.MessageCompose);
 }
 
-export function setSubject(subject: string): Promise<void> {
-  const item = getItem() as Office.MessageCompose;
-  return p<void>((cb) => item.subject.setAsync(subject, cb));
+export function getSubject(item?: Office.MessageCompose): Promise<string> {
+  const i = composeItem(item);
+  return p<string>((cb) => i.subject.getAsync(cb));
 }
 
-export function getRecipients(field: "to" | "cc" | "bcc"): Promise<Office.EmailAddressDetails[]> {
-  const item = getItem() as Office.MessageCompose;
-  const recipientsField = item[field];
+export function setSubject(subject: string, item?: Office.MessageCompose): Promise<void> {
+  const i = composeItem(item);
+  return p<void>((cb) => i.subject.setAsync(subject, cb));
+}
+
+export function getRecipients(
+  field: "to" | "cc" | "bcc",
+  item?: Office.MessageCompose
+): Promise<Office.EmailAddressDetails[]> {
+  const i = composeItem(item);
+  const recipientsField = i[field];
   return p<Office.EmailAddressDetails[]>((cb) => recipientsField.getAsync(cb));
 }
 
@@ -53,46 +68,59 @@ export interface BodyResult {
   format: Office.CoercionType;
 }
 
-export function getBody(format: Office.CoercionType = Office.CoercionType.Html): Promise<string> {
-  const item = getItem() as Office.MessageCompose;
-  return p<string>((cb) => item.body.getAsync(format, cb));
+export function getBody(
+  format: Office.CoercionType = Office.CoercionType.Html,
+  item?: Office.MessageCompose
+): Promise<string> {
+  const i = composeItem(item);
+  return p<string>((cb) => i.body.getAsync(format, cb));
 }
 
-export function setBody(html: string): Promise<void> {
-  const item = getItem() as Office.MessageCompose;
-  return p<void>((cb) => item.body.setAsync(html, { coercionType: Office.CoercionType.Html }, cb));
+export function setBody(html: string, item?: Office.MessageCompose): Promise<void> {
+  const i = composeItem(item);
+  return p<void>((cb) => i.body.setAsync(html, { coercionType: Office.CoercionType.Html }, cb));
 }
 
-export function getAttachmentsCompose(): Promise<Office.AttachmentDetailsCompose[]> {
-  const item = getItem() as Office.MessageCompose;
-  return p<Office.AttachmentDetailsCompose[]>((cb) => item.getAttachmentsAsync(cb));
+export function getAttachmentsCompose(
+  item?: Office.MessageCompose
+): Promise<Office.AttachmentDetailsCompose[]> {
+  const i = composeItem(item);
+  return p<Office.AttachmentDetailsCompose[]>((cb) => i.getAttachmentsAsync(cb));
 }
 
 export function getAttachmentContentCompose(
-  attachmentId: string
+  attachmentId: string,
+  item?: Office.MessageCompose
 ): Promise<Office.AttachmentContent> {
-  const item = getItem() as Office.MessageCompose;
-  return p<Office.AttachmentContent>((cb) => item.getAttachmentContentAsync(attachmentId, cb));
+  const i = composeItem(item);
+  return p<Office.AttachmentContent>((cb) => i.getAttachmentContentAsync(attachmentId, cb));
 }
 
-export function removeAttachment(attachmentId: string): Promise<void> {
-  const item = getItem() as Office.MessageCompose;
-  return p<void>((cb) => item.removeAttachmentAsync(attachmentId, cb));
+export function removeAttachment(
+  attachmentId: string,
+  item?: Office.MessageCompose
+): Promise<void> {
+  const i = composeItem(item);
+  return p<void>((cb) => i.removeAttachmentAsync(attachmentId, cb));
 }
 
 // Adds a base64 inline file attachment. Returns the attachment id assigned by Outlook.
-export function addBase64Attachment(filename: string, base64: string): Promise<string> {
-  const item = getItem() as Office.MessageCompose;
-  return p<string>((cb) => item.addFileAttachmentFromBase64Async(base64, filename, cb as never));
+export function addBase64Attachment(
+  filename: string,
+  base64: string,
+  item?: Office.MessageCompose
+): Promise<string> {
+  const i = composeItem(item);
+  return p<string>((cb) => i.addFileAttachmentFromBase64Async(base64, filename, cb as never));
 }
 
 // Commits the current draft (subject, body, attachments) to the server. We need
 // this after writing the encrypted body + attachment because Send otherwise races
 // the server-side upload of those changes; new Outlook on Windows shows a Smart
 // Alerts-style "PostGuard timed out" dialog when that race occurs.
-export function saveItem(): Promise<string> {
-  const item = getItem() as Office.MessageCompose;
-  return p<string>((cb) => item.saveAsync(cb));
+export function saveItem(item?: Office.MessageCompose): Promise<string> {
+  const i = composeItem(item);
+  return p<string>((cb) => i.saveAsync(cb));
 }
 
 // Internet header storage. Used to share state (e.g. the encrypt toggle)
@@ -102,19 +130,25 @@ export function saveItem(): Promise<string> {
 // onto the message itself so they're guaranteed visible on send.
 //
 // Custom internet header names must start with "x-" per Office.js.
-export function setItemHeaders(headers: Record<string, string>): Promise<void> {
-  const item = getItem() as Office.MessageCompose;
-  return p<void>((cb) => item.internetHeaders.setAsync(headers, cb));
+export function setItemHeaders(
+  headers: Record<string, string>,
+  item?: Office.MessageCompose
+): Promise<void> {
+  const i = composeItem(item);
+  return p<void>((cb) => i.internetHeaders.setAsync(headers, cb));
 }
 
-export function removeItemHeaders(names: string[]): Promise<void> {
-  const item = getItem() as Office.MessageCompose;
-  return p<void>((cb) => item.internetHeaders.removeAsync(names, cb));
+export function removeItemHeaders(names: string[], item?: Office.MessageCompose): Promise<void> {
+  const i = composeItem(item);
+  return p<void>((cb) => i.internetHeaders.removeAsync(names, cb));
 }
 
-export function getItemHeaders(names: string[]): Promise<Record<string, string>> {
-  const item = getItem() as Office.MessageCompose;
-  return p<Record<string, string>>((cb) => item.internetHeaders.getAsync(names, cb));
+export function getItemHeaders(
+  names: string[],
+  item?: Office.MessageCompose
+): Promise<Record<string, string>> {
+  const i = composeItem(item);
+  return p<Record<string, string>>((cb) => i.internetHeaders.getAsync(names, cb));
 }
 
 // --- Read mode getters ---
