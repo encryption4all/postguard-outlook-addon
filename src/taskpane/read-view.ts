@@ -28,6 +28,7 @@ import {
 import { Badge, FriendlySender } from "../lib/types";
 import { PKG_URL, CRYPTIFY_URL, ADDIN_VERSION, clientHeaders } from "../lib/pkg-client";
 import { byId } from "../lib/dom";
+import { wrapHtml } from "../lib/render-body";
 import { t } from "../lib/i18n";
 import { stringifyError } from "../lib/stringify-error";
 import { showView, setStatus, showError } from "./taskpane";
@@ -300,22 +301,4 @@ function badgesFromSender(sender: FriendlySender | null): Badge[] {
     if (a.value) out.push({ value: a.value });
   }
   return out;
-}
-
-function wrapHtml(body: string, isHtml: boolean): string {
-  if (isHtml) {
-    if (/<html[\s>]|<body[\s>]/i.test(body)) return body;
-    return `<!doctype html><html><body>${body}</body></html>`;
-  }
-  return `<!doctype html><html><body><pre style="white-space:pre-wrap;font-family:Segoe UI,Helvetica,Arial,sans-serif">${escape(
-    body
-  )}</pre></body></html>`;
-}
-
-function escape(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
 }
