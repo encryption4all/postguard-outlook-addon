@@ -13,5 +13,5 @@
     "lib": ["es2022", "dom"],
     "types": ["office-js", "office-runtime"]
   },
-  "exclude": ["node_modules", "dist", "lib", "lib-amd"]
+  "exclude": ["node_modules", "dist", "lib", "lib-amd", "test", "jest.config.js"]
 }
