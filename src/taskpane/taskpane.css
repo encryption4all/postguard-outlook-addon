@@ -527,6 +527,10 @@ body {
   border-radius: var(--pg-radius);
   min-height: 400px;
   background: white;
+  /* Keep the decrypted body on a light scheme so the Outlook host's dark
+     mode does not invert the white background to dark blue while leaving the
+     email's default black text untouched (unreadable black-on-blue, #58). */
+  color-scheme: light;
 }
 
 .pg-decrypted-attachments {
