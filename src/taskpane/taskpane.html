@@ -81,6 +81,14 @@
         <div id="pg-decrypted-attachments" class="pg-decrypted-attachments" hidden></div>
       </section>
 
+      <!-- Read-mode plaintext shown in a separate popup dialog window -->
+      <section id="view-decrypted-dialog" class="pg-view" hidden>
+        <div class="pg-info">
+          <span id="pg-decrypted-dialog-text"></span>
+        </div>
+        <button id="pg-btn-reopen-decrypted" class="pg-btn pg-btn-primary" type="button"></button>
+      </section>
+
       <!-- Not-applicable (read mode but no PostGuard content) -->
       <section id="view-read-noop" class="pg-view" hidden>
         <p id="pg-read-noop-text" class="pg-subtitle"></p>

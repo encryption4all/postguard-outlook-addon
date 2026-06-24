@@ -36,6 +36,7 @@ module.exports = async (env, options) => {
       commands: "./src/commands/commands.ts",
       launchevent: "./src/launchevent/launchevent.ts",
       "yivi-dialog": ["./src/yivi-dialog/yivi-dialog.ts", "./src/yivi-dialog/yivi-dialog.html"],
+      "read-dialog": ["./src/read-dialog/read-dialog.ts", "./src/read-dialog/read-dialog.html"],
     },
     output: {
       clean: true,
@@ -117,6 +118,11 @@ module.exports = async (env, options) => {
         filename: "yivi-dialog.html",
         template: "./src/yivi-dialog/yivi-dialog.html",
         chunks: ["polyfill", "yivi-dialog"],
+      }),
+      new HtmlWebpackPlugin({
+        filename: "read-dialog.html",
+        template: "./src/read-dialog/read-dialog.html",
+        chunks: ["polyfill", "read-dialog"],
       }),
       new CopyWebpackPlugin({
         patterns: [
