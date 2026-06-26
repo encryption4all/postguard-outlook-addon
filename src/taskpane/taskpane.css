@@ -561,6 +561,21 @@ body {
   text-decoration: underline;
 }
 
+/* Read-mode decryption popup (issue #72). The dialog reuses the taskpane
+   component styles (subject, meta, badges, attachments); it only needs a
+   flex column so the body iframe fills the larger window instead of the
+   taskpane's fixed 400px height. */
+.pg-read-dialog .pg-view,
+.pg-read-dialog #pg-rd-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.pg-read-dialog .pg-decrypted-body {
+  flex: 1 1 auto;
+}
+
 /* Spinner */
 
 .pg-spinner {

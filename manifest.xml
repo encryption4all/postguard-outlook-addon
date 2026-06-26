@@ -206,6 +206,7 @@
           <bt:Url id="WebViewRuntime.Url" DefaultValue="https://localhost:3000/launchevent.html"/>
           <bt:Url id="JSRuntime.Url" DefaultValue="https://localhost:3000/launchevent.js"/>
           <bt:Url id="YiviDialog.Url" DefaultValue="https://localhost:3000/yivi-dialog.html"/>
+          <bt:Url id="ReadDialog.Url" DefaultValue="https://localhost:3000/read-dialog.html"/>
         </bt:Urls>
         <bt:ShortStrings>
           <bt:String id="GroupLabel" DefaultValue="PostGuard"/>

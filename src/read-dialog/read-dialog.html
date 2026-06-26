@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PostGuard — Decrypted message</title>
+    <script
+      type="text/javascript"
+      src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"
+    ></script>
+    <link href="../taskpane/taskpane.css" rel="stylesheet" type="text/css" />
+  </head>
+  <body class="pg-app pg-read-dialog">
+    <main class="pg-main">
+      <section class="pg-view">
+        <p id="pg-rd-status" class="pg-subtitle" role="status" aria-live="polite">Loading decrypted message…</p>
+        <div id="pg-rd-error" class="pg-error" role="alert" hidden></div>
+        <div id="pg-rd-content" hidden>
+          <div id="pg-rd-badges" class="pg-badges"></div>
+          <div id="pg-rd-meta" class="pg-meta"></div>
+          <h3 id="pg-rd-subject" class="pg-decrypted-subject"></h3>
+          <iframe
+            id="pg-rd-body"
+            class="pg-decrypted-body"
+            title="Decrypted message body"
+            sandbox="allow-same-origin"
+            referrerpolicy="no-referrer"
+          ></iframe>
+          <div id="pg-rd-attachments" class="pg-decrypted-attachments" hidden></div>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

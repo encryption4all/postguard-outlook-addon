@@ -15,6 +15,7 @@ const views = {
   read_was_encrypted: byId("view-read-was-encrypted"),
   read_noop: byId("view-read-noop"),
   decrypted: byId("view-decrypted"),
+  decrypted_dialog: byId("view-decrypted-dialog"),
   yivi: byId("view-yivi"),
   error: byId("view-error"),
   settings: byId("view-settings"),
@@ -30,6 +31,7 @@ const SETTINGS_ENTRY_VIEWS: ReadonlySet<ViewName> = new Set<ViewName>([
   "read_was_encrypted",
   "read_noop",
   "decrypted",
+  "decrypted_dialog",
 ]);
 
 let lastSettingsEntryView: ViewName = "compose";

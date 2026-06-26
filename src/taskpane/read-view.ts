@@ -16,7 +16,7 @@ import {
   getSenderEmail,
   showNotification,
 } from "../lib/office-helpers";
-import { fromBase64, bytesToUtf8 } from "../lib/encoding";
+import { fromBase64, toBase64, bytesToUtf8 } from "../lib/encoding";
 import {
   POSTGUARD_ENCRYPTED_FILENAME,
   extractArmoredCiphertext,
@@ -26,23 +26,47 @@ import {
   readMimeHeader,
 } from "../lib/mime";
 import { Badge, FriendlySender } from "../lib/types";
-import { PKG_URL, CRYPTIFY_URL, ADDIN_VERSION, clientHeaders } from "../lib/pkg-client";
+import {
+  PKG_URL,
+  CRYPTIFY_URL,
+  ADDIN_VERSION,
+  ADDIN_PUBLIC_URL,
+  clientHeaders,
+} from "../lib/pkg-client";
 import { byId } from "../lib/dom";
 import { wrapHtml } from "../lib/render-body";
+import { chunkPayload } from "../lib/dialog-chunk";
+import { getAllowOptimisticDialog } from "../lib/settings";
 import { t } from "../lib/i18n";
 import { stringifyError } from "../lib/stringify-error";
+import type { DecryptedMessagePayload } from "../read-dialog/read-dialog";
 import { showView, setStatus, showError } from "./taskpane";
+
+// Parsed, ready-to-render form of a decrypted message. Held in memory only
+// (on `state.decrypted`) so the dialog can be re-opened without decrypting
+// again; never written anywhere persistent.
+interface DecryptedContent {
+  subject: string;
+  from: string;
+  date: string;
+  badges: string[];
+  body: string;
+  isHtml: boolean;
+  attachments: ParsedAttachment[];
+}
 
 interface ReadState {
   ciphertext: Uint8Array | null;
   recipientEmail: string;
   busy: boolean;
+  decrypted: DecryptedContent | null;
 }
 
 const state: ReadState = {
   ciphertext: null,
   recipientEmail: "",
   busy: false,
+  decrypted: null,
 };
 
 export async function mountReadView(): Promise<void> {
@@ -205,42 +229,166 @@ interface OpenedMessage {
 
 function renderDecrypted(plaintext: Uint8Array, sender: FriendlySender | null): void {
   const mime = bytesToUtf8(plaintext);
-  const subject = readMimeHeader(mime, "Subject") ?? "";
-  const from = readMimeHeader(mime, "From") ?? "";
-  const date = readMimeHeader(mime, "Date") ?? "";
+  const parsed = parseDecryptedMime(mime);
+  const content: DecryptedContent = {
+    subject: readMimeHeader(mime, "Subject") ?? "",
+    from: readMimeHeader(mime, "From") ?? "",
+    date: readMimeHeader(mime, "Date") ?? "",
+    badges: badgesFromSender(sender).map((b) => b.value),
+    body: parsed.htmlBody ?? parsed.plainBody ?? "",
+    isHtml: parsed.htmlBody != null,
+    attachments: parsed.attachments,
+  };
+  // Keep the parsed plaintext in memory so the dialog can be re-opened
+  // without a second Yivi/decrypt round-trip. Nothing is persisted.
+  state.decrypted = content;
+  void presentDecrypted();
+}
 
+// Show the decrypted message in a roomy popup dialog (issue #72). The
+// cramped taskpane is a poor fit for reading a full email, so the
+// already-decrypted content is marshalled into a dedicated dialog window
+// in memory. If the dialog cannot be opened (popup blocked, host
+// limitation), fall back to rendering inline in the taskpane so the user
+// can still read their message.
+async function presentDecrypted(): Promise<void> {
+  const content = state.decrypted;
+  if (!content) return;
+  try {
+    await openDecryptedDialog(content);
+    showDialogOpenedView();
+  } catch (err) {
+    console.log(`[pg-read] dialog open failed, falling back to taskpane: ${stringifyError(err)}`);
+    renderInTaskpane(content);
+  }
+}
+
+// displayDialogAsync only accepts a screen percentage. Convert a target
+// pixel size, clamped to Office's [1, 99] range. Mirrors the launchevent
+// helper so the dialog scales sensibly on both laptops and ultrawides.
+function pctOfScreen(targetPx: number, screenPx: number): number {
+  const pct = Math.ceil((targetPx / screenPx) * 100);
+  return Math.min(99, Math.max(1, pct));
+}
+
+function buildDialogPayload(content: DecryptedContent): DecryptedMessagePayload {
+  return {
+    type: "decrypted-message",
+    subject: content.subject,
+    from: content.from,
+    date: content.date,
+    badges: content.badges,
+    body: content.body,
+    isHtml: content.isHtml,
+    attachments: content.attachments.map((a) => ({
+      name: a.name,
+      type: a.type,
+      base64: toBase64(a.data),
+    })),
+  };
+}
+
+// Opens the read dialog and, once it signals ready, posts the decrypted
+// message to it in memory (chunked, since messageChild caps each frame at
+// ~32KB). Resolves as soon as the dialog window is open — the taskpane
+// does not wait for it to close. Rejects if displayDialogAsync fails.
+function openDecryptedDialog(content: DecryptedContent): Promise<void> {
+  const url = `${ADDIN_PUBLIC_URL}read-dialog.html`;
+  const screenW = window.screen?.width || 1920;
+  const screenH = window.screen?.height || 1080;
+  const options: Office.DialogOptions = {
+    width: pctOfScreen(900, screenW),
+    height: pctOfScreen(800, screenH),
+    displayInIframe: false,
+    // Respect the same "skip the open-a-dialog confirmation" setting the
+    // encrypt flow uses. Default (off) shows Office's prompt, which opens
+    // reliably on every host; a blocked open falls back to the taskpane.
+    promptBeforeOpen: !getAllowOptimisticDialog(),
+  };
+
+  return new Promise((resolve, reject) => {
+    Office.context.ui.displayDialogAsync(url, options, (asyncResult) => {
+      if (asyncResult.status !== Office.AsyncResultStatus.Succeeded) {
+        const err = asyncResult.error;
+        reject(err ? new Error(stringifyError(err)) : new Error("displayDialogAsync failed"));
+        return;
+      }
+      const dialog = asyncResult.value;
+      let sent = false;
+      dialog.addEventHandler(
+        Office.EventType.DialogMessageReceived,
+        (arg: { message: string } | { error: number }) => {
+          if ("error" in arg) return;
+          let body: { type?: unknown };
+          try {
+            body = JSON.parse(arg.message) as { type?: unknown };
+          } catch {
+            return;
+          }
+          if (body.type === "ready" && !sent) {
+            sent = true;
+            const payload = buildDialogPayload(content);
+            for (const c of chunkPayload(payload)) {
+              dialog.messageChild(JSON.stringify(c));
+            }
+          }
+        }
+      );
+      resolve();
+    });
+  });
+}
+
+// Compact taskpane state shown while the decrypted message lives in its
+// own dialog window. Offers a button to re-open it (the plaintext is kept
+// in memory on state.decrypted).
+function showDialogOpenedView(): void {
+  const text = byId<HTMLElement>("pg-decrypted-dialog-text");
+  text.textContent = t("decryptedOpenedInWindow");
+
+  const btn = byId<HTMLButtonElement>("pg-btn-reopen-decrypted");
+  btn.textContent = t("decryptedReopen");
+  // Replace listeners by cloning so re-renders don't stack handlers.
+  const fresh = btn.cloneNode(true) as HTMLButtonElement;
+  btn.replaceWith(fresh);
+  fresh.addEventListener("click", () => void presentDecrypted());
+
+  showView("decrypted_dialog");
+}
+
+// Fallback renderer: shows the decrypted message inline in the taskpane
+// when the popup dialog could not be opened.
+function renderInTaskpane(content: DecryptedContent): void {
   const subjectEl = byId<HTMLElement>("pg-decrypted-subject");
-  subjectEl.textContent = subject;
+  subjectEl.textContent = content.subject;
 
   const metaEl = byId<HTMLElement>("pg-decrypted-meta");
-  metaEl.textContent = [from && `${t("metaFrom")}: ${from}`, date && `${t("metaDate")}: ${date}`]
+  metaEl.textContent = [
+    content.from && `${t("metaFrom")}: ${content.from}`,
+    content.date && `${t("metaDate")}: ${content.date}`,
+  ]
     .filter(Boolean)
     .join("  •  ");
 
   const badgesEl = byId<HTMLElement>("pg-decrypted-badges");
   badgesEl.innerHTML = "";
-  const badges = badgesFromSender(sender);
-  if (badges.length > 0) {
+  if (content.badges.length > 0) {
     const label = document.createElement("span");
     label.textContent = `${t("notificationHeaderBadgesLabel")}: `;
     label.className = "pg-meta";
     badgesEl.appendChild(label);
-    for (const b of badges) {
+    for (const value of content.badges) {
       const span = document.createElement("span");
       span.className = "pg-badge";
-      span.textContent = b.value;
+      span.textContent = value;
       badgesEl.appendChild(span);
     }
   }
 
-  const parsed = parseDecryptedMime(mime);
-  const bodyText = parsed.htmlBody ?? parsed.plainBody ?? "";
-  const isHtml = parsed.htmlBody != null;
-
   const iframe = byId<HTMLIFrameElement>("pg-decrypted-body");
-  iframe.srcdoc = wrapHtml(bodyText, isHtml);
+  iframe.srcdoc = wrapHtml(content.body, content.isHtml);
 
-  renderAttachments(parsed.attachments);
+  renderAttachments(content.attachments);
 
   showView("decrypted");
 }
