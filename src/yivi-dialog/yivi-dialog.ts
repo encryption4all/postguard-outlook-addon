@@ -19,6 +19,7 @@ import {
 } from "../lib/pkg-client";
 import { ChunkAssembler, chunkPayload, isChunkMessage, ChunkMessage } from "../lib/dialog-chunk";
 import { stringifyError } from "../lib/stringify-error";
+import { runEncryptionFlow } from "./encryption-flow";
 import {
   recordPendingUpload,
   clearPendingUpload,
@@ -216,32 +217,22 @@ function handlePayload(msg: DialogMessage): void {
   setSubtitle(
     `Building encrypted message (${req.attachments.length} attachment${req.attachments.length === 1 ? "" : "s"})…`
   );
-  void runEncryption(req).then(
-    (result) => {
-      log("encryption complete; posting result");
-      postChunkedToParent(result as unknown as DialogMessage);
-      showCompleted("Encrypted and sent. You can close this window.");
-    },
-    (err) => {
-      // pg-js raises UploadSessionExpiredError when cryptify's structured
-      // 404 says the upload session is gone (TTL expired, server restart,
-      // unknown UUID, or wrong recovery_token). Surface that distinctly so
-      // the Smart Alert can tell the user "start a new send" instead of a
-      // generic "encryption failed" — see issue #82.
-      const expired = err instanceof UploadSessionExpiredError;
-      const message = expired
-        ? "The upload session expired. Please start a new send."
-        : stringifyError(err);
-      log(`encryption failed${expired ? " (upload session expired)" : ""}: ${stringifyError(err)}`);
-      showError(expired ? message : `Encryption failed: ${message}`);
-      postChunkedToParent(
-        expired
-          ? { type: "encrypt-error", message, code: "upload_session_expired" }
-          : { type: "encrypt-error", message }
-      );
-      showCompleted(message, true);
-    }
-  );
+  // The success/failure handling lives in runEncryptionFlow, which wraps
+  // every DOM/Office.js side-effect so a throw inside showError /
+  // postChunkedToParent / showCompleted cannot be silently swallowed or
+  // leak as an unhandled rejection (see encryption-flow.ts). It is designed
+  // never to reject; the .catch is a last-resort boundary guard.
+  void runEncryptionFlow(req, {
+    runEncryption,
+    postChunkedToParent,
+    showError,
+    showCompleted,
+    log,
+    stringifyError,
+    isUploadSessionExpired: (err) => err instanceof UploadSessionExpiredError,
+  }).catch((err) => {
+    log(`unexpected error in encryption flow: ${stringifyError(err)}`);
+  });
 }
 
 Office.onReady(() => {
