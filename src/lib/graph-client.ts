@@ -3,6 +3,7 @@
 // messages. Encryption itself never touches Graph.
 
 import { getGraphToken } from "./auth";
+import { escapeODataString } from "./odata";
 
 const GRAPH_BASE = "https://graph.microsoft.com/v1.0";
 
@@ -26,7 +27,8 @@ export interface GraphFolder {
 }
 
 export async function findFolder(displayName: string): Promise<GraphFolder | null> {
-  const url = `/me/mailFolders?$filter=displayName eq '${encodeURIComponent(displayName)}'&$top=1`;
+  const safeName = escapeODataString(displayName);
+  const url = `/me/mailFolders?$filter=displayName eq '${encodeURIComponent(safeName)}'&$top=1`;
   const res = await graphFetch(url);
   if (!res.ok) throw new Error(`findFolder failed: ${res.status}`);
   const body = (await res.json()) as { value: GraphFolder[] };
