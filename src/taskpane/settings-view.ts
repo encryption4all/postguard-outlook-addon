@@ -102,10 +102,16 @@ function wireListeners(): void {
       ),
       [SIGN_PREFILL_MOBILE]: byId<HTMLInputElement>("pg-prefill-mobile").value,
     };
-    console.log("[pg-settings] saving prefills:", next);
+    // Prefills contain PII (full name, date of birth, mobile number); only
+    // log them in non-production builds so they never leak into production.
+    if (process.env.NODE_ENV !== "production") {
+      console.log("[pg-settings] saving prefills:", next);
+    }
     setSignPrefills(next)
       .then(() => {
-        console.log("[pg-settings] persisted; readback:", getSignPrefills());
+        if (process.env.NODE_ENV !== "production") {
+          console.log("[pg-settings] persisted; readback:", getSignPrefills());
+        }
         setStatus(t("settingsSaved"));
         setTimeout(() => setStatus(""), 2000);
         showView(returnView);
