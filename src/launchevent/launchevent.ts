@@ -87,8 +87,11 @@ function log(msg: string): void {
 // Build the Smart Alert text for a thrown encryption failure. The dialog
 // tags upload-session-expired rejections with `code: "upload_session_expired"`
 // (see runEncryptDialog's encrypt-error dispatch) so we can show the
-// dedicated message verbatim instead of burying it behind the generic
-// "PostGuard encryption failed:" prefix. See issue #82.
+// dedicated message verbatim. Every other failure returns a generic,
+// localised message: the raw error (which may carry a stack trace, internal
+// file paths, or SDK internals) must never reach the Smart Alert dialog or
+// taskpane UI. It is logged for diagnostics instead. See issue #82 and
+// security advisory GHSA-8rxw-3qj6-p59v (#113).
 function encryptionFailureMessage(e: unknown): string {
   if (
     typeof e === "object" &&
@@ -97,7 +100,8 @@ function encryptionFailureMessage(e: unknown): string {
   ) {
     return t("uploadSessionExpiredError");
   }
-  return `PostGuard encryption failed: ${stringifyError(e)}`;
+  log(`encryption failed: ${stringifyError(e)}`);
+  return t("encryptionError");
 }
 
 // Encryption-path watchdog. Once the user opts into encrypting this

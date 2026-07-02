@@ -6,7 +6,12 @@
 // every diagnostic clue. This helper preserves whatever shape we got.
 export function stringifyError(err: unknown): string {
   if (err instanceof Error) {
-    return err.stack ? `${err.message}\n${err.stack}` : err.message;
+    // Never fold the stack into the returned string — it can leak internal
+    // file paths and implementation details into user-facing UI (Smart Alert
+    // dialog / taskpane). Log it to the console for diagnostics instead and
+    // return only the human-readable message. See GHSA-8rxw-3qj6-p59v.
+    if (err.stack) console.error(err.stack);
+    return err.message;
   }
   if (typeof err === "string") return err;
   if (err && typeof err === "object") {
