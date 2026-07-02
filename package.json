@@ -50,14 +50,20 @@
     "office-addin-usage-data@2.0.8": {
       "applicationinsights": "^3.15.0"
     },
-    "uuid": "^11.1.1"
+    "uuid": "^11.1.1",
+    "js-yaml": "^4.3.0",
+    "form-data": "^4.0.6",
+    "hono": "^4.12.27",
+    "tar": "^7.5.19",
+    "http-proxy-middleware": "^2.0.10",
+    "launch-editor": "^2.14.1"
   },
   "devDependencies": {
-    "@babel/core": "^7.29.0",
+    "@babel/core": "^7.29.7",
     "@babel/preset-env": "^7.29.5",
     "@babel/preset-typescript": "^7.28.5",
-    "@types/office-js": "^1.0.591",
-    "@types/office-runtime": "^1.0.37",
+    "@types/office-js": "^1.0.596",
+    "@types/office-runtime": "^1.0.39",
     "babel-loader": "^10.1.1",
     "copy-webpack-plugin": "^14.0.0",
     "dotenv": "^17.4.2",
@@ -75,9 +81,9 @@
     "process": "^0.11.10",
     "source-map-loader": "^5.0.0",
     "typescript": "^6.0.3",
-    "webpack": "^5.107.1",
-    "webpack-cli": "^7.0.2",
-    "webpack-dev-server": "^5.2.4"
+    "webpack": "^5.108.3",
+    "webpack-cli": "^7.1.0",
+    "webpack-dev-server": "^5.2.5"
   },
   "prettier": "office-addin-prettier-config",
   "browserslist": [
