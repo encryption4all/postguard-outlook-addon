@@ -9,6 +9,7 @@
 // this dialog window. Closing the dialog drops it.
 
 import { wrapHtml } from "../lib/render-body";
+import { reconcileSender, senderMetaLine } from "../lib/verified-sender";
 import { fromBase64 } from "../lib/encoding";
 import { ChunkAssembler, isChunkMessage, ChunkMessage } from "../lib/dialog-chunk";
 import { stringifyError } from "../lib/stringify-error";
@@ -28,7 +29,11 @@ export interface DecryptedAttachmentPayload {
 export interface DecryptedMessagePayload {
   type: "decrypted-message";
   subject: string;
+  // Claimed MIME `From` header (sender-controlled); reconciled against
+  // `verifiedSender` before display, never trusted on its own.
   from: string;
+  // Cryptographically verified sender, or null when none was present.
+  verifiedSender: string | null;
   date: string;
   badges: string[];
   body: string;
@@ -114,10 +119,8 @@ function render(msg: DecryptedMessagePayload): void {
 
   const metaEl = document.getElementById("pg-rd-meta");
   if (metaEl) {
-    metaEl.textContent = [
-      msg.from && `${t("metaFrom")}: ${msg.from}`,
-      msg.date && `${t("metaDate")}: ${msg.date}`,
-    ]
+    const sender = senderMetaLine(reconcileSender(msg.from, msg.verifiedSender), t);
+    metaEl.textContent = [sender.from, msg.date && `${t("metaDate")}: ${msg.date}`, sender.warning]
       .filter(Boolean)
       .join("  •  ");
   }

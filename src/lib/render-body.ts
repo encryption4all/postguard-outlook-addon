@@ -25,7 +25,22 @@ const BASE_STYLE =
   `html,body{background:${BODY_BG};color:${BODY_FG};}` +
   `body{margin:0;padding:8px;}`;
 
-const HEAD_TAGS = `<meta name="color-scheme" content="light"><style>${BASE_STYLE}</style>`;
+// Content-Security-Policy for the decrypted body document. The body is
+// attacker-influenced markup, so the wrapper denies everything by default and
+// re-enables only what the reader legitimately needs:
+//   - default-src 'none'  block every fetch/connect/frame unless allowed below
+//   - img-src data: blob:  show inlined images only; remote URLs (tracking
+//                          pixels, read-receipts) are blocked, so opening a
+//                          message no longer leaks the reader's IP/activity
+//   - style-src 'unsafe-inline'  our base <style> and senders' inline styles
+//   - font-src data:  inlined web fonts only
+// Placed first in <head> so it governs everything that follows.
+const BODY_CSP =
+  "default-src 'none'; img-src data: blob:; style-src 'unsafe-inline'; font-src data:;";
+
+const HEAD_TAGS =
+  `<meta http-equiv="Content-Security-Policy" content="${BODY_CSP}">` +
+  `<meta name="color-scheme" content="light"><style>${BASE_STYLE}</style>`;
 
 /**
  * Wrap a decrypted email body into a self-contained HTML document suitable for
