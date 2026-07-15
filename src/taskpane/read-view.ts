@@ -35,6 +35,7 @@ import {
 } from "../lib/pkg-client";
 import { byId } from "../lib/dom";
 import { wrapHtml } from "../lib/render-body";
+import { reconcileSender, senderMetaLine } from "../lib/verified-sender";
 import { chunkPayload } from "../lib/dialog-chunk";
 import { getAllowOptimisticDialog } from "../lib/settings";
 import { t } from "../lib/i18n";
@@ -47,7 +48,13 @@ import { showView, setStatus, showError } from "./taskpane";
 // again; never written anywhere persistent.
 interface DecryptedContent {
   subject: string;
+  // Claimed MIME `From` header from inside the decrypted payload. Sender-
+  // controlled and never trusted on its own — reconciled against
+  // `verifiedSender` before display (see ../lib/verified-sender).
   from: string;
+  // Cryptographically verified sender bound to the PostGuard signature, or
+  // null when the message carried no verified sender.
+  verifiedSender: string | null;
   date: string;
   badges: string[];
   body: string;
@@ -233,6 +240,7 @@ function renderDecrypted(plaintext: Uint8Array, sender: FriendlySender | null): 
   const content: DecryptedContent = {
     subject: readMimeHeader(mime, "Subject") ?? "",
     from: readMimeHeader(mime, "From") ?? "",
+    verifiedSender: sender?.email ?? null,
     date: readMimeHeader(mime, "Date") ?? "",
     badges: badgesFromSender(sender).map((b) => b.value),
     body: parsed.htmlBody ?? parsed.plainBody ?? "",
@@ -276,6 +284,7 @@ function buildDialogPayload(content: DecryptedContent): DecryptedMessagePayload 
     type: "decrypted-message",
     subject: content.subject,
     from: content.from,
+    verifiedSender: content.verifiedSender,
     date: content.date,
     badges: content.badges,
     body: content.body,
@@ -363,9 +372,11 @@ function renderInTaskpane(content: DecryptedContent): void {
   subjectEl.textContent = content.subject;
 
   const metaEl = byId<HTMLElement>("pg-decrypted-meta");
+  const sender = senderMetaLine(reconcileSender(content.from, content.verifiedSender), t);
   metaEl.textContent = [
-    content.from && `${t("metaFrom")}: ${content.from}`,
+    sender.from,
     content.date && `${t("metaDate")}: ${content.date}`,
+    sender.warning,
   ]
     .filter(Boolean)
     .join("  •  ");
