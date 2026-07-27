@@ -15,8 +15,7 @@ PostGuard end-to-end email encryption as an Office Add-in for the new Outlook on
 - `npm run validate` — validates `manifest.xml` against the Office Add-in schema. Run after manifest edits.
 - `npm run lint` / `npm run lint:fix` / `npm run prettier` — `office-addin-lint` wrappers (ESLint + Prettier with the office-addins config).
 - `npm run signin` / `npm run signout` — manage the M365 dev account used by the debugging tools.
-
-There are no automated tests in this project.
+- `npm test` — the `node:test` suites under `test/`. Needs Node >= 22.6 for `--experimental-strip-types`.
 
 ## Build-time configuration
 
@@ -102,12 +101,16 @@ Outlook add-in (Office.js). Default branch: `master`. Separate from `postguard-t
 - `npm install` works cleanly, no `--legacy-peer-deps` needed.
 - `npm run build` compiles; there's a pre-existing size-limit warning on the `taskpane.js` (~1.03 MiB) and `yivi-dialog.js` (~1 MiB) entrypoint bundles, which embed the bundled WASM (no standalone `.wasm` is emitted to `dist/`). Baseline, not a regression.
 - Keep `package-lock.json` committed for install reproducibility.
-- CI (`ci.yml`) runs eslint (`max-warnings=0`), `tsc --noEmit`, `npm run build`, and `npm run validate` on PR + push to master.
+- CI (`ci.yml`) runs eslint (`max-warnings=0`), `tsc --noEmit`, `npm run build`, `npm run validate`, and `npm test` (Node 22) on PR + push to master.
 
 ### Tests
-Node's built-in test runner, zero extra deps: `npm test` runs `node --test --experimental-strip-types "test/**/*.test.ts"`. Tests live under `test/`, outside the src-scoped lint/prettier/tsc CI globs (`test/` is in tsconfig `exclude`). Do NOT introduce Jest, the repo has already migrated a Jest-based test back to `node:test` + `node:assert/strict` once. Pattern file: `test/render-body.test.ts`.
+Node's built-in test runner, zero extra deps: `npm test` runs `node --test --experimental-strip-types "test/**/*.test.ts"`. Tests live under `test/` and are covered by `tsc --noEmit` (still outside the src-scoped eslint/prettier CI globs). Do NOT introduce Jest, the repo has already migrated a Jest-based test back to `node:test` + `node:assert/strict` once. Pattern file: `test/render-body.test.ts`.
 
 Gotchas under `--experimental-strip-types`: imports of source modules must use the explicit `.ts` extension (`from "../src/lib/foo.ts"`), and type-only imports must use `import type { ... }`, a plain `import { SomeInterface }` makes Node try to resolve a non-existent runtime export and the whole file errors.
+
+Those `.ts` import specifiers are why `tsconfig.json` sets `allowImportingTsExtensions` (and therefore `noEmit`, which the option requires). Nothing emits through `tsc` anyway, webpack + Babel do the build, so `outDir` / `sourceMap` / `noEmitOnError` are not set.
+
+The suites import `node:test` / `node:assert/strict`, so `@types/node` is a declared devDependency and `node` is listed in the `types` compiler option. Both are needed: `types` is set explicitly, which switches off automatic inclusion of every `@types/*` package, so installing `@types/node` on its own does not put it in the program. Before `node` was added to that array the only thing pulling node types in was a `/// <reference types="node" />` deep inside the `office-addin-dev-certs` and `undici-types` declarations, reached through `webpack.config.js` (in the program via `allowJs`). That link would have broken on any unrelated dependency bump.
 
 ### Dependencies
 - Webpack + `copy-webpack-plugin` + `webpack-dev-server`.
