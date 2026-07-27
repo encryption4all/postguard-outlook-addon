@@ -1,9 +1,11 @@
 {
   "compilerOptions": {
+    "allowImportingTsExtensions": true,
     "allowJs": true,
     "esModuleInterop": true,
     "moduleResolution": "bundler",
     "module": "esnext",
+    "noEmit": true,
     "noEmitOnError": true,
     "outDir": "lib",
     "skipLibCheck": true,
@@ -13,5 +15,5 @@
     "lib": ["es2022", "dom"],
     "types": ["office-js", "office-runtime"]
   },
-  "exclude": ["node_modules", "dist", "lib", "lib-amd", "test"]
+  "exclude": ["node_modules", "dist", "lib", "lib-amd"]
 }

@@ -15,8 +15,7 @@ PostGuard end-to-end email encryption as an Office Add-in for the new Outlook on
 - `npm run validate` — validates `manifest.xml` against the Office Add-in schema. Run after manifest edits.
 - `npm run lint` / `npm run lint:fix` / `npm run prettier` — `office-addin-lint` wrappers (ESLint + Prettier with the office-addins config).
 - `npm run signin` / `npm run signout` — manage the M365 dev account used by the debugging tools.
-
-There are no automated tests in this project.
+- `npm test` — the `node:test` suites under `test/`. Needs Node >= 22.6 for `--experimental-strip-types`.
 
 ## Build-time configuration
 
@@ -105,9 +104,11 @@ Outlook add-in (Office.js). Default branch: `master`. Separate from `postguard-t
 - CI (`ci.yml`) runs eslint (`max-warnings=0`), `tsc --noEmit`, `npm run build`, and `npm run validate` on PR + push to master.
 
 ### Tests
-Node's built-in test runner, zero extra deps: `npm test` runs `node --test --experimental-strip-types "test/**/*.test.ts"`. Tests live under `test/`, outside the src-scoped lint/prettier/tsc CI globs (`test/` is in tsconfig `exclude`). Do NOT introduce Jest, the repo has already migrated a Jest-based test back to `node:test` + `node:assert/strict` once. Pattern file: `test/render-body.test.ts`.
+Node's built-in test runner, zero extra deps: `npm test` runs `node --test --experimental-strip-types "test/**/*.test.ts"`. Tests live under `test/` and are covered by `tsc --noEmit` (still outside the src-scoped eslint/prettier CI globs). Do NOT introduce Jest, the repo has already migrated a Jest-based test back to `node:test` + `node:assert/strict` once. Pattern file: `test/render-body.test.ts`.
 
 Gotchas under `--experimental-strip-types`: imports of source modules must use the explicit `.ts` extension (`from "../src/lib/foo.ts"`), and type-only imports must use `import type { ... }`, a plain `import { SomeInterface }` makes Node try to resolve a non-existent runtime export and the whole file errors.
+
+Those `.ts` import specifiers are why `tsconfig.json` sets `allowImportingTsExtensions` (and therefore `noEmit`, which the option requires). Nothing emits through `tsc` anyway — webpack + Babel do the build. `@types/node` is a declared devDependency because the suites import `node:test` / `node:assert/strict`; without it the typecheck cannot resolve them.
 
 ### Dependencies
 - Webpack + `copy-webpack-plugin` + `webpack-dev-server`.
