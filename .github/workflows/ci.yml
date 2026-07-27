@@ -38,6 +38,24 @@ jobs:
       - name: Validate manifest
         run: npm run validate
 
+  test:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      # node --test --experimental-strip-types needs Node >= 22.6, so this job
+      # cannot share the check job's Node 20.
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Unit tests (node:test)
+        run: npm test
+
   nginx:
     name: nginx config test
     runs-on: ubuntu-latest

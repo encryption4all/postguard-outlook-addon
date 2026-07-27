@@ -101,7 +101,7 @@ Outlook add-in (Office.js). Default branch: `master`. Separate from `postguard-t
 - `npm install` works cleanly, no `--legacy-peer-deps` needed.
 - `npm run build` compiles; there's a pre-existing size-limit warning on the `taskpane.js` (~1.03 MiB) and `yivi-dialog.js` (~1 MiB) entrypoint bundles, which embed the bundled WASM (no standalone `.wasm` is emitted to `dist/`). Baseline, not a regression.
 - Keep `package-lock.json` committed for install reproducibility.
-- CI (`ci.yml`) runs eslint (`max-warnings=0`), `tsc --noEmit`, `npm run build`, and `npm run validate` on PR + push to master.
+- CI (`ci.yml`) runs eslint (`max-warnings=0`), `tsc --noEmit`, `npm run build`, `npm run validate`, and `npm test` (Node 22) on PR + push to master.
 
 ### Tests
 Node's built-in test runner, zero extra deps: `npm test` runs `node --test --experimental-strip-types "test/**/*.test.ts"`. Tests live under `test/` and are covered by `tsc --noEmit` (still outside the src-scoped eslint/prettier CI globs). Do NOT introduce Jest, the repo has already migrated a Jest-based test back to `node:test` + `node:assert/strict` once. Pattern file: `test/render-body.test.ts`.
