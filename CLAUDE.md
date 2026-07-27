@@ -108,7 +108,9 @@ Node's built-in test runner, zero extra deps: `npm test` runs `node --test --exp
 
 Gotchas under `--experimental-strip-types`: imports of source modules must use the explicit `.ts` extension (`from "../src/lib/foo.ts"`), and type-only imports must use `import type { ... }`, a plain `import { SomeInterface }` makes Node try to resolve a non-existent runtime export and the whole file errors.
 
-Those `.ts` import specifiers are why `tsconfig.json` sets `allowImportingTsExtensions` (and therefore `noEmit`, which the option requires). Nothing emits through `tsc` anyway — webpack + Babel do the build. `@types/node` is a declared devDependency because the suites import `node:test` / `node:assert/strict`; without it the typecheck cannot resolve them.
+Those `.ts` import specifiers are why `tsconfig.json` sets `allowImportingTsExtensions` (and therefore `noEmit`, which the option requires). Nothing emits through `tsc` anyway, webpack + Babel do the build, so `outDir` / `sourceMap` / `noEmitOnError` are not set.
+
+The suites import `node:test` / `node:assert/strict`, so `@types/node` is a declared devDependency and `node` is listed in the `types` compiler option. Both are needed: `types` is set explicitly, which switches off automatic inclusion of every `@types/*` package, so installing `@types/node` on its own does not put it in the program. Before `node` was added to that array the only thing pulling node types in was a `/// <reference types="node" />` deep inside the `office-addin-dev-certs` and `undici-types` declarations, reached through `webpack.config.js` (in the program via `allowJs`). That link would have broken on any unrelated dependency bump.
 
 ### Dependencies
 - Webpack + `copy-webpack-plugin` + `webpack-dev-server`.
