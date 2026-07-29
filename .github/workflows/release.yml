@@ -39,7 +39,7 @@ jobs:
       IMAGE: ghcr.io/${{ github.repository }}
       ADDIN_HOST: addin.staging.postguard.eu
       PKG_URL: https://staging.postguard.eu/pkg
-      CRYPTIFY_URL: https://fileshare.staging.postguard.eu
+      CRYPTIFY_URL: https://storage.staging.postguard.eu
       POSTGUARD_WEBSITE_URL: https://staging.postguard.eu
     steps:
       - uses: actions/checkout@v6
@@ -77,7 +77,7 @@ jobs:
       IMAGE: ghcr.io/${{ github.repository }}
       ADDIN_HOST: addin.postguard.eu
       PKG_URL: https://postguard.eu/pkg
-      CRYPTIFY_URL: https://fileshare.postguard.eu
+      CRYPTIFY_URL: https://storage.postguard.eu
       POSTGUARD_WEBSITE_URL: https://postguard.eu
     steps:
       - uses: actions/checkout@v6

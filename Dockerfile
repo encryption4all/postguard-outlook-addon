@@ -6,7 +6,7 @@ WORKDIR /app
 # Build-time configuration baked into the bundle and manifest.
 ARG ADDIN_PUBLIC_URL=https://addin.postguard.eu/
 ARG PKG_URL=https://postguard.eu/pkg
-ARG CRYPTIFY_URL=https://fileshare.postguard.eu
+ARG CRYPTIFY_URL=https://storage.postguard.eu
 ARG POSTGUARD_WEBSITE_URL=https://postguard.eu
 
 ENV ADDIN_PUBLIC_URL=${ADDIN_PUBLIC_URL} \

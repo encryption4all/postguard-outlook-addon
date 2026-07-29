@@ -13,7 +13,7 @@ const urlProd = process.env.ADDIN_PUBLIC_URL || "https://addin.postguard.eu/";
 const requiredEnv = ["PKG_URL", "CRYPTIFY_URL", "POSTGUARD_WEBSITE_URL"];
 const envDefaults = {
   PKG_URL: "https://staging.postguard.eu/pkg",
-  CRYPTIFY_URL: "https://fileshare.staging.postguard.eu",
+  CRYPTIFY_URL: "https://storage.staging.postguard.eu",
   POSTGUARD_WEBSITE_URL: "https://staging.postguard.eu",
 };
 const resolvedEnv = {};
