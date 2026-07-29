@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.5.0](https://github.com/encryption4all/postguard-outlook-addon/compare/v0.4.0...v0.5.0) (2026-07-29)
+
+
+### Features
+
+* **metrics:** tag cryptify uploads with X-Cryptify-Source: outlook ([#96](https://github.com/encryption4all/postguard-outlook-addon/issues/96)) ([5629fa5](https://github.com/encryption4all/postguard-outlook-addon/commit/5629fa584270d123c86f8ea2fe3c4a672bd00901))
+* show decrypted email in a popup dialog instead of the taskpane ([#110](https://github.com/encryption4all/postguard-outlook-addon/issues/110)) ([588b9ae](https://github.com/encryption4all/postguard-outlook-addon/commit/588b9ae942a6154ffbf1ab5c3e129ee2bd415650))
+
+
+### Bug Fixes
+
+* **compose:** enforce values on required decryption attributes ([#57](https://github.com/encryption4all/postguard-outlook-addon/issues/57)) ([#92](https://github.com/encryption4all/postguard-outlook-addon/issues/92)) ([928d925](https://github.com/encryption4all/postguard-outlook-addon/commit/928d92547fc0e5a57551933bdabd71016b77c796))
+* dialog client-version header uses pg4ol and live package version ([#105](https://github.com/encryption4all/postguard-outlook-addon/issues/105)) ([5300dc4](https://github.com/encryption4all/postguard-outlook-addon/commit/5300dc423107d55b4c2d0a0dc74b54d177f9ca5e)), closes [#103](https://github.com/encryption4all/postguard-outlook-addon/issues/103)
+* escape single quotes in Graph OData $filter (OData injection) ([#119](https://github.com/encryption4all/postguard-outlook-addon/issues/119)) ([355a960](https://github.com/encryption4all/postguard-outlook-addon/commit/355a960b4d6aae924f3bae2a201e8d8967021d64))
+* point Cryptify at storage.postguard.eu, not the dead fileshare host ([#133](https://github.com/encryption4all/postguard-outlook-addon/issues/133)) ([2e9acc4](https://github.com/encryption4all/postguard-outlook-addon/commit/2e9acc4ac1b83b0623334f361bf407e91d8eb54c)), closes [#132](https://github.com/encryption4all/postguard-outlook-addon/issues/132)
+* **read-view:** ensure decrypted body meets WCAG 2.2 AA contrast ([#58](https://github.com/encryption4all/postguard-outlook-addon/issues/58)) ([#109](https://github.com/encryption4all/postguard-outlook-addon/issues/109)) ([1f7ea91](https://github.com/encryption4all/postguard-outlook-addon/commit/1f7ea91e80793c553a1db0d2aed2e6c2269a069a))
+* **security:** stop leaking stack traces into user-facing UI ([#113](https://github.com/encryption4all/postguard-outlook-addon/issues/113)) ([#120](https://github.com/encryption4all/postguard-outlook-addon/issues/120)) ([dac4e9f](https://github.com/encryption4all/postguard-outlook-addon/commit/dac4e9fe29b9d13725104b1a5e2d3888ee6596bf))
+* **settings:** gate prefill PII console.log behind non-production check ([#118](https://github.com/encryption4all/postguard-outlook-addon/issues/118)) ([7f47df0](https://github.com/encryption4all/postguard-outlook-addon/commit/7f47df0f929c1efe30dec345707b9fc479634187))
+* sync From-address selector to encrypt flow ([#90](https://github.com/encryption4all/postguard-outlook-addon/issues/90)) ([c4ca35c](https://github.com/encryption4all/postguard-outlook-addon/commit/c4ca35cc878d5a1ddaaee80c7f0372b1142490fc))
+* **yivi-dialog:** guard encryption callbacks against silent/leaked throws ([#108](https://github.com/encryption4all/postguard-outlook-addon/issues/108)) ([d413cf5](https://github.com/encryption4all/postguard-outlook-addon/commit/d413cf5077a4b4d40f48264c850b4a3a5bb0870d)), closes [#78](https://github.com/encryption4all/postguard-outlook-addon/issues/78)
+
 ## [0.4.0](https://github.com/encryption4all/postguard-outlook-addon/compare/v0.3.0...v0.4.0) (2026-05-16)
 
 
