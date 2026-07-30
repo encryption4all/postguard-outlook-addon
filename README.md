@@ -2,6 +2,11 @@
 
 > For full documentation, visit [docs.postguard.eu](https://docs.postguard.eu/repos/postguard-outlook-addon).
 
+> [!IMPORTANT]
+> **Development moved to [encryption4all/postguard-js](https://github.com/encryption4all/postguard-js), under `apps/outlook-addon`.**
+> That repository builds and releases the add-in against the workspace copy of `@e4a/pg-js`; releases are tagged `outlook-addin-v*`.
+> This repository is kept for history and is about to be archived. It no longer publishes container images.
+
 Identity-based email encryption add-in for Microsoft Outlook. Users can send and receive encrypted email using [Yivi](https://yivi.app) identity verification, without needing to exchange keys. This is one of the main end-user clients for PostGuard, alongside the Thunderbird add-on.
 
 Targets the new Outlook on Windows and Outlook for Mac as a taskpane mail add-in (Compose + Read).
